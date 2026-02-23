@@ -1,7 +1,32 @@
 import { formatDistanceToNow } from "date-fns";
 
+const CURRENCY_MAP: Record<string, string> = {
+  EUR: "EUR",
+  USD: "USD",
+  GBP: "GBP",
+  CHF: "CHF",
+  JPY: "JPY",
+  CAD: "CAD",
+  AUD: "AUD",
+  SEK: "SEK",
+  NOK: "NOK",
+  DKK: "DKK",
+  PLN: "PLN",
+  CZK: "CZK",
+  HUF: "HUF",
+  RON: "RON",
+  BGN: "BGN",
+  HRK: "HRK",
+  TRY: "TRY",
+  BRL: "BRL",
+  INR: "INR",
+  CNY: "CNY",
+};
+
+export const availableCurrencies = Object.keys(CURRENCY_MAP);
+
 // Format cents to currency string
-export function formatCurrency(cents: number, currency = "USD"): string {
+export function formatCurrency(cents: number, currency = "EUR"): string {
   const amount = cents / 100;
   return new Intl.NumberFormat("en-US", {
     style: "currency",

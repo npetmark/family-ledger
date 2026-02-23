@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           account_type: string
           created_at: string
+          currency: string
           icon: string
           id: string
           is_visible: boolean
@@ -30,6 +31,7 @@ export type Database = {
         Insert: {
           account_type?: string
           created_at?: string
+          currency?: string
           icon?: string
           id?: string
           is_visible?: boolean
@@ -42,6 +44,7 @@ export type Database = {
         Update: {
           account_type?: string
           created_at?: string
+          currency?: string
           icon?: string
           id?: string
           is_visible?: boolean
@@ -55,6 +58,7 @@ export type Database = {
       }
       budgets: {
         Row: {
+          alert_threshold: number
           amount: number
           created_at: string
           id: string
@@ -63,6 +67,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          alert_threshold?: number
           amount?: number
           created_at?: string
           id?: string
@@ -71,6 +76,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          alert_threshold?: number
           amount?: number
           created_at?: string
           id?: string
