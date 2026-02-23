@@ -4,27 +4,42 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 import { DynamicIcon } from "@/components/DynamicIcon";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, CalendarIcon, Filter } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+
+type FilterPreset = "day" | "week" | "month" | "custom";
+
+function getPresetRange(preset: FilterPreset): { from: Date; to: Date } {
+  const now = new Date();
+  switch (preset) {
+    case "day":
+      return { from: startOfDay(now), to: now };
+    case "week":
+      return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
+    case "month":
+    default:
+      return { from: startOfMonth(now), to: endOfMonth(now) };
+  }
+}
 
 export default function TransactionsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [dateFilter, setDateFilter] = useState<{ from: Date; to: Date }>({
-    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    to: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
-  });
+  const [activePreset, setActivePreset] = useState<FilterPreset>("month");
+  const [dateFilter, setDateFilter] = useState(getPresetRange("month"));
+  const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
+  const [customOpen, setCustomOpen] = useState(false);
 
   const [form, setForm] = useState({
     transaction_type: "expense",
@@ -111,6 +126,24 @@ export default function TransactionsPage() {
 
   const resetForm = () => setForm({ transaction_type: "expense", amount: "", date: new Date(), account_id: "", subcategory_id: "", note: "", transfer_to_account_id: "" });
 
+  const selectPreset = (preset: FilterPreset) => {
+    if (preset === "custom") {
+      setCustomRange({});
+      setCustomOpen(true);
+      return;
+    }
+    setActivePreset(preset);
+    setDateFilter(getPresetRange(preset));
+  };
+
+  const confirmCustomRange = () => {
+    if (customRange.from && customRange.to) {
+      setActivePreset("custom");
+      setDateFilter({ from: customRange.from, to: customRange.to });
+      setCustomOpen(false);
+    }
+  };
+
   const totalIncome = transactions.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0);
   const totalExpenses = transactions.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0);
 
@@ -124,112 +157,132 @@ export default function TransactionsPage() {
             <span className="text-expense font-mono-numbers">-{formatCurrency(totalExpenses)}</span>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
-                <CalendarIcon className="h-4 w-4 mr-2" />
-                {format(dateFilter.from, "MMM d")} – {format(dateFilter.to, "MMM d, yyyy")}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="range"
-                selected={{ from: dateFilter.from, to: dateFilter.to }}
-                onSelect={(range) => {
-                  if (range?.from && range?.to) setDateFilter({ from: range.from, to: range.to });
-                }}
-                numberOfMonths={2}
-              />
-            </PopoverContent>
-          </Popover>
-          <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" /> Add</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>New Transaction</DialogTitle>
-              </DialogHeader>
-              <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); createMutation.mutate(form); }}>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["expense", "income", "transfer"] as const).map((type) => (
-                    <Button
-                      key={type}
-                      type="button"
-                      variant={form.transaction_type === type ? "default" : "outline"}
-                      size="sm"
-                      className="capitalize"
-                      onClick={() => setForm({ ...form, transaction_type: type })}
-                    >
-                      {type}
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
+          <DialogTrigger asChild>
+            <Button><Plus className="h-4 w-4 mr-2" /> Add</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>New Transaction</DialogTitle>
+            </DialogHeader>
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); createMutation.mutate(form); }}>
+              <div className="grid grid-cols-3 gap-2">
+                {(["expense", "income", "transfer"] as const).map((type) => (
+                  <Button key={type} type="button" variant={form.transaction_type === type ? "default" : "outline"} size="sm" className="capitalize" onClick={() => setForm({ ...form, transaction_type: type })}>
+                    {type}
+                  </Button>
+                ))}
+              </div>
+              <div className="space-y-2">
+                <Label>Amount</Label>
+                <Input type="number" step="0.01" min="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required placeholder="0.00" />
+              </div>
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start">
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      {format(form.date, "PPP")}
                     </Button>
-                  ))}
-                </div>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" selected={form.date} onSelect={(d) => d && setForm({ ...form, date: d })} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>Account</Label>
+                <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              {form.transaction_type === "transfer" ? (
                 <div className="space-y-2">
-                  <Label>Amount</Label>
-                  <Input type="number" step="0.01" min="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required placeholder="0.00" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Date</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start">
-                        <CalendarIcon className="h-4 w-4 mr-2" />
-                        {format(form.date, "PPP")}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar mode="single" selected={form.date} onSelect={(d) => d && setForm({ ...form, date: d })} />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="space-y-2">
-                  <Label>Account</Label>
-                  <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
+                  <Label>Transfer To</Label>
+                  <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
                     <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                     <SelectContent>
-                      {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                      {accounts.filter((a) => a.id !== form.account_id).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-                {form.transaction_type === "transfer" ? (
-                  <div className="space-y-2">
-                    <Label>Transfer To</Label>
-                    <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                      <SelectContent>
-                        {accounts.filter((a) => a.id !== form.account_id).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Select value={form.subcategory_id} onValueChange={(v) => setForm({ ...form, subcategory_id: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                      <SelectContent>
-                        {subcategories.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.main_categories?.name} → {s.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+              ) : (
                 <div className="space-y-2">
-                  <Label>Note (optional)</Label>
-                  <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={2} />
+                  <Label>Category</Label>
+                  <Select value={form.subcategory_id} onValueChange={(v) => setForm({ ...form, subcategory_id: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>
+                      {subcategories.map((s: any) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.main_categories?.name} → {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                  Add Transaction
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+              )}
+              <div className="space-y-2">
+                <Label>Note (optional)</Label>
+                <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={2} />
+              </div>
+              <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+                Add Transaction
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
+
+      {/* Time filter presets */}
+      <div className="flex gap-2 flex-wrap">
+        {(["day", "week", "month"] as const).map((preset) => (
+          <Button
+            key={preset}
+            variant={activePreset === preset ? "default" : "outline"}
+            size="sm"
+            className="capitalize"
+            onClick={() => selectPreset(preset)}
+          >
+            {preset}
+          </Button>
+        ))}
+        <Button
+          variant={activePreset === "custom" ? "default" : "outline"}
+          size="sm"
+          onClick={() => selectPreset("custom")}
+        >
+          {activePreset === "custom"
+            ? `${format(dateFilter.from, "MMM d")} – ${format(dateFilter.to, "MMM d")}`
+            : "Custom"}
+        </Button>
+      </div>
+
+      {/* Custom range dialog */}
+      <Dialog open={customOpen} onOpenChange={setCustomOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Date Range</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center">
+            <Calendar
+              mode="range"
+              selected={customRange.from && customRange.to ? { from: customRange.from, to: customRange.to } : undefined}
+              onSelect={(range) => {
+                if (range) setCustomRange({ from: range.from, to: range.to });
+              }}
+              numberOfMonths={2}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCustomOpen(false)}>Cancel</Button>
+            <Button onClick={confirmCustomRange} disabled={!customRange.from || !customRange.to}>Confirm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent className="pt-6">
@@ -251,7 +304,7 @@ export default function TransactionsPage() {
                         {t.subcategories?.name || t.note || (t.transaction_type === "transfer" ? "Transfer" : "Transaction")}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {t.accounts?.name} · {new Date(t.date).toLocaleDateString()}
+                        {(t as any).accounts?.name} · {new Date(t.date).toLocaleDateString()}
                         {t.note && t.subcategories?.name ? ` · ${t.note}` : ""}
                       </p>
                     </div>

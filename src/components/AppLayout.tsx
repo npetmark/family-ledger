@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { QuickAddTransaction } from "@/components/QuickAddTransaction";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -14,6 +15,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             {children}
           </div>
         </main>
+        <QuickAddTransaction />
       </div>
     </SidebarProvider>
   );

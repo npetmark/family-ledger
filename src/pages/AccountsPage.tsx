@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
+import { formatCurrency, parseCurrencyToCents, availableCurrencies } from "@/lib/financial";
 import { DynamicIcon, availableIcons } from "@/components/DynamicIcon";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,7 @@ export default function AccountsPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", icon: "wallet", account_type: "bank", starting_balance: "", is_visible: true });
+  const [form, setForm] = useState({ name: "", icon: "wallet", account_type: "bank", starting_balance: "", is_visible: true, currency: "EUR" });
 
   const { data: accounts = [] } = useQuery({
     queryKey: ["accounts", user?.id],
@@ -61,7 +61,11 @@ export default function AccountsPage() {
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
       const payload = {
-        ...data,
+        name: data.name,
+        icon: data.icon,
+        account_type: data.account_type,
+        is_visible: data.is_visible,
+        currency: data.currency,
         user_id: user!.id,
         starting_balance: parseCurrencyToCents(data.starting_balance),
       };
@@ -96,7 +100,7 @@ export default function AccountsPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  const resetForm = () => setForm({ name: "", icon: "wallet", account_type: "bank", starting_balance: "", is_visible: true });
+  const resetForm = () => setForm({ name: "", icon: "wallet", account_type: "bank", starting_balance: "", is_visible: true, currency: "EUR" });
 
   const openEdit = (acc: any) => {
     setEditing(acc);
@@ -106,6 +110,7 @@ export default function AccountsPage() {
       account_type: acc.account_type,
       starting_balance: (acc.starting_balance / 100).toString(),
       is_visible: acc.is_visible,
+      currency: acc.currency || "EUR",
     });
     setOpen(true);
   };
@@ -129,22 +134,30 @@ export default function AccountsPage() {
             <DialogHeader>
               <DialogTitle>{editing ? "Edit Account" : "New Account"}</DialogTitle>
             </DialogHeader>
-            <form
-              className="space-y-4"
-              onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(form); }}
-            >
+            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(form); }}>
               <div className="space-y-2">
                 <Label>Name</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               </div>
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Select value={form.account_type} onValueChange={(v) => setForm({ ...form, account_type: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {accountTypes.map((t) => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select value={form.account_type} onValueChange={(v) => setForm({ ...form, account_type: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {accountTypes.map((t) => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {availableCurrencies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Icon</Label>
@@ -190,7 +203,7 @@ export default function AccountsPage() {
                     </div>
                     <div>
                       <p className="font-medium">{account.name}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{account.account_type}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{account.account_type} · {(account as any).currency || "EUR"}</p>
                     </div>
                   </div>
                   <div className="flex gap-1">
@@ -203,7 +216,7 @@ export default function AccountsPage() {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <p className="text-2xl font-semibold font-mono-numbers">{formatCurrency(balance)}</p>
+                  <p className="text-2xl font-semibold font-mono-numbers">{formatCurrency(balance, (account as any).currency || "EUR")}</p>
                   {!account.is_visible && <p className="text-xs text-muted-foreground mt-1">Hidden from totals</p>}
                 </div>
               </CardContent>
