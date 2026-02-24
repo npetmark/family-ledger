@@ -15,7 +15,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, Sparkles, Loader2, AlertTriangle, CheckCircle, Info, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { format, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, eachDayOfInterval, eachMonthOfInterval } from "date-fns";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const AVAILABLE_YEARS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
@@ -26,12 +26,11 @@ const SUB_COLORS = [
   "hsl(320, 40%, 50%)", "hsl(60, 60%, 45%)", "hsl(240, 40%, 55%)", "hsl(100, 40%, 40%)",
 ];
 
-type FilterPreset = "day" | "week" | "month" | "year" | "custom";
+type FilterPreset = "week" | "month" | "year" | "custom";
 
 function getPresetRange(preset: FilterPreset, year?: number): { from: Date; to: Date } {
   const now = new Date();
   switch (preset) {
-    case "day": return { from: startOfDay(now), to: now };
     case "week": return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
     case "year": { const y = year ?? now.getFullYear(); return { from: startOfYear(new Date(y, 0, 1)), to: endOfYear(new Date(y, 0, 1)) }; }
     case "month":
@@ -144,14 +143,35 @@ export default function AnalyticsPage() {
   const totalIncome = incomes.reduce((s, t) => s + t.amount, 0);
 
   // Monthly trend data
-  const monthlyTrend = useMemo(() => MONTHS.map((m, i) => {
-    const monthTxns = yearTransactions.filter((t) => new Date(t.date).getMonth() === i);
-    return {
-      month: m,
-      income: monthTxns.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0),
-      expenses: monthTxns.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0),
-    };
-  }), [yearTransactions]);
+  const trendData = useMemo(() => {
+    if (activePreset === "year") {
+      // Monthly granularity
+      return eachMonthOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((monthDate) => {
+        const m = monthDate.getMonth();
+        const y = monthDate.getFullYear();
+        const monthTxns = yearTransactions.filter((t) => {
+          const d = new Date(t.date);
+          return d.getMonth() === m && d.getFullYear() === y;
+        });
+        return {
+          label: format(monthDate, "MMM"),
+          income: monthTxns.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0),
+          expenses: monthTxns.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0),
+        };
+      });
+    } else {
+      // Daily granularity for week, month, custom
+      return eachDayOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((day) => {
+        const dayStr = format(day, "yyyy-MM-dd");
+        const dayTxns = yearTransactions.filter((t) => t.date === dayStr);
+        return {
+          label: format(day, activePreset === "week" ? "EEE d" : "d MMM"),
+          income: dayTxns.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0),
+          expenses: dayTxns.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0),
+        };
+      });
+    }
+  }, [yearTransactions, activePreset, dateFilter]);
 
   // Monthly by main category
   const monthlyByCategory = useMemo(() => MONTHS.map((m, i) => {
@@ -232,7 +252,7 @@ export default function AnalyticsPage() {
 
       {/* Time filter presets */}
       <div className="flex gap-2 flex-wrap items-center">
-        {(["day", "week", "month", "year"] as const).map((preset) => (
+        {(["week", "month", "year"] as const).map((preset) => (
           <Button key={preset} variant={activePreset === preset ? "default" : "outline"} size="sm" className="capitalize" onClick={() => selectPreset(preset)}>
             {preset}
           </Button>
@@ -376,14 +396,16 @@ export default function AnalyticsPage() {
         <TabsContent value="trends">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base font-medium">Monthly Income vs Expenses</CardTitle>
+              <CardTitle className="text-base font-medium">
+                {activePreset === "year" ? "Monthly" : "Daily"} Income vs Expenses
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthlyTrend}>
+                  <LineChart data={trendData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
+                    <XAxis dataKey="label" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
                     <YAxis tickFormatter={(v) => `€${(v / 100).toFixed(0)}`} className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
                     <Tooltip content={customTooltip} />
                     <Legend />
