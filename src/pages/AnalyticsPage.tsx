@@ -173,15 +173,33 @@ export default function AnalyticsPage() {
     }
   }, [yearTransactions, activePreset, dateFilter]);
 
-  // Monthly by main category
-  const monthlyByCategory = useMemo(() => MONTHS.map((m, i) => {
-    const monthTxns = expenses.filter((t) => new Date(t.date).getMonth() === i);
-    const entry: Record<string, any> = { month: m };
-    mainCategories.forEach((c) => {
-      entry[c.name] = monthTxns.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0);
-    });
-    return entry;
-  }), [expenses, mainCategories]);
+  const categoryTrendData = useMemo(() => {
+    if (activePreset === "year") {
+      return eachMonthOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((monthDate) => {
+        const m = monthDate.getMonth();
+        const y = monthDate.getFullYear();
+        const monthTxns = expenses.filter((t) => {
+          const d = new Date(t.date);
+          return d.getMonth() === m && d.getFullYear() === y;
+        });
+        const entry: Record<string, any> = { label: format(monthDate, "MMM") };
+        mainCategories.forEach((c) => {
+          entry[c.name] = monthTxns.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0);
+        });
+        return entry;
+      });
+    } else {
+      return eachDayOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((day) => {
+        const dayStr = format(day, "yyyy-MM-dd");
+        const dayTxns = expenses.filter((t) => t.date === dayStr);
+        const entry: Record<string, any> = { label: format(day, activePreset === "week" ? "EEE d" : "d MMM") };
+        mainCategories.forEach((c) => {
+          entry[c.name] = dayTxns.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0);
+        });
+        return entry;
+      });
+    }
+  }, [expenses, mainCategories, activePreset, dateFilter]);
 
   // Pie data by subcategory
   const subcategoryPieData = useMemo(() => {
@@ -422,14 +440,16 @@ export default function AnalyticsPage() {
         <TabsContent value="categories">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base font-medium">Monthly Expenses by Category</CardTitle>
+              <CardTitle className="text-base font-medium">
+                {activePreset === "year" ? "Monthly" : "Daily"} Expenses by Category
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyByCategory}>
+                  <BarChart data={categoryTrendData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
+                    <XAxis dataKey="label" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
                     <YAxis tickFormatter={(v) => `€${(v / 100).toFixed(0)}`} className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
                     <Tooltip content={customTooltip} />
                     <Legend />
