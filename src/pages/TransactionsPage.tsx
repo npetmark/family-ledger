@@ -20,7 +20,7 @@ import { format, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, s
 
 type FilterPreset = "day" | "week" | "month" | "year" | "custom";
 
-function getPresetRange(preset: FilterPreset, year?: number): { from: Date; to: Date } {
+function getPresetRange(preset: FilterPreset, year?: number, month?: number): { from: Date; to: Date } {
   const now = new Date();
   switch (preset) {
     case "day":
@@ -32,12 +32,17 @@ function getPresetRange(preset: FilterPreset, year?: number): { from: Date; to: 
       return { from: startOfYear(new Date(y, 0, 1)), to: endOfYear(new Date(y, 0, 1)) };
     }
     case "month":
-    default:
-      return { from: startOfMonth(now), to: endOfMonth(now) };
+    default: {
+      const m = month ?? now.getMonth();
+      const y = year ?? now.getFullYear();
+      const d = new Date(y, m, 1);
+      return { from: startOfMonth(d), to: endOfMonth(d) };
+    }
   }
 }
 
 const AVAILABLE_YEARS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 export default function TransactionsPage() {
   const { user } = useAuth();
@@ -47,6 +52,7 @@ export default function TransactionsPage() {
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
   const [activePreset, setActivePreset] = useState<FilterPreset>("month");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [dateFilter, setDateFilter] = useState(getPresetRange("month"));
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [customOpen, setCustomOpen] = useState(false);
@@ -171,15 +177,20 @@ export default function TransactionsPage() {
       return;
     }
     setActivePreset(preset);
-    setDateFilter(getPresetRange(preset, selectedYear));
+    setDateFilter(getPresetRange(preset, selectedYear, selectedMonth));
   };
 
   const handleYearChange = (year: string) => {
     const y = parseInt(year);
     setSelectedYear(y);
-    if (activePreset === "year") {
-      setDateFilter(getPresetRange("year", y));
-    }
+    if (activePreset === "year") setDateFilter(getPresetRange("year", y));
+    if (activePreset === "month") setDateFilter(getPresetRange("month", y, selectedMonth));
+  };
+
+  const handleMonthChange = (month: string) => {
+    const m = parseInt(month);
+    setSelectedMonth(m);
+    if (activePreset === "month") setDateFilter(getPresetRange("month", selectedYear, m));
   };
 
   const confirmCustomRange = () => {
@@ -348,6 +359,27 @@ export default function TransactionsPage() {
             ? `${format(dateFilter.from, "MMM d")} – ${format(dateFilter.to, "MMM d")}`
             : "Custom"}
         </Button>
+
+        {activePreset === "month" && (
+          <>
+            <Select value={String(selectedMonth)} onValueChange={handleMonthChange}>
+              <SelectTrigger className="w-[130px] h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {MONTH_NAMES.map((m, i) => (
+                  <SelectItem key={i} value={String(i)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={String(selectedYear)} onValueChange={handleYearChange}>
+              <SelectTrigger className="w-[100px] h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {AVAILABLE_YEARS.map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
 
         {activePreset === "year" && (
           <Select value={String(selectedYear)} onValueChange={handleYearChange}>
