@@ -106,6 +106,9 @@ export function BudgetBurndown() {
               {formatCurrency(totalSpent)}
             </span>
             <span className="text-muted-foreground"> / {formatCurrency(totalBudget)}</span>
+            <span className={`ml-2 font-mono-numbers font-medium ${getBurndownTextColor(totalPct, 90)}`}>
+              {Math.round(totalPct)}%
+            </span>
           </div>
         </div>
         <Progress
@@ -139,7 +142,7 @@ export function BudgetBurndown() {
                   <span>
                     {item.remaining >= 0
                       ? `${formatCurrency(item.remaining)} remaining`
-                      : `${formatCurrency(Math.abs(item.remaining))} over budget (${Math.round(item.pct - 100)}% over)`}
+                      : `${formatCurrency(Math.abs(item.remaining))} over budget`}
                   </span>
                   <span>{Math.round(item.pct)}%</span>
                 </div>
