@@ -238,7 +238,7 @@ export default function TransactionsPage() {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0">
-            <Calendar mode="single" selected={form.date} onSelect={(d) => d && setForm({ ...form, date: d })} className="pointer-events-auto" />
+            <Calendar mode="single" selected={form.date} onSelect={(d) => d && setForm({ ...form, date: d })} className="pointer-events-auto" weekStartsOn={1} />
           </PopoverContent>
         </Popover>
       </div>
@@ -382,6 +382,7 @@ export default function TransactionsPage() {
           </div>
           <div className="flex items-center justify-center w-full overflow-x-auto">
             <Calendar
+              weekStartsOn={1}
               mode="range"
               selected={customRange.from ? { from: customRange.from, to: customRange.to } : undefined}
               onSelect={(range) => {

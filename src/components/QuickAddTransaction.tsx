@@ -122,7 +122,7 @@ export function QuickAddTransaction() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={form.date} onSelect={(d) => d && setForm({ ...form, date: d })} />
+                  <Calendar mode="single" selected={form.date} onSelect={(d) => d && setForm({ ...form, date: d })} weekStartsOn={1} />
                 </PopoverContent>
               </Popover>
             </div>
