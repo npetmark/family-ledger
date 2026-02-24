@@ -11,12 +11,13 @@ import {
   SidebarMenuItem,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, ArrowLeftRight, Wallet, Tags, Target, Repeat, LogOut } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, Wallet, Tags, Target, Repeat, LogOut, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Transactions", url: "/transactions", icon: ArrowLeftRight },
+  { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Accounts", url: "/accounts", icon: Wallet },
   { title: "Categories", url: "/categories", icon: Tags },
   { title: "Budgets", url: "/budgets", icon: Target },

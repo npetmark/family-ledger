@@ -259,11 +259,24 @@ export default function TransactionsPage() {
           <Select value={form.subcategory_id} onValueChange={(v) => setForm({ ...form, subcategory_id: v })}>
             <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
             <SelectContent>
-              {subcategories.map((s: any) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.main_categories?.name} → {s.name}
-                </SelectItem>
-              ))}
+              {(() => {
+                const grouped: Record<string, any[]> = {};
+                subcategories.forEach((s: any) => {
+                  const mainName = s.main_categories?.name || "Other";
+                  if (!grouped[mainName]) grouped[mainName] = [];
+                  grouped[mainName].push(s);
+                });
+                return Object.entries(grouped).map(([mainName, subs]) => (
+                  <div key={mainName}>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{mainName}</div>
+                    {subs.map((s: any) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </div>
+                ));
+              })()}
             </SelectContent>
           </Select>
         </div>

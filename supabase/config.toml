@@ -1,1 +1,4 @@
 project_id = "clgwzbxmjmxktwreubqc"
+
+[functions.analyze-spending]
+verify_jwt = false
