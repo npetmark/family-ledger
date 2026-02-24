@@ -6,11 +6,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { Filter } from "lucide-react";
 
-export type AccountFilterMode = "all-visible" | "specific" | "custom";
+export type AccountFilterMode = "all-visible" | "custom";
 
 export interface AccountFilterValue {
   mode: AccountFilterMode;
-  specificAccountId?: string;
   customAccountIds?: string[];
 }
 
@@ -32,8 +31,6 @@ export function getFilteredAccountIds(
   switch (filter.mode) {
     case "all-visible":
       return accounts.filter((a) => a.is_visible).map((a) => a.id);
-    case "specific":
-      return filter.specificAccountId ? [filter.specificAccountId] : null;
     case "custom":
       return filter.customAccountIds?.length ? filter.customAccountIds : null;
     default:
@@ -48,12 +45,8 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
     switch (value.mode) {
       case "all-visible":
         return "All Visible";
-      case "specific": {
-        const acc = accounts.find((a) => a.id === value.specificAccountId);
-        return acc?.name || "Select Account";
-      }
       case "custom":
-        return `${value.customAccountIds?.length || 0} accounts`;
+        return `${value.customAccountIds?.length || 0} selected`;
     }
   })();
 
@@ -64,8 +57,6 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
         onValueChange={(mode: AccountFilterMode) => {
           if (mode === "all-visible") {
             onChange({ mode });
-          } else if (mode === "specific") {
-            onChange({ mode, specificAccountId: "" });
           } else {
             onChange({
               mode,
@@ -74,40 +65,16 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
           }
         }}
       >
-        <SelectTrigger className="w-[140px] h-8">
+        <SelectTrigger className="w-[180px] h-8">
           <Filter className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+          <span className="text-xs text-muted-foreground mr-1">Accounts:</span>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all-visible">All Visible</SelectItem>
-          <SelectItem value="specific">Specific Account</SelectItem>
           <SelectItem value="custom">Custom</SelectItem>
         </SelectContent>
       </Select>
-
-      {value.mode === "specific" && (
-        <Select
-          value={value.specificAccountId || ""}
-          onValueChange={(id) => onChange({ ...value, specificAccountId: id })}
-        >
-          <SelectTrigger className="w-[160px] h-8">
-            <SelectValue placeholder="Select account" />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                <span className="flex items-center gap-2">
-                  <DynamicIcon name={a.icon} className="h-3.5 w-3.5" />
-                  {a.name}
-                  {!a.is_visible && (
-                    <span className="text-xs text-muted-foreground">(hidden)</span>
-                  )}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
 
       {value.mode === "custom" && (
         <Popover open={customOpen} onOpenChange={setCustomOpen}>
