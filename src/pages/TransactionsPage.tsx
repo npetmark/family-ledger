@@ -13,9 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, CalendarIcon } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { format, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
 
 type FilterPreset = "day" | "week" | "month" | "custom";
 
@@ -40,6 +40,7 @@ export default function TransactionsPage() {
   const [dateFilter, setDateFilter] = useState(getPresetRange("month"));
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [customOpen, setCustomOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   const [form, setForm] = useState({
     transaction_type: "expense",
@@ -131,6 +132,7 @@ export default function TransactionsPage() {
   const selectPreset = (preset: FilterPreset) => {
     if (preset === "custom") {
       setCustomRange({});
+      setCalendarMonth(new Date());
       setCustomOpen(true);
       return;
     }
@@ -269,6 +271,17 @@ export default function TransactionsPage() {
           <DialogHeader>
             <DialogTitle>Select Date Range</DialogTitle>
           </DialogHeader>
+          <div className="flex items-center justify-between gap-2 px-2">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCalendarMonth(prev => subMonths(prev, 1))}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium">
+              {format(calendarMonth, "MMMM yyyy")} – {format(addMonths(calendarMonth, 1), "MMMM yyyy")}
+            </span>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCalendarMonth(prev => addMonths(prev, 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="flex items-center justify-center w-full overflow-x-auto">
             <Calendar
               mode="range"
@@ -279,8 +292,12 @@ export default function TransactionsPage() {
               }}
               numberOfMonths={2}
               className="pointer-events-auto mx-auto"
-              fromYear={2020}
-              toYear={2030}
+              month={calendarMonth}
+              onMonthChange={setCalendarMonth}
+              classNames={{
+                caption: "hidden",
+                nav: "hidden",
+              }}
             />
           </div>
           <DialogFooter>
