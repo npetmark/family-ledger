@@ -7,12 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Calendar } from "@/components/ui/calendar";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LineChart, Line,
 } from "recharts";
-import { TrendingUp, TrendingDown, Minus, Sparkles, Loader2, AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Sparkles, Loader2, AlertTriangle, CheckCircle, Info, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { format, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths } from "date-fns";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const AVAILABLE_YEARS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
@@ -23,18 +26,59 @@ const SUB_COLORS = [
   "hsl(320, 40%, 50%)", "hsl(60, 60%, 45%)", "hsl(240, 40%, 55%)", "hsl(100, 40%, 40%)",
 ];
 
+type FilterPreset = "day" | "week" | "month" | "year" | "custom";
+
+function getPresetRange(preset: FilterPreset, year?: number): { from: Date; to: Date } {
+  const now = new Date();
+  switch (preset) {
+    case "day": return { from: startOfDay(now), to: now };
+    case "week": return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
+    case "year": { const y = year ?? now.getFullYear(); return { from: startOfYear(new Date(y, 0, 1)), to: endOfYear(new Date(y, 0, 1)) }; }
+    case "month":
+    default: return { from: startOfMonth(now), to: endOfMonth(now) };
+  }
+}
+
 export default function AnalyticsPage() {
   const { user } = useAuth();
+  const [activePreset, setActivePreset] = useState<FilterPreset>("month");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [dateFilter, setDateFilter] = useState(getPresetRange("month"));
+  const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
+  const [customOpen, setCustomOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+
+  const selectPreset = (preset: FilterPreset) => {
+    if (preset === "custom") { setCustomRange({}); setCalendarMonth(new Date()); setCustomOpen(true); return; }
+    setActivePreset(preset);
+    setDateFilter(getPresetRange(preset, selectedYear));
+  };
+
+  const handleYearChange = (year: string) => {
+    const y = parseInt(year);
+    setSelectedYear(y);
+    if (activePreset === "year") setDateFilter(getPresetRange("year", y));
+  };
+
+  const confirmCustomRange = () => {
+    if (customRange.from && customRange.to) {
+      setActivePreset("custom");
+      setDateFilter({ from: customRange.from, to: customRange.to });
+      setCustomOpen(false);
+    }
+  };
+
+  const fromStr = `${dateFilter.from.getFullYear()}-${String(dateFilter.from.getMonth() + 1).padStart(2, "0")}-${String(dateFilter.from.getDate()).padStart(2, "0")}`;
+  const toStr = `${dateFilter.to.getFullYear()}-${String(dateFilter.to.getMonth() + 1).padStart(2, "0")}-${String(dateFilter.to.getDate()).padStart(2, "0")}`;
 
   const { data: yearTransactions = [] } = useQuery({
-    queryKey: ["analytics-transactions", user?.id, selectedYear],
+    queryKey: ["analytics-transactions", user?.id, fromStr, toStr],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("transactions")
         .select("*, subcategories(name, icon, color, main_category_id, main_categories(id, name, color))")
-        .gte("date", `${selectedYear}-01-01`)
-        .lte("date", `${selectedYear}-12-31`)
+        .gte("date", fromStr)
+        .lte("date", toStr)
         .order("date");
       if (error) throw error;
       return data;
@@ -174,25 +218,72 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
-          <p className="text-sm text-muted-foreground mt-1">Yearly spending analysis and trends</p>
+          <p className="text-sm text-muted-foreground mt-1">Spending analysis and trends</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-            <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
+        <Button
+          variant="outline"
+          onClick={() => aiMutation.mutate()}
+          disabled={aiMutation.isPending || yearTransactions.length === 0}
+        >
+          {aiMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+          AI Analysis
+        </Button>
+      </div>
+
+      {/* Time filter presets */}
+      <div className="flex gap-2 flex-wrap items-center">
+        {(["day", "week", "month", "year"] as const).map((preset) => (
+          <Button key={preset} variant={activePreset === preset ? "default" : "outline"} size="sm" className="capitalize" onClick={() => selectPreset(preset)}>
+            {preset}
+          </Button>
+        ))}
+        <Button variant={activePreset === "custom" ? "default" : "outline"} size="sm" onClick={() => selectPreset("custom")}>
+          {activePreset === "custom" ? `${format(dateFilter.from, "MMM d")} – ${format(dateFilter.to, "MMM d")}` : "Custom"}
+        </Button>
+        {activePreset === "year" && (
+          <Select value={String(selectedYear)} onValueChange={handleYearChange}>
+            <SelectTrigger className="w-[100px] h-8"><SelectValue /></SelectTrigger>
             <SelectContent>
               {AVAILABLE_YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            onClick={() => aiMutation.mutate()}
-            disabled={aiMutation.isPending || yearTransactions.length === 0}
-          >
-            {aiMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-            AI Analysis
-          </Button>
-        </div>
+        )}
       </div>
+
+      {/* Custom range dialog */}
+      <Dialog open={customOpen} onOpenChange={setCustomOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Select Date Range</DialogTitle></DialogHeader>
+          <div className="flex items-center justify-between gap-2 px-2">
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCalendarMonth(prev => subMonths(prev, 1))}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium">
+              {format(calendarMonth, "MMMM yyyy")} – {format(addMonths(calendarMonth, 1), "MMMM yyyy")}
+            </span>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCalendarMonth(prev => addMonths(prev, 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex items-center justify-center w-full overflow-x-auto">
+            <Calendar
+              weekStartsOn={1}
+              mode="range"
+              selected={customRange.from ? { from: customRange.from, to: customRange.to } : undefined}
+              onSelect={(range) => { if (range) setCustomRange({ from: range.from, to: range.to }); else setCustomRange({}); }}
+              numberOfMonths={2}
+              className="pointer-events-auto mx-auto"
+              month={calendarMonth}
+              onMonthChange={setCalendarMonth}
+              classNames={{ caption: "flex justify-center pt-1 relative items-center", caption_label: "text-sm font-medium", nav: "hidden" }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCustomOpen(false)}>Cancel</Button>
+            <Button onClick={confirmCustomRange} disabled={!customRange.from || !customRange.to}>Confirm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
