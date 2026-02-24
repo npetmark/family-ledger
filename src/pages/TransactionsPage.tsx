@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DynamicIcon } from "@/components/DynamicIcon";
+import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Pencil, Banknote } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths } from "date-fns";
 
@@ -89,7 +91,7 @@ export default function TransactionsPage() {
       const toStr = `${dateFilter.to.getFullYear()}-${String(dateFilter.to.getMonth() + 1).padStart(2, "0")}-${String(dateFilter.to.getDate()).padStart(2, "0")}`;
       const { data, error } = await supabase
         .from("transactions")
-        .select("*, subcategories(name, icon, main_categories(name)), accounts!transactions_account_id_fkey(name, icon)")
+        .select("*, subcategories(name, icon, color, main_categories(name, color)), accounts!transactions_account_id_fkey(name, icon)")
         .gte("date", fromStr)
         .lte("date", toStr)
         .order("date", { ascending: false })
@@ -393,63 +395,106 @@ export default function TransactionsPage() {
         </DialogContent>
       </Dialog>
 
-      <Card>
-        <CardContent className="pt-6">
-          {transactions.length > 0 ? (
-            <div className="space-y-1">
-              {transactions.map((t) => (
-                <div
-                  key={t.id}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors group cursor-pointer"
-                  onClick={() => openEditDialog(t)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                      t.transaction_type === "income" ? "bg-income/10" :
-                      t.transaction_type === "transfer" ? "bg-transfer/10" : "bg-expense/10"
-                    }`}>
-                      {t.transaction_type === "income" ? <ArrowUpRight className="h-4 w-4 text-income" /> :
-                       t.transaction_type === "transfer" ? <ArrowLeftRight className="h-4 w-4 text-transfer" /> :
-                       <ArrowDownRight className="h-4 w-4 text-expense" />}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">
-                        {t.subcategories?.name || t.note || (t.transaction_type === "transfer" ? "Transfer" : "Transaction")}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {(t as any).accounts?.name} · {new Date(t.date).toLocaleDateString()}
-                        {t.note && t.subcategories?.name ? ` · ${t.note}` : ""}
-                      </p>
-                    </div>
-                  </div>
+      {(() => {
+        // Group transactions by main category
+        const grouped = transactions.reduce<Record<string, { name: string; color: string; transactions: typeof transactions }>>((acc, t) => {
+          const mainCatName = t.subcategories?.main_categories?.name || (t.transaction_type === "income" ? "Income" : t.transaction_type === "transfer" ? "Transfers" : "Uncategorized");
+          const mainCatColor = t.subcategories?.main_categories?.color || (t.transaction_type === "income" ? "145 45% 42%" : "0 0% 50%");
+          if (!acc[mainCatName]) acc[mainCatName] = { name: mainCatName, color: mainCatColor, transactions: [] };
+          acc[mainCatName].transactions.push(t);
+          return acc;
+        }, {});
+
+        const groups = Object.values(grouped);
+        if (groups.length === 0) {
+          return (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
+                  No transactions in this period
+                </div>
+              </CardContent>
+            </Card>
+          );
+        }
+
+        return groups.map((group) => (
+          <Collapsible key={group.name} defaultOpen>
+            <Card>
+              <CollapsibleTrigger className="w-full">
+                <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors rounded-t-lg">
                   <div className="flex items-center gap-2">
-                    <span className={`font-mono-numbers text-sm font-medium ${
-                      t.transaction_type === "income" ? "text-income" :
-                      t.transaction_type === "transfer" ? "text-transfer" : "text-expense"
-                    }`}>
-                      {t.transaction_type === "income" ? "+" : t.transaction_type === "expense" ? "-" : ""}
-                      {formatCurrency(t.amount)}
+                    <div className="w-3 h-3 rounded-full" style={{ background: `hsl(${group.color})` }} />
+                    <span className="font-semibold text-sm">{group.name}</span>
+                    <span className="text-xs text-muted-foreground">({group.transactions.length})</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono-numbers text-sm text-muted-foreground">
+                      {formatCurrency(group.transactions.reduce((s, t) => s + t.amount, 0))}
                     </span>
-                    <Pencil className="h-3.5 w-3.5 opacity-0 group-hover:opacity-50 transition-opacity" />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
-                      onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(t.id); }}
-                    >
-                      <span className="text-xs">✕</span>
-                    </Button>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform [[data-state=closed]_&]:rotate-[-90deg]" />
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-              No transactions in this period
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0 pb-2">
+                  <div className="space-y-0.5">
+                    {group.transactions.map((t) => (
+                      <div
+                        key={t.id}
+                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors group cursor-pointer"
+                        onClick={() => openEditDialog(t)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-8 h-8 rounded-lg flex items-center justify-center"
+                            style={{ background: `hsl(${t.subcategories?.color || group.color} / 0.12)` }}
+                          >
+                            {t.transaction_type === "transfer" ? (
+                              <ArrowLeftRight className="h-4 w-4" style={{ color: `hsl(${group.color})` }} />
+                            ) : t.transaction_type === "income" ? (
+                              <Banknote className="h-4 w-4" style={{ color: `hsl(${group.color})` }} />
+                            ) : (
+                              <DynamicIcon name={t.subcategories?.icon || "circle"} className="h-4 w-4" style={{ color: `hsl(${t.subcategories?.color || group.color})` }} />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {t.subcategories?.name || t.note || (t.transaction_type === "transfer" ? "Transfer" : "Transaction")}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {(t as any).accounts?.name} · {new Date(t.date).toLocaleDateString()}
+                              {t.note && t.subcategories?.name ? ` · ${t.note}` : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`font-mono-numbers text-sm font-medium ${
+                            t.transaction_type === "income" ? "text-income" :
+                            t.transaction_type === "transfer" ? "text-transfer" : "text-expense"
+                          }`}>
+                            {t.transaction_type === "income" ? "+" : t.transaction_type === "expense" ? "-" : ""}
+                            {formatCurrency(t.amount)}
+                          </span>
+                          <Pencil className="h-3.5 w-3.5 opacity-0 group-hover:opacity-50 transition-opacity" />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+                            onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(t.id); }}
+                          >
+                            <span className="text-xs">✕</span>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        ));
+      })()}
     </div>
   );
 }
