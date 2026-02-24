@@ -178,7 +178,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {/* Spending by Category */}
         <Card>
           <CardHeader>
@@ -261,10 +261,10 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Budget Burndown */}
-      <BudgetBurndown />
+        {/* Budget Burndown */}
+        <BudgetBurndown />
+      </div>
 
       {/* Recent Transactions */}
       <Card>
