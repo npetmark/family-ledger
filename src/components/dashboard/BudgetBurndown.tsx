@@ -139,7 +139,7 @@ export function BudgetBurndown() {
                   <span>
                     {item.remaining >= 0
                       ? `${formatCurrency(item.remaining)} remaining`
-                      : `${formatCurrency(Math.abs(item.remaining))} over budget`}
+                      : `${formatCurrency(Math.abs(item.remaining))} over budget (${Math.round(item.pct - 100)}% over)`}
                   </span>
                   <span>{Math.round(item.pct)}%</span>
                 </div>
