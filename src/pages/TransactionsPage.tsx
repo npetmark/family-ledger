@@ -272,13 +272,13 @@ export default function TransactionsPage() {
           <div className="flex items-center justify-center w-full overflow-x-auto">
             <Calendar
               mode="range"
-              selected={customRange.from && customRange.to ? { from: customRange.from, to: customRange.to } : undefined}
+              selected={customRange.from ? { from: customRange.from, to: customRange.to } : undefined}
               onSelect={(range) => {
                 if (range) setCustomRange({ from: range.from, to: range.to });
+                else setCustomRange({});
               }}
               numberOfMonths={2}
               className="pointer-events-auto mx-auto"
-              disabled={undefined}
             />
           </div>
           <DialogFooter>
