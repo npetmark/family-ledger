@@ -237,15 +237,15 @@ export default function DashboardPage() {
           <CardContent>
             {accountBalances.length > 0 ? (
               <div className="space-y-3">
-                {accountBalances.filter((a) => a.is_visible).map((account) => (
-                  <div key={account.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                {accountBalances.map((account) => (
+                  <div key={account.id} className={`flex items-center justify-between p-3 rounded-lg bg-muted/50 ${!account.is_visible ? "opacity-40" : ""}`}>
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                         <DynamicIcon name={account.icon} className="h-4 w-4 text-primary" />
                       </div>
                       <div>
                         <p className="text-sm font-medium">{account.name}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{account.account_type}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{account.account_type}{!account.is_visible ? " · excluded" : ""}</p>
                       </div>
                     </div>
                     <span className="font-mono-numbers text-sm font-medium">
