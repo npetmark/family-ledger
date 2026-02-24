@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { AccountFilter, AccountFilterValue, getFilteredAccountIds } from "@/components/AccountFilter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -53,6 +54,7 @@ export default function AnalyticsPage() {
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [customOpen, setCustomOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [accountFilter, setAccountFilter] = useState<AccountFilterValue>({ mode: "all-visible" });
 
   const selectPreset = (preset: FilterPreset) => {
     if (preset === "custom") { setCustomRange({}); setCalendarMonth(new Date()); setCustomOpen(true); return; }
@@ -99,6 +101,16 @@ export default function AnalyticsPage() {
     enabled: !!user,
   });
 
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["accounts", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const { data: mainCategories = [] } = useQuery({
     queryKey: ["main_categories", user?.id],
     queryFn: async () => {
@@ -119,11 +131,17 @@ export default function AnalyticsPage() {
     enabled: !!user,
   });
 
+  // Filter transactions by account
+  const filteredAccountIds = getFilteredAccountIds(accounts, accountFilter);
+  const filteredYearTransactions = filteredAccountIds
+    ? yearTransactions.filter((t) => filteredAccountIds.includes(t.account_id))
+    : yearTransactions;
+
   // AI Analysis
   const aiMutation = useMutation({
     mutationFn: async () => {
       const monthlyData = MONTHS.map((m, i) => {
-        const monthTxns = yearTransactions.filter((t) => new Date(t.date).getMonth() === i);
+        const monthTxns = filteredYearTransactions.filter((t) => new Date(t.date).getMonth() === i);
         return {
           month: m,
           income: monthTxns.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0) / 100,
@@ -137,7 +155,7 @@ export default function AnalyticsPage() {
 
       const catSummary = mainCategories.map((c) => ({
         name: c.name,
-        total: yearTransactions.filter((t) => t.transaction_type === "expense" && t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0) / 100,
+        total: filteredYearTransactions.filter((t) => t.transaction_type === "expense" && t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0) / 100,
       }));
 
       const { data, error } = await supabase.functions.invoke("analyze-spending", {
@@ -151,8 +169,8 @@ export default function AnalyticsPage() {
   });
 
   // Computed data
-  const expenses = yearTransactions.filter((t) => t.transaction_type === "expense");
-  const incomes = yearTransactions.filter((t) => t.transaction_type === "income");
+  const expenses = filteredYearTransactions.filter((t) => t.transaction_type === "expense");
+  const incomes = filteredYearTransactions.filter((t) => t.transaction_type === "income");
   const totalExpenses = expenses.reduce((s, t) => s + t.amount, 0);
   const totalIncome = incomes.reduce((s, t) => s + t.amount, 0);
 
@@ -163,7 +181,7 @@ export default function AnalyticsPage() {
       return eachMonthOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((monthDate) => {
         const m = monthDate.getMonth();
         const y = monthDate.getFullYear();
-        const monthTxns = yearTransactions.filter((t) => {
+        const monthTxns = filteredYearTransactions.filter((t) => {
           const d = new Date(t.date);
           return d.getMonth() === m && d.getFullYear() === y;
         });
@@ -177,7 +195,7 @@ export default function AnalyticsPage() {
       // Daily granularity for week, month, custom
       return eachDayOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((day) => {
         const dayStr = format(day, "yyyy-MM-dd");
-        const dayTxns = yearTransactions.filter((t) => t.date === dayStr);
+        const dayTxns = filteredYearTransactions.filter((t) => t.date === dayStr);
         return {
           label: format(day, activePreset === "week" ? "EEE d" : "d MMM"),
           income: dayTxns.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0),
@@ -185,7 +203,7 @@ export default function AnalyticsPage() {
         };
       });
     }
-  }, [yearTransactions, activePreset, dateFilter]);
+  }, [filteredYearTransactions, activePreset, dateFilter]);
 
   const categoryTrendData = useMemo(() => {
     if (activePreset === "year") {
@@ -275,7 +293,7 @@ export default function AnalyticsPage() {
         <Button
           variant="outline"
           onClick={() => aiMutation.mutate()}
-          disabled={aiMutation.isPending || yearTransactions.length === 0}
+          disabled={aiMutation.isPending || filteredYearTransactions.length === 0}
         >
           {aiMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
           AI Analysis
@@ -318,6 +336,8 @@ export default function AnalyticsPage() {
             </SelectContent>
           </Select>
         )}
+
+        <AccountFilter accounts={accounts} value={accountFilter} onChange={setAccountFilter} />
       </div>
 
       {/* Custom range dialog */}
