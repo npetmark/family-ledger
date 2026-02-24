@@ -293,7 +293,11 @@ export default function TransactionsPage() {
         <Label>Note (optional)</Label>
         <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={2} />
       </div>
-      <Button type="submit" className="w-full" disabled={isPending}>
+      <Button type="submit" className={`w-full ${
+        form.transaction_type === "income" ? "bg-income hover:bg-income/90 text-income-foreground" :
+        form.transaction_type === "transfer" ? "bg-transfer hover:bg-transfer/90 text-transfer-foreground" :
+        "bg-expense hover:bg-expense/90 text-expense-foreground"
+      }`} disabled={isPending}>
         {submitLabel}
       </Button>
     </form>
