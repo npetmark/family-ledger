@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
-import { DynamicIcon } from "@/components/DynamicIcon";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,36 +12,45 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { format, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
+import { format, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths } from "date-fns";
 
-type FilterPreset = "day" | "week" | "month" | "custom";
+type FilterPreset = "day" | "week" | "month" | "year" | "custom";
 
-function getPresetRange(preset: FilterPreset): { from: Date; to: Date } {
+function getPresetRange(preset: FilterPreset, year?: number): { from: Date; to: Date } {
   const now = new Date();
   switch (preset) {
     case "day":
       return { from: startOfDay(now), to: now };
     case "week":
       return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
+    case "year": {
+      const y = year ?? now.getFullYear();
+      return { from: startOfYear(new Date(y, 0, 1)), to: endOfYear(new Date(y, 0, 1)) };
+    }
     case "month":
     default:
       return { from: startOfMonth(now), to: endOfMonth(now) };
   }
 }
 
+const AVAILABLE_YEARS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
+
 export default function TransactionsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<any>(null);
   const [activePreset, setActivePreset] = useState<FilterPreset>("month");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [dateFilter, setDateFilter] = useState(getPresetRange("month"));
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [customOpen, setCustomOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
 
-  const [form, setForm] = useState({
+  const emptyForm = {
     transaction_type: "expense",
     amount: "",
     date: new Date(),
@@ -50,7 +58,9 @@ export default function TransactionsPage() {
     subcategory_id: "",
     note: "",
     transfer_to_account_id: "",
-  });
+  };
+
+  const [form, setForm] = useState(emptyForm);
 
   const { data: accounts = [] } = useQuery({
     queryKey: ["accounts", user?.id],
@@ -109,8 +119,32 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
       setOpen(false);
-      resetForm();
+      setForm(emptyForm);
       toast.success("Transaction added");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const payload = {
+        transaction_type: data.transaction_type,
+        amount: parseCurrencyToCents(data.amount),
+        date: format(data.date, "yyyy-MM-dd"),
+        account_id: data.account_id,
+        subcategory_id: data.transaction_type !== "transfer" ? data.subcategory_id || null : null,
+        note: data.note,
+        transfer_to_account_id: data.transaction_type === "transfer" ? data.transfer_to_account_id || null : null,
+      };
+      const { error } = await supabase.from("transactions").update(payload).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
+      setEditOpen(false);
+      setEditingTransaction(null);
+      toast.success("Transaction updated");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -127,8 +161,6 @@ export default function TransactionsPage() {
     },
   });
 
-  const resetForm = () => setForm({ transaction_type: "expense", amount: "", date: new Date(), account_id: "", subcategory_id: "", note: "", transfer_to_account_id: "" });
-
   const selectPreset = (preset: FilterPreset) => {
     if (preset === "custom") {
       setCustomRange({});
@@ -137,7 +169,15 @@ export default function TransactionsPage() {
       return;
     }
     setActivePreset(preset);
-    setDateFilter(getPresetRange(preset));
+    setDateFilter(getPresetRange(preset, selectedYear));
+  };
+
+  const handleYearChange = (year: string) => {
+    const y = parseInt(year);
+    setSelectedYear(y);
+    if (activePreset === "year") {
+      setDateFilter(getPresetRange("year", y));
+    }
   };
 
   const confirmCustomRange = () => {
@@ -148,8 +188,93 @@ export default function TransactionsPage() {
     }
   };
 
+  const openEditDialog = (t: any) => {
+    setEditingTransaction(t);
+    setForm({
+      transaction_type: t.transaction_type,
+      amount: (t.amount / 100).toFixed(2),
+      date: new Date(t.date + "T00:00:00"),
+      account_id: t.account_id,
+      subcategory_id: t.subcategory_id || "",
+      note: t.note || "",
+      transfer_to_account_id: t.transfer_to_account_id || "",
+    });
+    setEditOpen(true);
+  };
+
   const totalIncome = transactions.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0);
   const totalExpenses = transactions.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0);
+
+  const renderTransactionForm = (onSubmit: (e: React.FormEvent) => void, submitLabel: string, isPending: boolean) => (
+    <form className="space-y-4" onSubmit={onSubmit}>
+      <div className="grid grid-cols-3 gap-2">
+        {(["expense", "income", "transfer"] as const).map((type) => (
+          <Button key={type} type="button" variant={form.transaction_type === type ? "default" : "outline"} size="sm" className="capitalize" onClick={() => setForm({ ...form, transaction_type: type })}>
+            {type}
+          </Button>
+        ))}
+      </div>
+      <div className="space-y-2">
+        <Label>Amount</Label>
+        <Input type="number" step="0.01" min="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required placeholder="0.00" />
+      </div>
+      <div className="space-y-2">
+        <Label>Date</Label>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-full justify-start">
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              {format(form.date, "PPP")}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar mode="single" selected={form.date} onSelect={(d) => d && setForm({ ...form, date: d })} className="pointer-events-auto" />
+          </PopoverContent>
+        </Popover>
+      </div>
+      <div className="space-y-2">
+        <Label>Account</Label>
+        <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
+          <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+          <SelectContent>
+            {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      {form.transaction_type === "transfer" ? (
+        <div className="space-y-2">
+          <Label>Transfer To</Label>
+          <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
+            <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+            <SelectContent>
+              {accounts.filter((a) => a.id !== form.account_id).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Label>Category</Label>
+          <Select value={form.subcategory_id} onValueChange={(v) => setForm({ ...form, subcategory_id: v })}>
+            <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+            <SelectContent>
+              {subcategories.map((s: any) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.main_categories?.name} → {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      <div className="space-y-2">
+        <Label>Note (optional)</Label>
+        <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={2} />
+      </div>
+      <Button type="submit" className="w-full" disabled={isPending}>
+        {submitLabel}
+      </Button>
+    </form>
+  );
 
   return (
     <div className="space-y-6 max-w-4xl animate-fade-in">
@@ -161,7 +286,7 @@ export default function TransactionsPage() {
             <span className="text-expense font-mono-numbers">-{formatCurrency(totalExpenses)}</span>
           </div>
         </div>
-        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setForm(emptyForm); }}>
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" /> Add</Button>
           </DialogTrigger>
@@ -169,81 +294,14 @@ export default function TransactionsPage() {
             <DialogHeader>
               <DialogTitle>New Transaction</DialogTitle>
             </DialogHeader>
-            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); createMutation.mutate(form); }}>
-              <div className="grid grid-cols-3 gap-2">
-                {(["expense", "income", "transfer"] as const).map((type) => (
-                  <Button key={type} type="button" variant={form.transaction_type === type ? "default" : "outline"} size="sm" className="capitalize" onClick={() => setForm({ ...form, transaction_type: type })}>
-                    {type}
-                  </Button>
-                ))}
-              </div>
-              <div className="space-y-2">
-                <Label>Amount</Label>
-                <Input type="number" step="0.01" min="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required placeholder="0.00" />
-              </div>
-              <div className="space-y-2">
-                <Label>Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start">
-                      <CalendarIcon className="h-4 w-4 mr-2" />
-                      {format(form.date, "PPP")}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={form.date} onSelect={(d) => d && setForm({ ...form, date: d })} />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-2">
-                <Label>Account</Label>
-                <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              {form.transaction_type === "transfer" ? (
-                <div className="space-y-2">
-                  <Label>Transfer To</Label>
-                  <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                    <SelectContent>
-                      {accounts.filter((a) => a.id !== form.account_id).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={form.subcategory_id} onValueChange={(v) => setForm({ ...form, subcategory_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                    <SelectContent>
-                      {subcategories.map((s: any) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.main_categories?.name} → {s.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label>Note (optional)</Label>
-                <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={2} />
-              </div>
-              <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                Add Transaction
-              </Button>
-            </form>
+            {renderTransactionForm((e) => { e.preventDefault(); createMutation.mutate(form); }, "Add Transaction", createMutation.isPending)}
           </DialogContent>
         </Dialog>
       </div>
 
       {/* Time filter presets */}
-      <div className="flex gap-2 flex-wrap">
-        {(["day", "week", "month"] as const).map((preset) => (
+      <div className="flex gap-2 flex-wrap items-center">
+        {(["day", "week", "month", "year"] as const).map((preset) => (
           <Button
             key={preset}
             variant={activePreset === preset ? "default" : "outline"}
@@ -263,6 +321,19 @@ export default function TransactionsPage() {
             ? `${format(dateFilter.from, "MMM d")} – ${format(dateFilter.to, "MMM d")}`
             : "Custom"}
         </Button>
+
+        {activePreset === "year" && (
+          <Select value={String(selectedYear)} onValueChange={handleYearChange}>
+            <SelectTrigger className="w-[100px] h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {AVAILABLE_YEARS.map((y) => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Custom range dialog */}
@@ -308,12 +379,30 @@ export default function TransactionsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit transaction dialog */}
+      <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) { setEditingTransaction(null); setForm(emptyForm); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Transaction</DialogTitle>
+          </DialogHeader>
+          {renderTransactionForm(
+            (e) => { e.preventDefault(); if (editingTransaction) updateMutation.mutate({ id: editingTransaction.id, data: form }); },
+            "Save Changes",
+            updateMutation.isPending
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardContent className="pt-6">
           {transactions.length > 0 ? (
             <div className="space-y-1">
               {transactions.map((t) => (
-                <div key={t.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors group">
+                <div
+                  key={t.id}
+                  className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors group cursor-pointer"
+                  onClick={() => openEditDialog(t)}
+                >
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                       t.transaction_type === "income" ? "bg-income/10" :
@@ -341,11 +430,12 @@ export default function TransactionsPage() {
                       {t.transaction_type === "income" ? "+" : t.transaction_type === "expense" ? "-" : ""}
                       {formatCurrency(t.amount)}
                     </span>
+                    <Pencil className="h-3.5 w-3.5 opacity-0 group-hover:opacity-50 transition-opacity" />
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
-                      onClick={() => deleteMutation.mutate(t.id)}
+                      onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(t.id); }}
                     >
                       <span className="text-xs">✕</span>
                     </Button>
