@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AccountFilter, AccountFilterValue, getFilteredAccountIds } from "@/components/AccountFilter";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
@@ -57,6 +58,7 @@ export default function TransactionsPage() {
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [customOpen, setCustomOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [accountFilter, setAccountFilter] = useState<AccountFilterValue>({ mode: "all-visible" });
 
   const emptyForm = {
     transaction_type: "expense",
@@ -215,8 +217,13 @@ export default function TransactionsPage() {
     setEditOpen(true);
   };
 
-  const totalIncome = transactions.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0);
-  const totalExpenses = transactions.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0);
+  const filteredAccountIds = getFilteredAccountIds(accounts, accountFilter);
+  const filteredTransactions = filteredAccountIds
+    ? transactions.filter((t) => filteredAccountIds.includes(t.account_id))
+    : transactions;
+
+  const totalIncome = filteredTransactions.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0);
+  const totalExpenses = filteredTransactions.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0);
 
   const renderTransactionForm = (onSubmit: (e: React.FormEvent) => void, submitLabel: string, isPending: boolean) => (
     <form className="space-y-4" onSubmit={onSubmit}>
@@ -393,6 +400,8 @@ export default function TransactionsPage() {
             </SelectContent>
           </Select>
         )}
+
+        <AccountFilter accounts={accounts} value={accountFilter} onChange={setAccountFilter} />
       </div>
 
       {/* Custom range dialog */}
@@ -455,7 +464,7 @@ export default function TransactionsPage() {
 
       {(() => {
         // Group transactions by main category
-        const grouped = transactions.reduce<Record<string, { name: string; color: string; transactions: typeof transactions }>>((acc, t) => {
+        const grouped = filteredTransactions.reduce<Record<string, { name: string; color: string; transactions: typeof transactions }>>((acc, t) => {
           const mainCatName = t.subcategories?.main_categories?.name || (t.transaction_type === "income" ? "Income" : t.transaction_type === "transfer" ? "Transfers" : "Uncategorized");
           const mainCatColor = t.subcategories?.main_categories?.color || (t.transaction_type === "income" ? "145 45% 42%" : "0 0% 50%");
           if (!acc[mainCatName]) acc[mainCatName] = { name: mainCatName, color: mainCatColor, transactions: [] };
