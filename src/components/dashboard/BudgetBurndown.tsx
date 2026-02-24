@@ -106,15 +106,20 @@ export function BudgetBurndown() {
               {formatCurrency(totalSpent)}
             </span>
             <span className="text-muted-foreground"> / {formatCurrency(totalBudget)}</span>
-            <span className={`ml-2 font-mono-numbers font-medium ${getBurndownTextColor(totalPct, 90)}`}>
-              {Math.round(totalPct)}%
-            </span>
           </div>
         </div>
         <Progress
           value={Math.min(totalPct, 100)}
           className={`h-2 mt-1 ${getBurndownColor(totalPct, 90)}`}
         />
+        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+          <span>
+            {totalBudget - totalSpent >= 0
+              ? `${formatCurrency(totalBudget - totalSpent)} remaining`
+              : `${formatCurrency(Math.abs(totalBudget - totalSpent))} over budget`}
+          </span>
+          <span>{Math.round(totalPct)}%</span>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
