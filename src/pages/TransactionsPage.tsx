@@ -210,11 +210,19 @@ export default function TransactionsPage() {
   const renderTransactionForm = (onSubmit: (e: React.FormEvent) => void, submitLabel: string, isPending: boolean) => (
     <form className="space-y-4" onSubmit={onSubmit}>
       <div className="grid grid-cols-3 gap-2">
-        {(["expense", "income", "transfer"] as const).map((type) => (
-          <Button key={type} type="button" variant={form.transaction_type === type ? "default" : "outline"} size="sm" className="capitalize" onClick={() => setForm({ ...form, transaction_type: type })}>
-            {type}
-          </Button>
-        ))}
+        {(["expense", "income", "transfer"] as const).map((type) => {
+          const isActive = form.transaction_type === type;
+          const colorMap = {
+            expense: isActive ? "bg-expense text-expense-foreground hover:bg-expense/90" : "border-expense/40 text-expense hover:bg-expense/10",
+            income: isActive ? "bg-income text-income-foreground hover:bg-income/90" : "border-income/40 text-income hover:bg-income/10",
+            transfer: isActive ? "bg-transfer text-transfer-foreground hover:bg-transfer/90" : "border-transfer/40 text-transfer hover:bg-transfer/10",
+          };
+          return (
+            <Button key={type} type="button" variant={isActive ? "default" : "outline"} size="sm" className={`capitalize ${colorMap[type]}`} onClick={() => setForm({ ...form, transaction_type: type })}>
+              {type}
+            </Button>
+          );
+        })}
       </div>
       <div className="space-y-2">
         <Label>Amount</Label>
