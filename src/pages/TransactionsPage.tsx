@@ -74,11 +74,13 @@ export default function TransactionsPage() {
   const { data: transactions = [] } = useQuery({
     queryKey: ["transactions", user?.id, dateFilter.from.toISOString(), dateFilter.to.toISOString()],
     queryFn: async () => {
+      const fromStr = `${dateFilter.from.getFullYear()}-${String(dateFilter.from.getMonth() + 1).padStart(2, "0")}-${String(dateFilter.from.getDate()).padStart(2, "0")}`;
+      const toStr = `${dateFilter.to.getFullYear()}-${String(dateFilter.to.getMonth() + 1).padStart(2, "0")}-${String(dateFilter.to.getDate()).padStart(2, "0")}`;
       const { data, error } = await supabase
         .from("transactions")
         .select("*, subcategories(name, icon, main_categories(name)), accounts!transactions_account_id_fkey(name, icon)")
-        .gte("date", dateFilter.from.toISOString().split("T")[0])
-        .lte("date", dateFilter.to.toISOString().split("T")[0])
+        .gte("date", fromStr)
+        .lte("date", toStr)
         .order("date", { ascending: false })
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -276,6 +278,7 @@ export default function TransactionsPage() {
               }}
               numberOfMonths={2}
               className="pointer-events-auto mx-auto"
+              disabled={undefined}
             />
           </div>
           <DialogFooter>
