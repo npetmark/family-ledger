@@ -147,13 +147,13 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 max-w-4xl w-full animate-fade-in overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Categories</h1>
           <p className="text-sm text-muted-foreground mt-1">50/30/20 budgeting model</p>
         </div>
-        <Button onClick={() => { setEditingMain(null); setMainForm({ name: "", color: "215 55% 52%" }); setMainOpen(true); }}>
+        <Button onClick={() => { setEditingMain(null); setMainForm({ name: "", color: "215 55% 52%" }); setMainOpen(true); }} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" /> Add Category
         </Button>
       </div>
@@ -166,7 +166,7 @@ export default function CategoriesPage() {
           return (
             <Card key={cat.id}>
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <Badge variant="secondary" className={colorClass}>
                       {cat.name}
@@ -175,7 +175,7 @@ export default function CategoriesPage() {
                       {cat.name === "Needs" ? "50%" : cat.name === "Wants" ? "30%" : cat.name === "Investments" ? "20%" : ""} target
                     </span>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-wrap">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditMain(cat)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -189,7 +189,7 @@ export default function CategoriesPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {subs.map((sub) => (
                     <div
                       key={sub.id}
