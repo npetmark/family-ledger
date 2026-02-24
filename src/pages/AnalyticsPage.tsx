@@ -284,8 +284,8 @@ export default function AnalyticsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+    <div className="space-y-6 max-w-7xl w-full animate-fade-in overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
           <p className="text-sm text-muted-foreground mt-1">Spending analysis and trends</p>
@@ -294,6 +294,7 @@ export default function AnalyticsPage() {
           variant="outline"
           onClick={() => aiMutation.mutate()}
           disabled={aiMutation.isPending || filteredYearTransactions.length === 0}
+          className="w-full sm:w-auto"
         >
           {aiMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
           AI Analysis
@@ -456,10 +457,10 @@ export default function AnalyticsPage() {
       )}
 
       <Tabs defaultValue="trends">
-        <TabsList>
-          <TabsTrigger value="trends">Income vs Expenses</TabsTrigger>
-          <TabsTrigger value="categories">By Category</TabsTrigger>
-          <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
+        <TabsList className="w-full sm:w-auto flex">
+          <TabsTrigger value="trends" className="flex-1 sm:flex-none text-xs sm:text-sm">Income vs Expenses</TabsTrigger>
+          <TabsTrigger value="categories" className="flex-1 sm:flex-none text-xs sm:text-sm">By Category</TabsTrigger>
+          <TabsTrigger value="breakdown" className="flex-1 sm:flex-none text-xs sm:text-sm">Breakdown</TabsTrigger>
         </TabsList>
 
         {/* Income vs Expenses Line Chart */}
@@ -471,7 +472,7 @@ export default function AnalyticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[350px]">
+              <div className="h-[300px] sm:h-[350px] -ml-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -497,7 +498,7 @@ export default function AnalyticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[350px]">
+              <div className="h-[300px] sm:h-[350px] -ml-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={categoryTrendData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
