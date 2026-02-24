@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, ArrowLeftRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
+import { BudgetBurndown } from "@/components/dashboard/BudgetBurndown";
 
 const CATEGORY_COLORS = [
   "hsl(215, 55%, 52%)",
@@ -261,6 +262,9 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Budget Burndown */}
+      <BudgetBurndown />
 
       {/* Recent Transactions */}
       <Card>
