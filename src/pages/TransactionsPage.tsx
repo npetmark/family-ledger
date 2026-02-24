@@ -279,6 +279,8 @@ export default function TransactionsPage() {
               }}
               numberOfMonths={2}
               className="pointer-events-auto mx-auto"
+              fromYear={2020}
+              toYear={2030}
             />
           </div>
           <DialogFooter>
