@@ -196,7 +196,7 @@ export default function DashboardPage() {
                         cy="50%"
                         innerRadius={35}
                         outerRadius={65}
-                        paddingAngle={3}
+                        paddingAngle={0}
                         dataKey="value"
                       >
                         {categoryBreakdown.map((entry, index) => (
