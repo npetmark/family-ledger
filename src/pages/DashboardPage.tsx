@@ -186,8 +186,8 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {categoryBreakdown.length > 0 ? (
-              <div className="flex items-center gap-6">
-                <div className="w-40 h-40">
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <div className="w-32 h-32 sm:w-40 sm:h-40 flex-shrink-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
