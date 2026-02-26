@@ -186,16 +186,16 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {categoryBreakdown.length > 0 ? (
-              <div className="flex flex-col sm:flex-row items-center gap-6">
-                <div className="w-32 h-32 sm:w-40 sm:h-40 flex-shrink-0">
+              <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
+                <div className="w-[160px] h-[160px] sm:w-[180px] sm:h-[180px] flex-shrink-0 overflow-visible">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={categoryBreakdown}
                         cx="50%"
                         cy="50%"
-                        innerRadius={40}
-                        outerRadius={70}
+                        innerRadius={35}
+                        outerRadius={65}
                         paddingAngle={3}
                         dataKey="value"
                       >
@@ -209,11 +209,11 @@ export default function DashboardPage() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="flex-1 space-y-3">
+                <div className="w-full sm:flex-1 space-y-3">
                   {categoryBreakdown.map((cat, i) => (
                     <div key={i} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
                         <span className="text-sm">{cat.name}</span>
                       </div>
                       <span className="text-sm font-mono-numbers font-medium">{formatCurrency(cat.value)}</span>
