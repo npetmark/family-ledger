@@ -15,11 +15,13 @@ import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Bell, AlertTriangle } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Needs: "bg-needs",
-  Wants: "bg-wants",
-  Investments: "bg-investments",
+const BUDGET_TARGETS: Record<string, number> = {
+  "Нужди": 50,
+  "Желания": 20,
+  "Инвестиции": 30,
 };
+
+const INCOME_CATEGORY = "Приходи";
 
 const ALERT_THRESHOLDS = [
   { value: "75", label: "75%" },
@@ -113,12 +115,14 @@ export default function BudgetsPage() {
   });
 
   // Group by main category
-  const grouped = subcategories.reduce((acc, sub) => {
-    const mainName = (sub as any).main_categories?.name || "Other";
-    if (!acc[mainName]) acc[mainName] = [];
-    acc[mainName].push(sub);
-    return acc;
-  }, {} as Record<string, typeof subcategories>);
+  const grouped = subcategories
+    .filter((sub) => (sub as any).main_categories?.name !== INCOME_CATEGORY)
+    .reduce((acc, sub) => {
+      const mainName = (sub as any).main_categories?.name || "Other";
+      if (!acc[mainName]) acc[mainName] = [];
+      acc[mainName].push(sub);
+      return acc;
+    }, {} as Record<string, typeof subcategories>);
 
   const getSpent = (subId: string) => transactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
   const getBudget = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.amount || 0;
@@ -163,6 +167,9 @@ export default function BudgetsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CardTitle className="text-base font-medium">{mainName}</CardTitle>
+                  {BUDGET_TARGETS[mainName] && (
+                    <Badge variant="secondary" className="text-xs font-mono-numbers">{BUDGET_TARGETS[mainName]}%</Badge>
+                  )}
                   {isMainOver && <AlertTriangle className="h-4 w-4 text-destructive" />}
                 </div>
                 <div className="text-right text-sm">
