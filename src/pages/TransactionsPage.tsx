@@ -478,16 +478,37 @@ export default function TransactionsPage() {
       </Dialog>
 
       {(() => {
-        // Group transactions by main category
-        const grouped = filteredTransactions.reduce<Record<string, { name: string; color: string; transactions: typeof transactions }>>((acc, t) => {
+        // Group transactions by main category, then by subcategory
+        type SubGroup = { name: string; icon: string; color: string; transactions: typeof transactions };
+        type MainGroup = { name: string; color: string; subGroups: Record<string, SubGroup>; ungrouped: typeof transactions };
+
+        const mainGroups: Record<string, MainGroup> = {};
+
+        filteredTransactions.forEach((t) => {
           const mainCatName = t.subcategories?.main_categories?.name || (t.transaction_type === "income" ? "Income" : t.transaction_type === "transfer" ? "Transfers" : "Uncategorized");
           const mainCatColor = t.subcategories?.main_categories?.color || (t.transaction_type === "income" ? "145 45% 42%" : "0 0% 50%");
-          if (!acc[mainCatName]) acc[mainCatName] = { name: mainCatName, color: mainCatColor, transactions: [] };
-          acc[mainCatName].transactions.push(t);
-          return acc;
-        }, {});
 
-        const groups = Object.values(grouped);
+          if (!mainGroups[mainCatName]) {
+            mainGroups[mainCatName] = { name: mainCatName, color: mainCatColor, subGroups: {}, ungrouped: [] };
+          }
+
+          const subName = t.subcategories?.name;
+          if (subName) {
+            if (!mainGroups[mainCatName].subGroups[subName]) {
+              mainGroups[mainCatName].subGroups[subName] = {
+                name: subName,
+                icon: t.subcategories?.icon || "circle",
+                color: t.subcategories?.color || mainCatColor,
+                transactions: [],
+              };
+            }
+            mainGroups[mainCatName].subGroups[subName].transactions.push(t);
+          } else {
+            mainGroups[mainCatName].ungrouped.push(t);
+          }
+        });
+
+        const groups = Object.values(mainGroups);
         if (groups.length === 0) {
           return (
             <Card>
@@ -500,82 +521,126 @@ export default function TransactionsPage() {
           );
         }
 
-        return groups.map((group) => (
-          <Collapsible key={group.name} defaultOpen>
-            <Card>
-              <CollapsibleTrigger className="w-full">
-                <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors rounded-t-lg">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ background: `hsl(${group.color})` }} />
-                    <span className="font-semibold text-sm">{group.name}</span>
-                    <span className="text-xs text-muted-foreground">({group.transactions.length})</span>
+        const renderTransaction = (t: typeof transactions[0], groupColor: string) => (
+          <div
+            key={t.id}
+            className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors group cursor-pointer"
+            onClick={() => openEditDialog(t)}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ background: `hsl(${t.subcategories?.color || groupColor} / 0.12)` }}
+              >
+                {t.transaction_type === "transfer" ? (
+                  <ArrowLeftRight className="h-4 w-4" style={{ color: `hsl(${groupColor})` }} />
+                ) : t.transaction_type === "income" ? (
+                  <Banknote className="h-4 w-4" style={{ color: `hsl(${groupColor})` }} />
+                ) : (
+                  <DynamicIcon name={t.subcategories?.icon || "circle"} className="h-4 w-4" style={{ color: `hsl(${t.subcategories?.color || groupColor})` }} />
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-medium">
+                  {t.subcategories?.name || t.note || (t.transaction_type === "transfer" ? "Transfer" : "Transaction")}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {(t as any).accounts?.name} · {new Date(t.date).toLocaleDateString()}
+                  {t.note && t.subcategories?.name ? ` · ${t.note}` : ""}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`font-mono-numbers text-sm font-medium ${
+                t.transaction_type === "income" ? "text-income" :
+                t.transaction_type === "transfer" ? "text-transfer" : "text-expense"
+              }`}>
+                {t.transaction_type === "income" ? "+" : t.transaction_type === "expense" ? "-" : ""}
+                {formatCurrency(t.amount)}
+              </span>
+              <Pencil className="h-3.5 w-3.5 opacity-0 group-hover:opacity-50 transition-opacity" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(t.id); }}
+              >
+                <span className="text-xs">✕</span>
+              </Button>
+            </div>
+          </div>
+        );
+
+        return groups.map((group) => {
+          const allTransactions = [...Object.values(group.subGroups).flatMap((sg) => sg.transactions), ...group.ungrouped];
+          const totalAmount = allTransactions.reduce((s, t) => s + t.amount, 0);
+
+          return (
+            <Collapsible key={group.name} defaultOpen>
+              <Card>
+                <CollapsibleTrigger className="w-full">
+                  <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors rounded-t-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ background: `hsl(${group.color})` }} />
+                      <span className="font-semibold text-sm">{group.name}</span>
+                      <span className="text-xs text-muted-foreground">({allTransactions.length})</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono-numbers text-sm text-muted-foreground">
+                        {formatCurrency(totalAmount)}
+                      </span>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform [[data-state=closed]_&]:rotate-[-90deg]" />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono-numbers text-sm text-muted-foreground">
-                      {formatCurrency(group.transactions.reduce((s, t) => s + t.amount, 0))}
-                    </span>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform [[data-state=closed]_&]:rotate-[-90deg]" />
-                  </div>
-                </div>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent className="pt-0 pb-2">
-                  <div className="space-y-0.5">
-                    {group.transactions.map((t) => (
-                      <div
-                        key={t.id}
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors group cursor-pointer"
-                        onClick={() => openEditDialog(t)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center"
-                            style={{ background: `hsl(${t.subcategories?.color || group.color} / 0.12)` }}
-                          >
-                            {t.transaction_type === "transfer" ? (
-                              <ArrowLeftRight className="h-4 w-4" style={{ color: `hsl(${group.color})` }} />
-                            ) : t.transaction_type === "income" ? (
-                              <Banknote className="h-4 w-4" style={{ color: `hsl(${group.color})` }} />
-                            ) : (
-                              <DynamicIcon name={t.subcategories?.icon || "circle"} className="h-4 w-4" style={{ color: `hsl(${t.subcategories?.color || group.color})` }} />
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">
-                              {t.subcategories?.name || t.note || (t.transaction_type === "transfer" ? "Transfer" : "Transaction")}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {(t as any).accounts?.name} · {new Date(t.date).toLocaleDateString()}
-                              {t.note && t.subcategories?.name ? ` · ${t.note}` : ""}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`font-mono-numbers text-sm font-medium ${
-                            t.transaction_type === "income" ? "text-income" :
-                            t.transaction_type === "transfer" ? "text-transfer" : "text-expense"
-                          }`}>
-                            {t.transaction_type === "income" ? "+" : t.transaction_type === "expense" ? "-" : ""}
-                            {formatCurrency(t.amount)}
-                          </span>
-                          <Pencil className="h-3.5 w-3.5 opacity-0 group-hover:opacity-50 transition-opacity" />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
-                            onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(t.id); }}
-                          >
-                            <span className="text-xs">✕</span>
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-        ));
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0 pb-2">
+                    <div className="space-y-0.5">
+                      {Object.values(group.subGroups).map((sg) => {
+                        const subTotal = sg.transactions.reduce((s, t) => s + t.amount, 0);
+                        if (sg.transactions.length === 1) {
+                          return renderTransaction(sg.transactions[0], group.color);
+                        }
+                        return (
+                          <Collapsible key={sg.name}>
+                            <CollapsibleTrigger className="w-full">
+                              <div className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors">
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                    style={{ background: `hsl(${sg.color} / 0.12)` }}
+                                  >
+                                    <DynamicIcon name={sg.icon} className="h-4 w-4" style={{ color: `hsl(${sg.color})` }} />
+                                  </div>
+                                  <div className="text-left">
+                                    <p className="text-sm font-medium">{sg.name}</p>
+                                    <p className="text-xs text-muted-foreground">{sg.transactions.length} transactions</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono-numbers text-sm font-medium text-muted-foreground">
+                                    {formatCurrency(subTotal)}
+                                  </span>
+                                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:rotate-[-90deg]" />
+                                </div>
+                              </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="ml-6 border-l border-border/50 pl-2 space-y-0.5">
+                                {sg.transactions.map((t) => renderTransaction(t, group.color))}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        );
+                      })}
+                      {group.ungrouped.map((t) => renderTransaction(t, group.color))}
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          );
+        });
       })()}
     </div>
   );
