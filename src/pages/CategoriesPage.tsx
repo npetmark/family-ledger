@@ -14,10 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Needs: "bg-needs/10 text-needs",
-  Wants: "bg-wants/10 text-wants",
-  Investments: "bg-investments/10 text-investments",
+const BUDGET_TARGETS: Record<string, string> = {
+  "Нужди": "50%",
+  "Желания": "20%",
+  "Инвестиции": "30%",
 };
 
 export default function CategoriesPage() {
@@ -161,18 +161,18 @@ export default function CategoriesPage() {
       <div className="space-y-6">
         {mainCategories.map((cat) => {
           const subs = subcategories.filter((s) => s.main_category_id === cat.id);
-          const colorClass = CATEGORY_COLORS[cat.name] || "bg-primary/10 text-primary";
+          const colorStyle = { backgroundColor: `hsl(${cat.color} / 0.1)`, color: `hsl(${cat.color})` };
 
           return (
             <Card key={cat.id}>
               <CardHeader className="pb-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <Badge variant="secondary" className={colorClass}>
+                    <Badge variant="secondary" style={colorStyle}>
                       {cat.name}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
-                      {cat.name === "Needs" ? "50%" : cat.name === "Wants" ? "30%" : cat.name === "Investments" ? "20%" : ""} target
+                      {BUDGET_TARGETS[cat.name] ? `${BUDGET_TARGETS[cat.name]} target` : ""}
                     </span>
                   </div>
                   <div className="flex gap-1 flex-wrap">
@@ -197,7 +197,7 @@ export default function CategoriesPage() {
                         sub.is_active ? "bg-card" : "bg-muted/50 opacity-50"
                       }`}
                     >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${colorClass}`}>
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={colorStyle}>
                         <DynamicIcon name={sub.icon} className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
