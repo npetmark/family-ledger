@@ -14,6 +14,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Plus, CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { getFundSubcategoryId } from "@/lib/fund-accounts";
 
 export function QuickAddTransaction() {
   const { user } = useAuth();
@@ -52,13 +53,20 @@ export function QuickAddTransaction() {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof form) => {
+      let subcategoryId: string | null = null;
+      if (data.transaction_type === "transfer" && data.transfer_to_account_id) {
+        const destAccount = accounts.find((a) => a.id === data.transfer_to_account_id);
+        if (destAccount) subcategoryId = getFundSubcategoryId(destAccount.name, subcategories);
+      } else if (data.transaction_type !== "transfer") {
+        subcategoryId = data.subcategory_id || null;
+      }
       const payload = {
         user_id: user!.id,
         transaction_type: data.transaction_type,
         amount: parseCurrencyToCents(data.amount),
         date: format(data.date, "yyyy-MM-dd"),
         account_id: data.account_id,
-        subcategory_id: data.transaction_type !== "transfer" ? data.subcategory_id || null : null,
+        subcategory_id: subcategoryId,
         note: data.note,
         transfer_to_account_id: data.transaction_type === "transfer" ? data.transfer_to_account_id || null : null,
       };

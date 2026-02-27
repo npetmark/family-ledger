@@ -60,10 +60,12 @@ export default function BudgetsPage() {
     queryFn: async () => {
       const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toISOString().split("T")[0];
       const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).toISOString().split("T")[0];
+      // Fetch expenses AND transfers with subcategory_id (fund transfers)
       const { data, error } = await supabase
         .from("transactions")
-        .select("subcategory_id, amount")
-        .eq("transaction_type", "expense")
+        .select("subcategory_id, amount, transaction_type")
+        .in("transaction_type", ["expense", "transfer"])
+        .not("subcategory_id", "is", null)
         .gte("date", startOfMonth)
         .lte("date", endOfMonth);
       if (error) throw error;
