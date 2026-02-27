@@ -7,6 +7,8 @@ import { DynamicIcon } from "@/components/DynamicIcon";
 import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, ArrowLeftRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { BudgetBurndown } from "@/components/dashboard/BudgetBurndown";
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 const CATEGORY_COLORS = [
   "hsl(215, 55%, 52%)",
@@ -16,6 +18,7 @@ const CATEGORY_COLORS = [
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [showAllAccounts, setShowAllAccounts] = useState(false);
 
   const { data: accounts = [] } = useQuery({
     queryKey: ["accounts", user?.id],
@@ -235,30 +238,50 @@ export default function DashboardPage() {
             <CardTitle className="text-base font-medium">Accounts</CardTitle>
           </CardHeader>
           <CardContent>
-            {accountBalances.filter((a) => a.is_visible).length > 0 ? (
-              <div className="space-y-3">
-                {accountBalances.filter((a) => a.is_visible).map((account) => (
-                  <div key={account.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <DynamicIcon name={account.icon} className="h-4 w-4 text-primary" />
+            {(() => {
+              const visibleSorted = accountBalances
+                .filter((a) => a.is_visible)
+                .sort((a, b) => b.computed_balance - a.computed_balance);
+              const displayedAccounts = showAllAccounts ? visibleSorted : visibleSorted.slice(0, 5);
+              const hasMore = visibleSorted.length > 5;
+
+              return visibleSorted.length > 0 ? (
+                <div className="space-y-3">
+                  {displayedAccounts.map((account) => (
+                    <div key={account.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <DynamicIcon name={account.icon} className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{account.name}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{account.account_type}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">{account.name}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{account.account_type}</p>
-                      </div>
+                      <span className="font-mono-numbers text-sm font-medium">
+                        {formatCurrency(account.computed_balance)}
+                      </span>
                     </div>
-                    <span className="font-mono-numbers text-sm font-medium">
-                      {formatCurrency(account.computed_balance)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-                No accounts yet. Create one to get started.
-              </div>
-            )}
+                  ))}
+                  {hasMore && (
+                    <button
+                      onClick={() => setShowAllAccounts(!showAllAccounts)}
+                      className="flex items-center justify-center gap-1 w-full py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showAllAccounts ? (
+                        <>Show less <ChevronUp className="h-3.5 w-3.5" /></>
+                      ) : (
+                        <>Show {visibleSorted.length - 5} more <ChevronDown className="h-3.5 w-3.5" /></>
+                      )}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+                  No accounts yet. Create one to get started.
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
