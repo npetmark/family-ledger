@@ -169,7 +169,10 @@ export default function AnalyticsPage() {
   });
 
   // Computed data
-  const expenses = filteredYearTransactions.filter((t) => t.transaction_type === "expense");
+  // Include fund transfers (transfers with subcategory_id) alongside expenses
+  const expenses = filteredYearTransactions.filter(
+    (t) => t.transaction_type === "expense" || (t.transaction_type === "transfer" && t.subcategory_id)
+  );
   const incomes = filteredYearTransactions.filter((t) => t.transaction_type === "income");
   const totalExpenses = expenses.reduce((s, t) => s + t.amount, 0);
   const totalIncome = incomes.reduce((s, t) => s + t.amount, 0);
@@ -530,7 +533,7 @@ export default function AnalyticsPage() {
                     <div className="h-[250px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie data={mainCatPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={3} dataKey="value">
+                          <Pie data={mainCatPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={0} dataKey="value">
                             {mainCatPieData.map((entry, index) => (
                               <Cell key={index} fill={entry.color} />
                             ))}
@@ -571,7 +574,7 @@ export default function AnalyticsPage() {
                     <div className="h-[250px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie data={subcategoryPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2} dataKey="value">
+                          <Pie data={subcategoryPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={0} dataKey="value">
                             {subcategoryPieData.map((entry, index) => (
                               <Cell key={index} fill={`hsl(${entry.color})`} />
                             ))}
