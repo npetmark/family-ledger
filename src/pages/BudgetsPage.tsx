@@ -16,9 +16,9 @@ import { ChevronLeft, ChevronRight, Bell, AlertTriangle } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
 
 const BUDGET_TARGETS: Record<string, number> = {
-  "Нужди": 50,
-  "Желания": 20,
-  "Инвестиции": 30,
+  Нужди: 50,
+  Желания: 20,
+  Инвестиции: 30,
 };
 
 const INCOME_CATEGORY = "Приходи";
@@ -38,7 +38,11 @@ export default function BudgetsPage() {
   const { data: subcategories = [] } = useQuery({
     queryKey: ["subcategories-with-main", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("subcategories").select("*, main_categories(name, sort_order)").eq("is_active", true).order("sort_order");
+      const { data, error } = await supabase
+        .from("subcategories")
+        .select("*, main_categories(name, sort_order)")
+        .eq("is_active", true)
+        .order("sort_order");
       if (error) throw error;
       return data;
     },
@@ -75,7 +79,15 @@ export default function BudgetsPage() {
   });
 
   const setBudgetMutation = useMutation({
-    mutationFn: async ({ subcategory_id, amount, alert_threshold }: { subcategory_id: string; amount: string; alert_threshold?: number }) => {
+    mutationFn: async ({
+      subcategory_id,
+      amount,
+      alert_threshold,
+    }: {
+      subcategory_id: string;
+      amount: string;
+      alert_threshold?: number;
+    }) => {
       const cents = parseCurrencyToCents(amount);
       const existing = budgets.find((b) => b.subcategory_id === subcategory_id);
       if (existing) {
@@ -119,14 +131,22 @@ export default function BudgetsPage() {
   // Group by main category
   const grouped = subcategories
     .filter((sub) => (sub as any).main_categories?.name !== INCOME_CATEGORY)
-    .reduce((acc, sub) => {
-      const mainName = (sub as any).main_categories?.name || "Other";
-      if (!acc[mainName]) acc[mainName] = [];
-      acc[mainName].push(sub);
-      return acc;
-    }, {} as Record<string, typeof subcategories>);
+    .reduce(
+      (acc, sub) => {
+        const mainName = (sub as any).main_categories?.name || "Other";
+        if (!acc[mainName]) acc[mainName] = [];
+        acc[mainName].push(sub);
+        return acc;
+      },
+      {} as Record<string, typeof subcategories>,
+    );
 
-  const getSpent = (subId: string) => transactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
+  // Filter transactions by visible accounts (matching Analytics behavior)
+  const visibleAccountIds = new Set(accounts.filter((a) => a.is_visible).map((a) => a.id));
+  const visibleTransactions = transactions.filter((t) => visibleAccountIds.has(t.account_id));
+
+  const getSpent = (subId: string) =>
+    visibleTransactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
   const getBudget = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.amount || 0;
   const getAlertThreshold = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.alert_threshold ?? 90;
 
@@ -138,9 +158,7 @@ export default function BudgetsPage() {
           <Button variant="ghost" size="icon" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm font-medium min-w-[120px] text-center">
-            {format(currentDate, "MMMM yyyy")}
-          </span>
+          <span className="text-sm font-medium min-w-[120px] text-center">{format(currentDate, "MMMM yyyy")}</span>
           <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -165,90 +183,98 @@ export default function BudgetsPage() {
           return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
         })
         .map(([mainName, subs]) => {
-        const mainBudgetTotal = subs.reduce((s, sub) => s + getBudget(sub.id), 0);
-        const mainSpentTotal = subs.reduce((s, sub) => s + getSpent(sub.id), 0);
-        const mainPct = mainBudgetTotal > 0 ? Math.min((mainSpentTotal / mainBudgetTotal) * 100, 100) : 0;
-        const isMainOver = mainSpentTotal > mainBudgetTotal && mainBudgetTotal > 0;
+          const mainBudgetTotal = subs.reduce((s, sub) => s + getBudget(sub.id), 0);
+          const mainSpentTotal = subs.reduce((s, sub) => s + getSpent(sub.id), 0);
+          const mainPct = mainBudgetTotal > 0 ? Math.min((mainSpentTotal / mainBudgetTotal) * 100, 100) : 0;
+          const isMainOver = mainSpentTotal > mainBudgetTotal && mainBudgetTotal > 0;
 
-        return (
-          <Card key={mainName}>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CardTitle className="text-base font-medium">{mainName}</CardTitle>
-                  {BUDGET_TARGETS[mainName] && (
-                    <Badge variant="secondary" className="text-xs font-mono-numbers">{BUDGET_TARGETS[mainName]}%</Badge>
-                  )}
-                  {isMainOver && <AlertTriangle className="h-4 w-4 text-destructive" />}
+          return (
+            <Card key={mainName}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-base font-medium">{mainName}</CardTitle>
+                    {BUDGET_TARGETS[mainName] && (
+                      <Badge variant="secondary" className="text-xs font-mono-numbers">
+                        {BUDGET_TARGETS[mainName]}%
+                      </Badge>
+                    )}
+                    {isMainOver && <AlertTriangle className="h-4 w-4 text-destructive" />}
+                  </div>
+                  <div className="text-right text-sm">
+                    <span className={`font-mono-numbers ${isMainOver ? "text-destructive" : ""}`}>
+                      {formatCurrency(mainSpentTotal)}
+                    </span>
+                    <span className="text-muted-foreground"> / {formatCurrency(mainBudgetTotal)}</span>
+                  </div>
                 </div>
-                <div className="text-right text-sm">
-                  <span className={`font-mono-numbers ${isMainOver ? "text-destructive" : ""}`}>{formatCurrency(mainSpentTotal)}</span>
-                  <span className="text-muted-foreground"> / {formatCurrency(mainBudgetTotal)}</span>
-                </div>
-              </div>
-              <Progress value={mainPct} className={`h-2 mt-2 ${isMainOver ? "[&>div]:bg-destructive" : ""}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {subs.map((sub) => {
-                  const budget = getBudget(sub.id);
-                  const spent = getSpent(sub.id);
-                  const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
-                  const isOver = spent > budget && budget > 0;
-                  const alertThreshold = getAlertThreshold(sub.id);
-                  const isAlerted = budget > 0 && (spent / budget) * 100 >= alertThreshold;
+                <Progress value={mainPct} className={`h-2 mt-2 ${isMainOver ? "[&>div]:bg-destructive" : ""}`} />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {subs.map((sub) => {
+                    const budget = getBudget(sub.id);
+                    const spent = getSpent(sub.id);
+                    const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
+                    const isOver = spent > budget && budget > 0;
+                    const alertThreshold = getAlertThreshold(sub.id);
+                    const isAlerted = budget > 0 && (spent / budget) * 100 >= alertThreshold;
 
-                  return (
-                    <div key={sub.id} className="space-y-1">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 min-w-[140px]">
-                          <DynamicIcon name={sub.icon} className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{sub.name}</span>
-                          {isAlerted && <Bell className="h-3 w-3 text-warning" />}
-                        </div>
-                        <div className="flex-1">
-                          <Progress value={pct} className={`h-1.5 ${isOver ? "[&>div]:bg-destructive" : ""}`} />
-                        </div>
-                        <div className="text-right min-w-[90px]">
-                          <span className={`text-xs font-mono-numbers ${isOver ? "text-destructive" : ""}`}>
-                            {formatCurrency(spent)}
-                          </span>
-                        </div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Budget"
-                          className="w-24 h-8 text-xs"
-                          defaultValue={budget > 0 ? (budget / 100).toFixed(2) : ""}
-                          onBlur={(e) => {
-                            if (e.target.value) {
-                              setBudgetMutation.mutate({ subcategory_id: sub.id, amount: e.target.value });
+                    return (
+                      <div key={sub.id} className="space-y-1">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2 min-w-[140px]">
+                            <DynamicIcon name={sub.icon} className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm">{sub.name}</span>
+                            {isAlerted && <Bell className="h-3 w-3 text-warning" />}
+                          </div>
+                          <div className="flex-1">
+                            <Progress value={pct} className={`h-1.5 ${isOver ? "[&>div]:bg-destructive" : ""}`} />
+                          </div>
+                          <div className="text-right min-w-[90px]">
+                            <span className={`text-xs font-mono-numbers ${isOver ? "text-destructive" : ""}`}>
+                              {formatCurrency(spent)}
+                            </span>
+                          </div>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="Budget"
+                            className="w-24 h-8 text-xs"
+                            defaultValue={budget > 0 ? (budget / 100).toFixed(2) : ""}
+                            onBlur={(e) => {
+                              if (e.target.value) {
+                                setBudgetMutation.mutate({ subcategory_id: sub.id, amount: e.target.value });
+                              }
+                            }}
+                          />
+                          <Select
+                            value={alertThreshold.toString()}
+                            onValueChange={(v) =>
+                              setAlertMutation.mutate({ subcategory_id: sub.id, alert_threshold: parseInt(v) })
                             }
-                          }}
-                        />
-                        <Select
-                          value={alertThreshold.toString()}
-                          onValueChange={(v) => setAlertMutation.mutate({ subcategory_id: sub.id, alert_threshold: parseInt(v) })}
-                        >
-                          <SelectTrigger className="w-20 h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ALERT_THRESHOLDS.map((t) => (
-                              <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          >
+                            <SelectTrigger className="w-20 h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ALERT_THRESHOLDS.map((t) => (
+                                <SelectItem key={t.value} value={t.value}>
+                                  {t.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
     </div>
   );
 }
