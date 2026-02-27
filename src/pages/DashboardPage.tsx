@@ -84,12 +84,16 @@ export default function DashboardPage() {
     .filter((a) => a.is_visible)
     .reduce((sum, a) => sum + a.computed_balance, 0);
 
+  // Filter transactions by visible accounts (matching Analytics behavior)
+  const visibleAccountIds = new Set(accounts.filter((a) => a.is_visible).map((a) => a.id));
+  const visibleTransactions = transactions.filter((t) => visibleAccountIds.has(t.account_id));
+
   // Monthly expenses by main category — include fund transfers (transfers with subcategory_id)
-  const expenseLike = transactions.filter(
+  const expenseLike = visibleTransactions.filter(
     (t) => t.transaction_type === "expense" || (t.transaction_type === "transfer" && t.subcategory_id)
   );
   const totalExpenses = expenseLike.reduce((sum, t) => sum + t.amount, 0);
-  const income = transactions.filter((t) => t.transaction_type === "income").reduce((sum, t) => sum + t.amount, 0);
+  const income = visibleTransactions.filter((t) => t.transaction_type === "income").reduce((sum, t) => sum + t.amount, 0);
 
   const categoryBreakdown = mainCategories.map((cat) => {
     const catExpenses = expenseLike.filter(
@@ -103,7 +107,7 @@ export default function DashboardPage() {
     };
   }).filter((c) => c.value > 0);
 
-  const recentTransactions = transactions.slice(0, 5);
+  const recentTransactions = visibleTransactions.slice(0, 5);
 
   return (
     <div className="space-y-6 max-w-7xl animate-fade-in">
@@ -217,7 +221,12 @@ export default function DashboardPage() {
                         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
                         <span className="text-sm">{cat.name}</span>
                       </div>
-                      <span className="text-sm font-mono-numbers font-medium">{formatCurrency(cat.value)}</span>
+                         <span className="text-sm font-mono-numbers font-medium">
+                           {formatCurrency(cat.value)}
+                           <span className="text-muted-foreground ml-1.5">
+                             {totalExpenses > 0 ? `${Math.round((cat.value / totalExpenses) * 100)}%` : "0%"}
+                           </span>
+                         </span>
                     </div>
                   ))}
                 </div>
