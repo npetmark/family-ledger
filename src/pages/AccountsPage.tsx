@@ -191,7 +191,7 @@ export default function AccountsPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {accounts.map((account) => {
+        {[...accounts].sort((a, b) => (b.is_visible ? 1 : 0) - (a.is_visible ? 1 : 0)).map((account) => {
           const balance = computeBalance(account);
           return (
             <Card key={account.id} className={!account.is_visible ? "opacity-60" : ""}>
