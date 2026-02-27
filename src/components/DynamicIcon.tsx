@@ -35,6 +35,13 @@ const iconMap: Record<string, React.ComponentType<LucideProps>> = {
   "stethoscope": LucideIcons.Stethoscope,
   "graduation-cap": LucideIcons.GraduationCap,
   "dumbbell": LucideIcons.Dumbbell,
+  "sparkles": LucideIcons.Sparkles,
+  "bus": LucideIcons.Bus,
+  "ticket": LucideIcons.Ticket,
+  "help-circle": LucideIcons.HelpCircle,
+  "tag": LucideIcons.Tag,
+  "shirt": LucideIcons.Shirt,
+  "gem": LucideIcons.Gem,
 };
 
 export function DynamicIcon({ name, ...props }: { name: string } & LucideProps) {
