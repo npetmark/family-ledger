@@ -34,7 +34,51 @@ serve(async (req) => {
       });
     }
 
-    const { transactions, categories, year } = await req.json();
+    const body = await req.json();
+
+    // Input validation
+    if (!body || typeof body !== "object") {
+      return new Response(JSON.stringify({ error: "Invalid request body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { transactions, categories, year } = body;
+
+    if (!Array.isArray(transactions) || transactions.length > 12) {
+      return new Response(JSON.stringify({ error: "Invalid transactions: must be an array with at most 12 entries" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!Array.isArray(categories) || categories.length > 100) {
+      return new Response(JSON.stringify({ error: "Invalid categories: must be an array with at most 100 entries" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (typeof year !== "number" || !Number.isInteger(year) || year < 2000 || year > 2100) {
+      return new Response(JSON.stringify({ error: "Invalid year: must be an integer between 2000 and 2100" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Limit payload size by re-serializing validated data
+    const safeTransactions = transactions.map((t: Record<string, unknown>) => ({
+      month: String(t.month ?? "").slice(0, 20),
+      income: Number(t.income) || 0,
+      expenses: Number(t.expenses) || 0,
+    }));
+
+    const safeCategories = categories.map((c: Record<string, unknown>) => ({
+      name: String(c.name ?? "").slice(0, 100),
+      total: Number(c.total) || 0,
+    }));
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -51,9 +95,9 @@ Return ONLY valid JSON, no markdown.`;
 
     const userPrompt = `Analyze my ${year} financial data:
 
-Categories: ${JSON.stringify(categories)}
+Categories: ${JSON.stringify(safeCategories)}
 
-Monthly transaction summary: ${JSON.stringify(transactions)}
+Monthly transaction summary: ${JSON.stringify(safeTransactions)}
 
 Provide analysis of spending patterns, trends, and actionable suggestions.`;
 
