@@ -39,8 +39,10 @@ export function BudgetBurndown() {
     queryKey: ["transactions-for-budget", user?.id, monthYear],
     queryFn: async () => {
       const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
+      const y = now.getFullYear(), m = now.getMonth();
+      const startOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+      const lastDay = new Date(y, m + 1, 0).getDate();
+      const endOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
       const { data, error } = await supabase
         .from("transactions")
         .select("subcategory_id, amount")
