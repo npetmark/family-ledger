@@ -141,12 +141,8 @@ export default function BudgetsPage() {
       {} as Record<string, typeof subcategories>,
     );
 
-  // Filter transactions by visible accounts (matching Analytics behavior)
-  const visibleAccountIds = new Set(accounts.filter((a) => a.is_visible).map((a) => a.id));
-  const visibleTransactions = transactions.filter((t) => visibleAccountIds.has(t.account_id));
-
   const getSpent = (subId: string) =>
-    visibleTransactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
+    transactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
   const getBudget = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.amount || 0;
   const getAlertThreshold = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.alert_threshold ?? 90;
 
