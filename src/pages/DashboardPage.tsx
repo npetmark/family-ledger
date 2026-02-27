@@ -10,11 +10,7 @@ import { BudgetBurndown } from "@/components/dashboard/BudgetBurndown";
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
-const CATEGORY_COLORS = [
-  "hsl(215, 55%, 52%)",
-  "hsl(280, 45%, 55%)",
-  "hsl(145, 45%, 42%)",
-];
+// No hardcoded colors - use DB colors from main_categories
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -88,20 +84,22 @@ export default function DashboardPage() {
     .filter((a) => a.is_visible)
     .reduce((sum, a) => sum + a.computed_balance, 0);
 
-  // Monthly expenses by main category
-  const expenses = transactions.filter((t) => t.transaction_type === "expense");
-  const totalExpenses = expenses.reduce((sum, t) => sum + t.amount, 0);
+  // Monthly expenses by main category — include fund transfers (transfers with subcategory_id)
+  const expenseLike = transactions.filter(
+    (t) => t.transaction_type === "expense" || (t.transaction_type === "transfer" && t.subcategory_id)
+  );
+  const totalExpenses = expenseLike.reduce((sum, t) => sum + t.amount, 0);
   const income = transactions.filter((t) => t.transaction_type === "income").reduce((sum, t) => sum + t.amount, 0);
 
-  const categoryBreakdown = mainCategories.map((cat, i) => {
-    const catExpenses = expenses.filter(
+  const categoryBreakdown = mainCategories.map((cat) => {
+    const catExpenses = expenseLike.filter(
       (t) => t.subcategories?.main_categories?.id === cat.id
     );
     const total = catExpenses.reduce((sum, t) => sum + t.amount, 0);
     return {
       name: cat.name,
       value: total,
-      color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+      color: `hsl(${cat.color})`,
     };
   }).filter((c) => c.value > 0);
 
