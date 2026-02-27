@@ -156,7 +156,7 @@ export default function BudgetsPage() {
   const visibleTransactions = transactions.filter((t) => visibleAccountIds.has(t.account_id));
 
   const getSpent = (subId: string) =>
-    transactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
+    visibleTransactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
   const getBudget = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.amount || 0;
   const getAlertThreshold = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.alert_threshold ?? 90;
 
