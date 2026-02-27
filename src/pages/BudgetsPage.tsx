@@ -157,7 +157,14 @@ export default function BudgetsPage() {
         </Card>
       )}
 
-      {Object.entries(grouped).map(([mainName, subs]) => {
+      {Object.entries(grouped)
+        .sort(([a], [b]) => {
+          const order = ["Нужди", "Желания", "Инвестиции"];
+          const ai = order.indexOf(a);
+          const bi = order.indexOf(b);
+          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+        })
+        .map(([mainName, subs]) => {
         const mainBudgetTotal = subs.reduce((s, sub) => s + getBudget(sub.id), 0);
         const mainSpentTotal = subs.reduce((s, sub) => s + getSpent(sub.id), 0);
         const mainPct = mainBudgetTotal > 0 ? Math.min((mainSpentTotal / mainBudgetTotal) * 100, 100) : 0;
