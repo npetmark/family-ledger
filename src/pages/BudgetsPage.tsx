@@ -35,6 +35,16 @@ export default function BudgetsPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const monthYear = getMonthYear(currentDate);
 
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["accounts", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const { data: subcategories = [] } = useQuery({
     queryKey: ["subcategories-with-main", user?.id],
     queryFn: async () => {
@@ -140,6 +150,10 @@ export default function BudgetsPage() {
       },
       {} as Record<string, typeof subcategories>,
     );
+
+  // Filter transactions by visible accounts (matching Analytics behavior)
+  const visibleAccountIds = new Set(accounts.filter((a) => a.is_visible).map((a) => a.id));
+  const visibleTransactions = transactions.filter((t) => visibleAccountIds.has(t.account_id));
 
   const getSpent = (subId: string) =>
     transactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
