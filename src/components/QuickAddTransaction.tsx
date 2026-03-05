@@ -11,15 +11,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Plus, CalendarIcon } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Plus, CalendarIcon, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { getFundSubcategoryId } from "@/lib/fund-accounts";
+import { DynamicIcon } from "@/components/DynamicIcon";
 
 export function QuickAddTransaction() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
 
   const [form, setForm] = useState({
     transaction_type: "expense",
@@ -138,7 +141,7 @@ export function QuickAddTransaction() {
               <Label>Account</Label>
               <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" sideOffset={4}>
                   {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -148,7 +151,7 @@ export function QuickAddTransaction() {
                 <Label>Transfer To</Label>
                 <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" sideOffset={4}>
                     {accounts.filter((a) => a.id !== form.account_id).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -156,29 +159,64 @@ export function QuickAddTransaction() {
             ) : (
               <div className="space-y-2">
                 <Label>Category</Label>
-                <Select value={form.subcategory_id} onValueChange={(v) => setForm({ ...form, subcategory_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                  <SelectContent>
-                    {(() => {
-                      const grouped: Record<string, any[]> = {};
-                      subcategories.forEach((s: any) => {
-                        const mainName = s.main_categories?.name || "Other";
-                        if (!grouped[mainName]) grouped[mainName] = [];
-                        grouped[mainName].push(s);
-                      });
-                      return Object.entries(grouped).map(([mainName, subs]) => (
-                        <div key={mainName}>
-                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{mainName}</div>
-                          {subs.map((s: any) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                        </div>
-                      ));
-                    })()}
-                  </SelectContent>
-                </Select>
+                <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between">
+                      <span className={form.subcategory_id ? "text-foreground" : "text-muted-foreground"}>
+                        {form.subcategory_id
+                          ? subcategories.find((s: any) => s.id === form.subcategory_id)?.name || "Select category"
+                          : "Select category"}
+                      </span>
+                      <ChevronRight className="h-4 w-4 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" sideOffset={4}>
+                    <div className="max-h-64 overflow-y-auto p-1">
+                      {(() => {
+                        const categoryOrder = ["Нужди", "Желания", "Инвестиции", "Приходи"];
+                        const grouped: Record<string, any[]> = {};
+                        subcategories.forEach((s: any) => {
+                          const mainName = s.main_categories?.name || "Other";
+                          if (!grouped[mainName]) grouped[mainName] = [];
+                          grouped[mainName].push(s);
+                        });
+                        const sortedEntries = categoryOrder
+                          .filter((name) => grouped[name])
+                          .map((name) => [name, grouped[name]] as const);
+                        // Add any remaining categories not in the order
+                        Object.entries(grouped).forEach(([name, subs]) => {
+                          if (!categoryOrder.includes(name)) sortedEntries.push([name, subs]);
+                        });
+                        return sortedEntries.map(([mainName, subs]) => (
+                          <Collapsible key={mainName}>
+                            <CollapsibleTrigger className="flex w-full items-center justify-between px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-accent rounded-sm">
+                              {mainName}
+                              <ChevronRight className="h-3 w-3 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              {subs.map((s: any) => (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  className={`flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer ${
+                                    form.subcategory_id === s.id ? "bg-accent font-medium" : ""
+                                  }`}
+                                  onClick={() => {
+                                    setForm({ ...form, subcategory_id: s.id });
+                                    setCategoryOpen(false);
+                                  }}
+                                >
+                                  <DynamicIcon name={s.icon} className="h-3.5 w-3.5 text-muted-foreground" />
+                                  {s.name}
+                                </button>
+                              ))}
+                            </CollapsibleContent>
+                          </Collapsible>
+                        ));
+                      })()}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             )}
             <div className="space-y-2">

@@ -22,6 +22,16 @@ export function BudgetBurndown() {
   const { user } = useAuth();
   const monthYear = getMonthYear();
 
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["accounts", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const { data: budgets = [] } = useQuery({
     queryKey: ["budgets", user?.id, monthYear],
     queryFn: async () => {
@@ -45,8 +55,7 @@ export function BudgetBurndown() {
       const endOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
       const { data, error } = await supabase
         .from("transactions")
-        .select("subcategory_id, amount")
-        .eq("transaction_type", "expense")
+        .select("subcategory_id, amount, account_id, transaction_type")
         .gte("date", startOfMonth)
         .lte("date", endOfMonth);
       if (error) throw error;
@@ -55,10 +64,17 @@ export function BudgetBurndown() {
     enabled: !!user,
   });
 
+  // Filter by visible accounts only
+  const visibleAccountIds = new Set(accounts.filter((a) => a.is_visible).map((a) => a.id));
+  const visibleTransactions = transactions.filter((t) => visibleAccountIds.has(t.account_id));
+  const expenseLike = visibleTransactions.filter(
+    (t) => t.transaction_type === "expense" || (t.transaction_type === "transfer" && t.subcategory_id)
+  );
+
   const budgetItems = budgets
     .filter((b) => b.amount > 0)
     .map((b) => {
-      const spent = transactions
+      const spent = expenseLike
         .filter((t) => t.subcategory_id === b.subcategory_id)
         .reduce((sum, t) => sum + t.amount, 0);
       const remaining = b.amount - spent;
