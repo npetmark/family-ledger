@@ -23,6 +23,7 @@ export function QuickAddTransaction() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
 
   const [form, setForm] = useState({
     transaction_type: "expense",
@@ -125,7 +126,7 @@ export function QuickAddTransaction() {
             </div>
             <div className="space-y-2">
               <Label>Date</Label>
-              <Popover>
+              <Popover open={dateOpen} onOpenChange={setDateOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
                     <CalendarIcon className="h-4 w-4 mr-2" />
@@ -133,7 +134,7 @@ export function QuickAddTransaction() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={form.date} onSelect={(d) => d && setForm({ ...form, date: d })} weekStartsOn={1} />
+                  <Calendar mode="single" selected={form.date} onSelect={(d) => { if (d) { setForm({ ...form, date: d }); setDateOpen(false); } }} weekStartsOn={1} />
                 </PopoverContent>
               </Popover>
             </div>
@@ -141,7 +142,7 @@ export function QuickAddTransaction() {
               <Label>Account</Label>
               <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                <SelectContent position="popper" sideOffset={4}>
+                <SelectContent position="popper" side="bottom" sideOffset={4}>
                   {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -151,7 +152,7 @@ export function QuickAddTransaction() {
                 <Label>Transfer To</Label>
                 <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                  <SelectContent position="popper" sideOffset={4}>
+                <SelectContent position="popper" side="bottom" sideOffset={4}>
                     {accounts.filter((a) => a.id !== form.account_id).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
