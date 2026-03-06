@@ -171,8 +171,8 @@ export function QuickAddTransaction() {
                       <ChevronRight className="h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" sideOffset={4}>
-                    <div className="max-h-64 overflow-y-auto overscroll-contain p-1" style={{ WebkitOverflowScrolling: "touch" }}>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" sideOffset={4} onOpenAutoFocus={(e) => e.preventDefault()}>
+                    <div className="max-h-64 overflow-y-auto overscroll-contain touch-pan-y p-1" onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()}>
                       {(() => {
                         const categoryOrder = ["Нужди", "Желания", "Инвестиции", "Приходи"];
                         const grouped: Record<string, any[]> = {};

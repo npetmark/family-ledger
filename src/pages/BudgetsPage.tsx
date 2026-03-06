@@ -234,50 +234,55 @@ export default function BudgetsPage() {
 
                     return (
                       <div key={sub.id} className="space-y-1">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2 min-w-[140px]">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                          <div className="flex items-center gap-2 sm:min-w-[140px]">
                             <DynamicIcon name={sub.icon} className="h-4 w-4 text-muted-foreground" />
                             <span className="text-sm">{sub.name}</span>
                             {isAlerted && <Bell className="h-3 w-3 text-warning" />}
+                            <span className={`text-xs font-mono-numbers sm:hidden ${isOver ? "text-destructive" : ""}`}>
+                              {formatCurrency(spent)}
+                            </span>
                           </div>
                           <div className="flex-1">
                             <Progress value={pct} className={`h-1.5 ${isOver ? "[&>div]:bg-destructive" : ""}`} />
                           </div>
-                          <div className="text-right min-w-[90px]">
+                          <div className="hidden sm:block text-right min-w-[90px]">
                             <span className={`text-xs font-mono-numbers ${isOver ? "text-destructive" : ""}`}>
                               {formatCurrency(spent)}
                             </span>
                           </div>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="Budget"
-                            className="w-24 h-8 text-xs"
-                            defaultValue={budget > 0 ? (budget / 100).toFixed(2) : ""}
-                            onBlur={(e) => {
-                              if (e.target.value) {
-                                setBudgetMutation.mutate({ subcategory_id: sub.id, amount: e.target.value });
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="Budget"
+                              className="flex-1 sm:w-24 h-8 text-xs"
+                              defaultValue={budget > 0 ? (budget / 100).toFixed(2) : ""}
+                              onBlur={(e) => {
+                                if (e.target.value) {
+                                  setBudgetMutation.mutate({ subcategory_id: sub.id, amount: e.target.value });
+                                }
+                              }}
+                            />
+                            <Select
+                              value={alertThreshold.toString()}
+                              onValueChange={(v) =>
+                                setAlertMutation.mutate({ subcategory_id: sub.id, alert_threshold: parseInt(v) })
                               }
-                            }}
-                          />
-                          <Select
-                            value={alertThreshold.toString()}
-                            onValueChange={(v) =>
-                              setAlertMutation.mutate({ subcategory_id: sub.id, alert_threshold: parseInt(v) })
-                            }
-                          >
-                            <SelectTrigger className="w-20 h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ALERT_THRESHOLDS.map((t) => (
-                                <SelectItem key={t.value} value={t.value}>
-                                  {t.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            >
+                              <SelectTrigger className="w-20 h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ALERT_THRESHOLDS.map((t) => (
+                                  <SelectItem key={t.value} value={t.value}>
+                                    {t.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                       </div>
                     );
