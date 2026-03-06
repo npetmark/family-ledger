@@ -121,59 +121,84 @@ export default function DashboardPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Assets</p>
-                <p className="text-2xl font-semibold font-mono-numbers mt-1">{formatCurrency(totalAssets)}</p>
+          <CardContent className="p-4 sm:pt-6 sm:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 sm:hidden">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Wallet className="h-4 w-4 text-primary" />
+                </div>
+                <p className="text-xs text-muted-foreground">Total Assets</p>
               </div>
-              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <div className="hidden sm:block">
+                <p className="text-sm text-muted-foreground">Total Assets</p>
+              </div>
+              <div className="hidden sm:flex h-10 w-10 rounded-xl bg-primary/10 items-center justify-center">
                 <Wallet className="h-5 w-5 text-primary" />
               </div>
             </div>
+            <p className="text-lg sm:text-2xl font-semibold font-mono-numbers mt-1">{formatCurrency(totalAssets)}</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Monthly Income</p>
-                <p className="text-2xl font-semibold font-mono-numbers mt-1 text-income">{formatCurrency(income)}</p>
+          <CardContent className="p-4 sm:pt-6 sm:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 sm:hidden">
+                <div className="h-8 w-8 rounded-lg bg-income/10 flex items-center justify-center flex-shrink-0">
+                  <ArrowUpRight className="h-4 w-4 text-income" />
+                </div>
+                <p className="text-xs text-muted-foreground">Income</p>
               </div>
-              <div className="h-10 w-10 rounded-xl bg-income/10 flex items-center justify-center">
+              <div className="hidden sm:block">
+                <p className="text-sm text-muted-foreground">Monthly Income</p>
+              </div>
+              <div className="hidden sm:flex h-10 w-10 rounded-xl bg-income/10 items-center justify-center">
                 <ArrowUpRight className="h-5 w-5 text-income" />
               </div>
             </div>
+            <p className="text-lg sm:text-2xl font-semibold font-mono-numbers mt-1 text-income">{formatCurrency(income)}</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Monthly Expenses</p>
-                <p className="text-2xl font-semibold font-mono-numbers mt-1 text-expense">{formatCurrency(totalExpenses)}</p>
+          <CardContent className="p-4 sm:pt-6 sm:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 sm:hidden">
+                <div className="h-8 w-8 rounded-lg bg-expense/10 flex items-center justify-center flex-shrink-0">
+                  <ArrowDownRight className="h-4 w-4 text-expense" />
+                </div>
+                <p className="text-xs text-muted-foreground">Expenses</p>
               </div>
-              <div className="h-10 w-10 rounded-xl bg-expense/10 flex items-center justify-center">
+              <div className="hidden sm:block">
+                <p className="text-sm text-muted-foreground">Monthly Expenses</p>
+              </div>
+              <div className="hidden sm:flex h-10 w-10 rounded-xl bg-expense/10 items-center justify-center">
                 <ArrowDownRight className="h-5 w-5 text-expense" />
               </div>
             </div>
+            <p className="text-lg sm:text-2xl font-semibold font-mono-numbers mt-1 text-expense">{formatCurrency(totalExpenses)}</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Net This Month</p>
-                <p className={`text-2xl font-semibold font-mono-numbers mt-1 ${income - totalExpenses >= 0 ? "text-income" : "text-expense"}`}>
-                  {formatCurrency(income - totalExpenses)}
-                </p>
+          <CardContent className="p-4 sm:pt-6 sm:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 sm:hidden">
+                <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${income - totalExpenses >= 0 ? "bg-income/10" : "bg-expense/10"}`}>
+                  {income - totalExpenses >= 0 ? (
+                    <TrendingUp className="h-4 w-4 text-income" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-expense" />
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Net</p>
               </div>
-              <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${income - totalExpenses >= 0 ? "bg-income/10" : "bg-expense/10"}`}>
+              <div className="hidden sm:block">
+                <p className="text-sm text-muted-foreground">Net This Month</p>
+              </div>
+              <div className={`hidden sm:flex h-10 w-10 rounded-xl items-center justify-center ${income - totalExpenses >= 0 ? "bg-income/10" : "bg-expense/10"}`}>
                 {income - totalExpenses >= 0 ? (
                   <TrendingUp className="h-5 w-5 text-income" />
                 ) : (
@@ -181,6 +206,9 @@ export default function DashboardPage() {
                 )}
               </div>
             </div>
+            <p className={`text-lg sm:text-2xl font-semibold font-mono-numbers mt-1 ${income - totalExpenses >= 0 ? "text-income" : "text-expense"}`}>
+              {formatCurrency(income - totalExpenses)}
+            </p>
           </CardContent>
         </Card>
       </div>
