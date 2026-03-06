@@ -142,7 +142,7 @@ export function QuickAddTransaction() {
               <Label>Account</Label>
               <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                <SelectContent position="popper" side="bottom" sideOffset={4}>
+                <SelectContent position="popper" side="bottom" sideOffset={4} className="max-h-60 overflow-y-auto">
                   {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -152,7 +152,7 @@ export function QuickAddTransaction() {
                 <Label>Transfer To</Label>
                 <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
                   <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                <SelectContent position="popper" side="bottom" sideOffset={4}>
+                <SelectContent position="popper" side="bottom" sideOffset={4} className="max-h-60 overflow-y-auto">
                     {accounts.filter((a) => a.id !== form.account_id).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -172,7 +172,7 @@ export function QuickAddTransaction() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" sideOffset={4}>
-                    <div className="max-h-64 overflow-y-auto p-1">
+                    <div className="max-h-64 overflow-y-auto overscroll-contain p-1" style={{ WebkitOverflowScrolling: "touch" }}>
                       {(() => {
                         const categoryOrder = ["Нужди", "Желания", "Инвестиции", "Приходи"];
                         const grouped: Record<string, any[]> = {};
