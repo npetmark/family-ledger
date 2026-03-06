@@ -10,6 +10,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { LayoutDashboard, ArrowLeftRight, Wallet, Tags, Target, Repeat, LogOut, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ const navItems = [
 
 export function AppSidebar() {
   const { signOut, user } = useAuth();
+  const { isMobile, setOpenMobile } = useSidebar();
 
   return (
     <Sidebar>
@@ -47,6 +49,7 @@ export function AppSidebar() {
                       end={item.url === "/"}
                       className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       activeClassName="bg-primary/10 text-primary"
+                      onClick={() => { if (isMobile) setOpenMobile(false); }}
                     >
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
