@@ -111,12 +111,12 @@ export function PendingTransactions() {
   if (pending.length === 0) return null;
 
   return (
-    <Card className="border-dashed border-amber-500/50">
+    <Card className="border-dashed border-warning/50">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-medium flex items-center gap-2">
-          <Clock className="h-4 w-4 text-amber-500" />
+          <Clock className="h-4 w-4 text-warning" />
           Pending Confirmation
-          <span className="text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full">
+          <span className="text-xs bg-warning/10 text-warning px-2 py-0.5 rounded-full">
             {pending.length}
           </span>
         </CardTitle>
