@@ -7,6 +7,7 @@ import { DynamicIcon } from "@/components/DynamicIcon";
 import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, ArrowLeftRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { BudgetBurndown } from "@/components/dashboard/BudgetBurndown";
+import { PendingTransactions } from "@/components/dashboard/PendingTransactions";
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
