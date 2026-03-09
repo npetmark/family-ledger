@@ -121,6 +121,9 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* Pending Transactions from Shared Notifications */}
+      <PendingTransactions />
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>

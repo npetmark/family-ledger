@@ -44,6 +44,7 @@ function AppRoutes() {
         <Route path="/budgets" element={<BudgetsPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/recurring" element={<RecurringPage />} />
+        <Route path="/share" element={<ShareTargetPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
