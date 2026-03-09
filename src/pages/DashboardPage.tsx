@@ -7,6 +7,7 @@ import { DynamicIcon } from "@/components/DynamicIcon";
 import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, ArrowLeftRight } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { BudgetBurndown } from "@/components/dashboard/BudgetBurndown";
+import { PendingTransactions } from "@/components/dashboard/PendingTransactions";
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
@@ -119,6 +120,9 @@ export default function DashboardPage() {
           {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })} overview
         </p>
       </div>
+
+      {/* Pending Transactions from Shared Notifications */}
+      <PendingTransactions />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
