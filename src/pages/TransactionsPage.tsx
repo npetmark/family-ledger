@@ -346,17 +346,6 @@ export default function TransactionsPage() {
             <span className="text-expense font-mono-numbers">-{formatCurrency(totalExpenses)}</span>
           </div>
         </div>
-        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setForm(emptyForm); }}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" /> Add</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>New Transaction</DialogTitle>
-            </DialogHeader>
-            {renderTransactionForm((e) => { e.preventDefault(); createMutation.mutate(form); }, "Add Transaction", createMutation.isPending)}
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Time filter presets */}
