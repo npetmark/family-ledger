@@ -121,60 +121,6 @@ export type Database = {
         }
         Relationships: []
       }
-      pending_transactions: {
-        Row: {
-          account_id: string | null
-          created_at: string
-          id: string
-          parsed_amount: number | null
-          parsed_note: string | null
-          raw_text: string
-          status: string
-          subcategory_id: string | null
-          transaction_type: string
-          user_id: string
-        }
-        Insert: {
-          account_id?: string | null
-          created_at?: string
-          id?: string
-          parsed_amount?: number | null
-          parsed_note?: string | null
-          raw_text?: string
-          status?: string
-          subcategory_id?: string | null
-          transaction_type?: string
-          user_id: string
-        }
-        Update: {
-          account_id?: string | null
-          created_at?: string
-          id?: string
-          parsed_amount?: number | null
-          parsed_note?: string | null
-          raw_text?: string
-          status?: string
-          subcategory_id?: string | null
-          transaction_type?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pending_transactions_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pending_transactions_subcategory_id_fkey"
-            columns: ["subcategory_id"]
-            isOneToOne: false
-            referencedRelation: "subcategories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           created_at: string
