@@ -14,6 +14,7 @@ import CategoriesPage from "@/pages/CategoriesPage";
 import BudgetsPage from "@/pages/BudgetsPage";
 import RecurringPage from "@/pages/RecurringPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
+import ShareTargetPage from "@/pages/ShareTargetPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
