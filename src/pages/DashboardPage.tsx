@@ -233,6 +233,20 @@ export default function DashboardPage() {
                         outerRadius={65}
                         paddingAngle={0}
                         dataKey="value"
+                        label={({ cx, cy, midAngle, innerRadius, outerRadius, index }) => {
+                          const pct = totalExpenses > 0 ? Math.round((categoryBreakdown[index].value / totalExpenses) * 100) : 0;
+                          if (pct < 5) return null;
+                          const RADIAN = Math.PI / 180;
+                          const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                          const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                          const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                          return (
+                            <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={600}>
+                              {pct}%
+                            </text>
+                          );
+                        }}
+                        labelLine={false}
                       >
                         {categoryBreakdown.map((entry, index) => (
                           <Cell key={index} fill={entry.color} />
@@ -251,12 +265,9 @@ export default function DashboardPage() {
                         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
                         <span className="text-sm">{cat.name}</span>
                       </div>
-                         <span className="text-sm font-mono-numbers font-medium">
-                           {formatCurrency(cat.value)}
-                           <span className="text-muted-foreground ml-1.5">
-                             {totalExpenses > 0 ? `${Math.round((cat.value / totalExpenses) * 100)}%` : "0%"}
-                           </span>
-                         </span>
+                      <span className="text-sm font-mono-numbers font-medium">
+                        {formatCurrency(cat.value)}
+                      </span>
                     </div>
                   ))}
                 </div>
