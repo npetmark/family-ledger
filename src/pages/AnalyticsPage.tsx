@@ -533,7 +533,23 @@ export default function AnalyticsPage() {
                     <div className="h-[250px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie data={mainCatPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={0} dataKey="value">
+                          <Pie
+                            data={mainCatPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={0} dataKey="value"
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, index }) => {
+                              const pct = totalExpenses > 0 ? Math.round((mainCatPieData[index].value / totalExpenses) * 100) : 0;
+                              if (pct < 5) return null;
+                              const RADIAN = Math.PI / 180;
+                              const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                              const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                              const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                              return (
+                                <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={600}>
+                                  {pct}%
+                                </text>
+                              );
+                            }}
+                            labelLine={false}
+                          >
                             {mainCatPieData.map((entry, index) => (
                               <Cell key={index} fill={entry.color} />
                             ))}
@@ -549,10 +565,7 @@ export default function AnalyticsPage() {
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
                             <span className="text-sm">{cat.name}</span>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs text-muted-foreground">{totalExpenses > 0 ? Math.round(cat.value / totalExpenses * 100) : 0}%</span>
-                            <span className="text-sm font-mono-numbers font-medium">{formatCurrency(cat.value)}</span>
-                          </div>
+                          <span className="text-sm font-mono-numbers font-medium">{formatCurrency(cat.value)}</span>
                         </div>
                       ))}
                     </div>
@@ -574,7 +587,23 @@ export default function AnalyticsPage() {
                     <div className="h-[250px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie data={subcategoryPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={0} dataKey="value">
+                          <Pie
+                            data={subcategoryPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={0} dataKey="value"
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, index }) => {
+                              const pct = totalExpenses > 0 ? Math.round((subcategoryPieData[index].value / totalExpenses) * 100) : 0;
+                              if (pct < 5) return null;
+                              const RADIAN = Math.PI / 180;
+                              const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                              const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                              const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                              return (
+                                <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={600}>
+                                  {pct}%
+                                </text>
+                              );
+                            }}
+                            labelLine={false}
+                          >
                             {subcategoryPieData.map((entry, index) => (
                               <Cell key={index} fill={`hsl(${entry.color})`} />
                             ))}
@@ -595,10 +624,7 @@ export default function AnalyticsPage() {
                               <span className="text-xs text-muted-foreground ml-1.5">({sub.mainCat})</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs text-muted-foreground">{totalExpenses > 0 ? Math.round(sub.value / totalExpenses * 100) : 0}%</span>
-                            <span className="text-sm font-mono-numbers font-medium">{formatCurrency(sub.value)}</span>
-                          </div>
+                          <span className="text-sm font-mono-numbers font-medium">{formatCurrency(sub.value)}</span>
                         </div>
                       ))}
                     </div>
