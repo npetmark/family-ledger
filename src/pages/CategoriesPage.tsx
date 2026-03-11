@@ -143,7 +143,7 @@ export default function CategoriesPage() {
 
   const openEditSub = (sub: any) => {
     setEditingSub(sub);
-    setSubForm({ name: sub.name, icon: sub.icon, main_category_id: sub.main_category_id, is_active: sub.is_active });
+    setSubForm({ name: sub.name, icon: sub.icon, main_category_id: sub.main_category_id, is_active: sub.is_active, color: sub.color || "168 35% 38%" });
     setSubOpen(true);
   };
 
