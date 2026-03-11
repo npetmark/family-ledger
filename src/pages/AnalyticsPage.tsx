@@ -22,11 +22,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const AVAILABLE_YEARS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-const SUB_COLORS = [
-  "hsl(168, 35%, 38%)", "hsl(38, 85%, 55%)", "hsl(215, 55%, 52%)", "hsl(280, 45%, 55%)",
-  "hsl(145, 45%, 42%)", "hsl(0, 60%, 52%)", "hsl(30, 70%, 50%)", "hsl(190, 50%, 45%)",
-  "hsl(320, 40%, 50%)", "hsl(60, 60%, 45%)", "hsl(240, 40%, 55%)", "hsl(100, 40%, 40%)",
-];
+import { getSubcategoryShade } from "@/components/ColorPicker";
 
 type FilterPreset = "week" | "month" | "year" | "custom";
 
