@@ -22,11 +22,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const AVAILABLE_YEARS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-const SUB_COLORS = [
-  "hsl(168, 35%, 38%)", "hsl(38, 85%, 55%)", "hsl(215, 55%, 52%)", "hsl(280, 45%, 55%)",
-  "hsl(145, 45%, 42%)", "hsl(0, 60%, 52%)", "hsl(30, 70%, 50%)", "hsl(190, 50%, 45%)",
-  "hsl(320, 40%, 50%)", "hsl(60, 60%, 45%)", "hsl(240, 40%, 55%)", "hsl(100, 40%, 40%)",
-];
+import { getSubcategoryShade } from "@/components/ColorPicker";
 
 type FilterPreset = "week" | "month" | "year" | "custom";
 
@@ -236,19 +232,33 @@ export default function AnalyticsPage() {
     }
   }, [expenses, mainCategories, activePreset, dateFilter]);
 
-  // Pie data by subcategory
+  // Pie data by subcategory — colors derived from parent main category
   const subcategoryPieData = useMemo(() => {
-    const map: Record<string, { name: string; value: number; icon: string; color: string; mainCat: string }> = {};
+    const map: Record<string, { name: string; value: number; icon: string; mainCatColor: string; mainCat: string }> = {};
     expenses.forEach((t) => {
       const subId = t.subcategory_id || "uncategorized";
       const subName = t.subcategories?.name || "Uncategorized";
       const subIcon = t.subcategories?.icon || "circle";
-      const subColor = t.subcategories?.color || "0 0% 50%";
+      const mainCatColor = t.subcategories?.main_categories?.color || "0 0% 50%";
       const mainCatName = t.subcategories?.main_categories?.name || "Other";
-      if (!map[subId]) map[subId] = { name: subName, value: 0, icon: subIcon, color: subColor, mainCat: mainCatName };
+      if (!map[subId]) map[subId] = { name: subName, value: 0, icon: subIcon, mainCatColor, mainCat: mainCatName };
       map[subId].value += t.amount;
     });
-    return Object.values(map).sort((a, b) => b.value - a.value);
+    const sorted = Object.values(map).sort((a, b) => b.value - a.value);
+
+    // Group by main category to compute shade indices
+    const mainCatGroups: Record<string, number[]> = {};
+    sorted.forEach((item, idx) => {
+      if (!mainCatGroups[item.mainCat]) mainCatGroups[item.mainCat] = [];
+      mainCatGroups[item.mainCat].push(idx);
+    });
+
+    return sorted.map((item, idx) => {
+      const group = mainCatGroups[item.mainCat];
+      const indexInGroup = group.indexOf(idx);
+      const shade = getSubcategoryShade(item.mainCatColor, indexInGroup, group.length);
+      return { ...item, color: shade };
+    });
   }, [expenses]);
 
   // Main category pie data

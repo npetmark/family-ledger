@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { DynamicIcon, availableIcons } from "@/components/DynamicIcon";
+import { ColorPicker } from "@/components/ColorPicker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ export default function CategoriesPage() {
   // Subcategory dialog
   const [subOpen, setSubOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<any>(null);
-  const [subForm, setSubForm] = useState({ name: "", icon: "circle", main_category_id: "", is_active: true });
+  const [subForm, setSubForm] = useState({ name: "", icon: "circle", main_category_id: "", is_active: true, color: "168 35% 38%" });
 
   const { data: mainCategories = [] } = useQuery({
     queryKey: ["main_categories", user?.id],
@@ -96,11 +97,11 @@ export default function CategoriesPage() {
   const saveSubMutation = useMutation({
     mutationFn: async (data: typeof subForm) => {
       if (editingSub) {
-        const { error } = await supabase.from("subcategories").update({ name: data.name, icon: data.icon, main_category_id: data.main_category_id, is_active: data.is_active }).eq("id", editingSub.id);
+        const { error } = await supabase.from("subcategories").update({ name: data.name, icon: data.icon, main_category_id: data.main_category_id, is_active: data.is_active, color: data.color }).eq("id", editingSub.id);
         if (error) throw error;
       } else {
         const subs = subcategories.filter((s) => s.main_category_id === data.main_category_id);
-        const { error } = await supabase.from("subcategories").insert({ user_id: user!.id, name: data.name, icon: data.icon, main_category_id: data.main_category_id, is_active: data.is_active, sort_order: subs.length });
+        const { error } = await supabase.from("subcategories").insert({ user_id: user!.id, name: data.name, icon: data.icon, main_category_id: data.main_category_id, is_active: data.is_active, color: data.color, sort_order: subs.length });
         if (error) throw error;
       }
     },
@@ -109,7 +110,7 @@ export default function CategoriesPage() {
       queryClient.invalidateQueries({ queryKey: ["subcategories"] });
       setSubOpen(false);
       setEditingSub(null);
-      setSubForm({ name: "", icon: "circle", main_category_id: "", is_active: true });
+      setSubForm({ name: "", icon: "circle", main_category_id: "", is_active: true, color: "168 35% 38%" });
       toast.success(editingSub ? "Subcategory updated" : "Subcategory created");
     },
     onError: (e) => toast.error(e.message),
@@ -136,13 +137,13 @@ export default function CategoriesPage() {
 
   const openAddSub = (mainCategoryId: string) => {
     setEditingSub(null);
-    setSubForm({ name: "", icon: "circle", main_category_id: mainCategoryId, is_active: true });
+    setSubForm({ name: "", icon: "circle", main_category_id: mainCategoryId, is_active: true, color: "168 35% 38%" });
     setSubOpen(true);
   };
 
   const openEditSub = (sub: any) => {
     setEditingSub(sub);
-    setSubForm({ name: sub.name, icon: sub.icon, main_category_id: sub.main_category_id, is_active: sub.is_active });
+    setSubForm({ name: sub.name, icon: sub.icon, main_category_id: sub.main_category_id, is_active: sub.is_active, color: sub.color || "168 35% 38%" });
     setSubOpen(true);
   };
 
@@ -232,6 +233,10 @@ export default function CategoriesPage() {
               <Label>Name</Label>
               <Input value={mainForm.name} onChange={(e) => setMainForm({ ...mainForm, name: e.target.value })} required />
             </div>
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <ColorPicker value={mainForm.color} onChange={(c) => setMainForm({ ...mainForm, color: c })} />
+            </div>
             <Button type="submit" className="w-full" disabled={saveMainMutation.isPending}>
               {editingMain ? "Update" : "Create"}
             </Button>
@@ -273,6 +278,10 @@ export default function CategoriesPage() {
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <ColorPicker value={subForm.color} onChange={(c) => setSubForm({ ...subForm, color: c })} />
             </div>
             <div className="flex items-center justify-between">
               <Label>Active</Label>
