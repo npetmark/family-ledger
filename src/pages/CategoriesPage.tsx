@@ -137,7 +137,7 @@ export default function CategoriesPage() {
 
   const openAddSub = (mainCategoryId: string) => {
     setEditingSub(null);
-    setSubForm({ name: "", icon: "circle", main_category_id: mainCategoryId, is_active: true });
+    setSubForm({ name: "", icon: "circle", main_category_id: mainCategoryId, is_active: true, color: "168 35% 38%" });
     setSubOpen(true);
   };
 
