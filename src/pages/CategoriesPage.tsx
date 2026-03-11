@@ -279,6 +279,10 @@ export default function CategoriesPage() {
                 ))}
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <ColorPicker value={subForm.color} onChange={(c) => setSubForm({ ...subForm, color: c })} />
+            </div>
             <div className="flex items-center justify-between">
               <Label>Active</Label>
               <Switch checked={subForm.is_active} onCheckedChange={(v) => setSubForm({ ...subForm, is_active: v })} />
