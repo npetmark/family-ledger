@@ -233,6 +233,10 @@ export default function CategoriesPage() {
               <Label>Name</Label>
               <Input value={mainForm.name} onChange={(e) => setMainForm({ ...mainForm, name: e.target.value })} required />
             </div>
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <ColorPicker value={mainForm.color} onChange={(c) => setMainForm({ ...mainForm, color: c })} />
+            </div>
             <Button type="submit" className="w-full" disabled={saveMainMutation.isPending}>
               {editingMain ? "Update" : "Create"}
             </Button>
