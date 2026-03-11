@@ -101,7 +101,7 @@ export default function CategoriesPage() {
         if (error) throw error;
       } else {
         const subs = subcategories.filter((s) => s.main_category_id === data.main_category_id);
-        const { error } = await supabase.from("subcategories").insert({ user_id: user!.id, name: data.name, icon: data.icon, main_category_id: data.main_category_id, is_active: data.is_active, sort_order: subs.length });
+        const { error } = await supabase.from("subcategories").insert({ user_id: user!.id, name: data.name, icon: data.icon, main_category_id: data.main_category_id, is_active: data.is_active, color: data.color, sort_order: subs.length });
         if (error) throw error;
       }
     },
