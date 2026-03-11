@@ -110,7 +110,7 @@ export default function CategoriesPage() {
       queryClient.invalidateQueries({ queryKey: ["subcategories"] });
       setSubOpen(false);
       setEditingSub(null);
-      setSubForm({ name: "", icon: "circle", main_category_id: "", is_active: true });
+      setSubForm({ name: "", icon: "circle", main_category_id: "", is_active: true, color: "168 35% 38%" });
       toast.success(editingSub ? "Subcategory updated" : "Subcategory created");
     },
     onError: (e) => toast.error(e.message),
