@@ -33,7 +33,7 @@ export default function CategoriesPage() {
   // Subcategory dialog
   const [subOpen, setSubOpen] = useState(false);
   const [editingSub, setEditingSub] = useState<any>(null);
-  const [subForm, setSubForm] = useState({ name: "", icon: "circle", main_category_id: "", is_active: true });
+  const [subForm, setSubForm] = useState({ name: "", icon: "circle", main_category_id: "", is_active: true, color: "168 35% 38%" });
 
   const { data: mainCategories = [] } = useQuery({
     queryKey: ["main_categories", user?.id],
