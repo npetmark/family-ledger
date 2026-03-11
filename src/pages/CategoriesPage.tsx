@@ -97,7 +97,7 @@ export default function CategoriesPage() {
   const saveSubMutation = useMutation({
     mutationFn: async (data: typeof subForm) => {
       if (editingSub) {
-        const { error } = await supabase.from("subcategories").update({ name: data.name, icon: data.icon, main_category_id: data.main_category_id, is_active: data.is_active }).eq("id", editingSub.id);
+        const { error } = await supabase.from("subcategories").update({ name: data.name, icon: data.icon, main_category_id: data.main_category_id, is_active: data.is_active, color: data.color }).eq("id", editingSub.id);
         if (error) throw error;
       } else {
         const subs = subcategories.filter((s) => s.main_category_id === data.main_category_id);
