@@ -12,16 +12,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, CalendarIcon, ChevronRight } from "lucide-react";
+import { Plus, CalendarIcon, ChevronRight, MessageSquare, PenLine } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { getFundSubcategoryId } from "@/lib/fund-accounts";
 import { DynamicIcon } from "@/components/DynamicIcon";
+import { TransactionChatbot } from "@/components/TransactionChatbot";
 
 export function QuickAddTransaction() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [menuOpen, setMenuOpen] = useState(false);
   const [open, setOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
 
@@ -91,13 +94,38 @@ export function QuickAddTransaction() {
 
   return (
     <>
-      <Button
-        onClick={() => setOpen(true)}
-        size="icon"
-        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg"
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
+      {/* FAB Menu */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+        {menuOpen && (
+          <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <Button
+              onClick={() => { setChatOpen(true); setMenuOpen(false); }}
+              size="sm"
+              variant="secondary"
+              className="rounded-full shadow-lg px-4 gap-2"
+            >
+              <MessageSquare className="h-4 w-4" /> AI Chatbot
+            </Button>
+            <Button
+              onClick={() => { setOpen(true); setMenuOpen(false); }}
+              size="sm"
+              variant="secondary"
+              className="rounded-full shadow-lg px-4 gap-2"
+            >
+              <PenLine className="h-4 w-4" /> Add Record
+            </Button>
+          </div>
+        )}
+        <Button
+          onClick={() => setMenuOpen((v) => !v)}
+          size="icon"
+          className={`h-14 w-14 rounded-full shadow-lg transition-transform ${menuOpen ? "rotate-45" : ""}`}
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      </div>
+
+      <TransactionChatbot open={chatOpen} onOpenChange={setChatOpen} />
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
         <DialogContent>
