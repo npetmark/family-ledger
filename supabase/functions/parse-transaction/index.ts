@@ -45,7 +45,7 @@ serve(async (req) => {
     const subcategories = subcatsRes.data || [];
 
     const body = await req.json();
-    const { message, image } = body;
+    const { message, image, history } = body;
 
     if (!message && !image) {
       return new Response(JSON.stringify({ error: "Message or image is required" }), {
