@@ -59,13 +59,13 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
   });
 
   const parseMutation = useMutation({
-    mutationFn: async ({ message, image }: { message?: string; image?: string }) => {
+    mutationFn: async ({ message, image, history }: { message?: string; image?: string; history?: { role: string; content: string }[] }) => {
       const { data, error } = await supabase.functions.invoke("parse-transaction", {
-        body: { message, image },
+        body: { message, image, history },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      return data as { transactions: ParsedTransaction[]; message: string };
+      return data as { transactions: ParsedTransaction[]; message: string; needs_clarification?: boolean };
     },
   });
 
