@@ -142,7 +142,7 @@ Return ONLY valid JSON with this structure:
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
-        messages,
+        messages: aiMessages,
       }),
     });
 
