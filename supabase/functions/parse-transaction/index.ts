@@ -45,7 +45,7 @@ serve(async (req) => {
     const subcategories = subcatsRes.data || [];
 
     const body = await req.json();
-    const { message, image } = body;
+    const { message, image, history } = body;
 
     if (!message && !image) {
       return new Response(JSON.stringify({ error: "Message or image is required" }), {
@@ -89,22 +89,33 @@ Rules:
 - Match categories by semantic meaning (e.g. "groceries" → the groceries/food subcategory, "salary" → income subcategory)
 - If multiple transactions are found (e.g. from a screenshot with multiple notifications), return ALL of them
 - Amounts should be in cents (multiply by 100)
-- If you can't determine a field, use reasonable defaults
 - Today's date is ${new Date().toISOString().split("T")[0]}
-- Respond with a friendly confirmation message
+- IMPORTANT: If the user did NOT specify which account the transaction is from (for expenses/income) or the source/destination accounts (for transfers), do NOT guess. Instead, set "needs_clarification" to true and ask the user in the "message" field which account to use. List the available account names in your question.
+- Similarly if amount is missing, ask for it.
+- Only set "needs_clarification" to false when you have all required info.
 
 Return ONLY valid JSON with this structure:
 {
+  "needs_clarification": true/false,
   "transactions": [{ transaction_type, amount, account_id, subcategory_id, transfer_to_account_id, note, date }],
-  "message": "friendly summary of what was parsed"
+  "message": "friendly summary or clarification question"
 }`;
 
-    const messages: any[] = [
+    const aiMessages: any[] = [
       { role: "system", content: systemPrompt },
     ];
 
+    // Add conversation history for multi-turn clarification
+    if (Array.isArray(history) && history.length <= 20) {
+      for (const h of history) {
+        if (h.role === "user" || h.role === "assistant") {
+          aiMessages.push({ role: h.role, content: String(h.content || "").slice(0, 2000) });
+        }
+      }
+    }
+
     if (image && message) {
-      messages.push({
+      aiMessages.push({
         role: "user",
         content: [
           { type: "text", text: message || "Parse the transactions from this image" },
@@ -112,7 +123,7 @@ Return ONLY valid JSON with this structure:
         ],
       });
     } else if (image) {
-      messages.push({
+      aiMessages.push({
         role: "user",
         content: [
           { type: "text", text: "Parse the transactions from this image" },
@@ -120,7 +131,7 @@ Return ONLY valid JSON with this structure:
         ],
       });
     } else {
-      messages.push({ role: "user", content: message });
+      aiMessages.push({ role: "user", content: message });
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -131,7 +142,7 @@ Return ONLY valid JSON with this structure:
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
-        messages,
+        messages: aiMessages,
       }),
     });
 
