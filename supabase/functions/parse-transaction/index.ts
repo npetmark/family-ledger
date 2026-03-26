@@ -101,12 +101,21 @@ Return ONLY valid JSON with this structure:
   "message": "friendly summary or clarification question"
 }`;
 
-    const messages: any[] = [
+    const aiMessages: any[] = [
       { role: "system", content: systemPrompt },
     ];
 
+    // Add conversation history for multi-turn clarification
+    if (Array.isArray(history) && history.length <= 20) {
+      for (const h of history) {
+        if (h.role === "user" || h.role === "assistant") {
+          aiMessages.push({ role: h.role, content: String(h.content || "").slice(0, 2000) });
+        }
+      }
+    }
+
     if (image && message) {
-      messages.push({
+      aiMessages.push({
         role: "user",
         content: [
           { type: "text", text: message || "Parse the transactions from this image" },
@@ -114,7 +123,7 @@ Return ONLY valid JSON with this structure:
         ],
       });
     } else if (image) {
-      messages.push({
+      aiMessages.push({
         role: "user",
         content: [
           { type: "text", text: "Parse the transactions from this image" },
@@ -122,7 +131,7 @@ Return ONLY valid JSON with this structure:
         ],
       });
     } else {
-      messages.push({ role: "user", content: message });
+      aiMessages.push({ role: "user", content: message });
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
