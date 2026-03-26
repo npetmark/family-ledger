@@ -89,14 +89,16 @@ Rules:
 - Match categories by semantic meaning (e.g. "groceries" → the groceries/food subcategory, "salary" → income subcategory)
 - If multiple transactions are found (e.g. from a screenshot with multiple notifications), return ALL of them
 - Amounts should be in cents (multiply by 100)
-- If you can't determine a field, use reasonable defaults
 - Today's date is ${new Date().toISOString().split("T")[0]}
-- Respond with a friendly confirmation message
+- IMPORTANT: If the user did NOT specify which account the transaction is from (for expenses/income) or the source/destination accounts (for transfers), do NOT guess. Instead, set "needs_clarification" to true and ask the user in the "message" field which account to use. List the available account names in your question.
+- Similarly if amount is missing, ask for it.
+- Only set "needs_clarification" to false when you have all required info.
 
 Return ONLY valid JSON with this structure:
 {
+  "needs_clarification": true/false,
   "transactions": [{ transaction_type, amount, account_id, subcategory_id, transfer_to_account_id, note, date }],
-  "message": "friendly summary of what was parsed"
+  "message": "friendly summary or clarification question"
 }`;
 
     const messages: any[] = [
