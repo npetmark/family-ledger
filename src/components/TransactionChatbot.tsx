@@ -98,15 +98,22 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
     if (!msg && !img) return;
 
     const userMsg: ChatMessage = { role: "user", content: msg || "📷 Image uploaded", image: img || undefined };
-    setMessages((prev) => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setInput("");
     setImagePreview(null);
 
+    // Build conversation history (skip system greeting and images)
+    const history = newMessages
+      .filter((m) => m.role === "user" || (m.role === "assistant" && !m.transactions?.length))
+      .map((m) => ({ role: m.role, content: m.content }));
+
     try {
-      const result = await parseMutation.mutateAsync({ message: msg || undefined, image: img || undefined });
+      const result = await parseMutation.mutateAsync({ message: msg || undefined, image: img || undefined, history });
+      const showTransactions = !result.needs_clarification && result.transactions?.length > 0;
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: result.message, transactions: result.transactions },
+        { role: "assistant", content: result.message, transactions: showTransactions ? result.transactions : undefined },
       ]);
     } catch (e: any) {
       setMessages((prev) => [...prev, { role: "assistant", content: `Sorry, something went wrong: ${e.message}` }]);
