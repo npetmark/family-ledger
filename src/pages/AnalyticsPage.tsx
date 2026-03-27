@@ -230,7 +230,7 @@ export default function AnalyticsPage() {
       return eachMonthOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((monthDate) => {
         const m = monthDate.getMonth();
         const y = monthDate.getFullYear();
-        const monthTxns = expenses.filter((t) => {
+        const monthTxns = allExpenses.filter((t) => {
           const d = new Date(t.date);
           return d.getMonth() === m && d.getFullYear() === y;
         });
