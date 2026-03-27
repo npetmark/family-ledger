@@ -90,12 +90,30 @@ export default function DashboardPage() {
   const visibleAccountIds = new Set(accounts.filter((a) => a.is_visible).map((a) => a.id));
   const visibleTransactions = transactions.filter((t) => visibleAccountIds.has(t.account_id));
 
-  // Monthly expenses by main category — include fund transfers (transfers with subcategory_id)
+  // All expense-like transactions (expenses + fund transfers with subcategory)
   const expenseLike = visibleTransactions.filter(
     (t) => t.transaction_type === "expense" || (t.transaction_type === "transfer" && t.subcategory_id)
   );
-  const totalExpenses = expenseLike.reduce((sum, t) => sum + t.amount, 0);
   const income = visibleTransactions.filter((t) => t.transaction_type === "income").reduce((sum, t) => sum + t.amount, 0);
+
+  // Find the "Investments" main category to separate it from expenses
+  const investmentCatIds = new Set(
+    mainCategories.filter((c) => c.name === "Investments" || c.name === "Инвестиции").map((c) => c.id)
+  );
+
+  // Total Expenses = Needs + Wants only (excluding Investments)
+  const nonInvestmentExpenses = expenseLike.filter(
+    (t) => !investmentCatIds.has(t.subcategories?.main_categories?.id)
+  );
+  const totalExpenses = nonInvestmentExpenses.reduce((sum, t) => sum + t.amount, 0);
+
+  // Investments total (for savings)
+  const investmentTotal = expenseLike
+    .filter((t) => investmentCatIds.has(t.subcategories?.main_categories?.id))
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  // Net Savings = Investments + (Income - Total Expenses)
+  const netSavings = investmentTotal + (income - totalExpenses);
 
   const categoryBreakdown = mainCategories.map((cat) => {
     const catExpenses = expenseLike.filter(
@@ -186,28 +204,28 @@ export default function DashboardPage() {
           <CardContent className="p-4 sm:pt-6 sm:p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2 sm:hidden">
-                <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${income - totalExpenses >= 0 ? "bg-income/10" : "bg-expense/10"}`}>
-                  {income - totalExpenses >= 0 ? (
+            <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${netSavings >= 0 ? "bg-income/10" : "bg-expense/10"}`}>
+                  {netSavings >= 0 ? (
                     <TrendingUp className="h-4 w-4 text-income" />
                   ) : (
                     <TrendingDown className="h-4 w-4 text-expense" />
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">Net</p>
+                <p className="text-xs text-muted-foreground">Savings</p>
               </div>
               <div className="hidden sm:block">
-                <p className="text-sm text-muted-foreground">Net This Month</p>
+                <p className="text-sm text-muted-foreground">Net Savings</p>
               </div>
-              <div className={`hidden sm:flex h-10 w-10 rounded-xl items-center justify-center ${income - totalExpenses >= 0 ? "bg-income/10" : "bg-expense/10"}`}>
-                {income - totalExpenses >= 0 ? (
+              <div className={`hidden sm:flex h-10 w-10 rounded-xl items-center justify-center ${netSavings >= 0 ? "bg-income/10" : "bg-expense/10"}`}>
+                {netSavings >= 0 ? (
                   <TrendingUp className="h-5 w-5 text-income" />
                 ) : (
                   <TrendingDown className="h-5 w-5 text-expense" />
                 )}
               </div>
             </div>
-            <p className={`text-lg sm:text-2xl font-semibold font-mono-numbers mt-1 ${income - totalExpenses >= 0 ? "text-income" : "text-expense"}`}>
-              {formatCurrency(income - totalExpenses)}
+            <p className={`text-lg sm:text-2xl font-semibold font-mono-numbers mt-1 ${netSavings >= 0 ? "text-income" : "text-expense"}`}>
+              {formatCurrency(netSavings)}
             </p>
           </CardContent>
         </Card>

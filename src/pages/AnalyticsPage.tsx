@@ -164,14 +164,35 @@ export default function AnalyticsPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  // Computed data
   // Include fund transfers (transfers with subcategory_id) alongside expenses
-  const expenses = filteredYearTransactions.filter(
+  const allExpenseLike = filteredYearTransactions.filter(
     (t) => t.transaction_type === "expense" || (t.transaction_type === "transfer" && t.subcategory_id)
   );
   const incomes = filteredYearTransactions.filter((t) => t.transaction_type === "income");
-  const totalExpenses = expenses.reduce((s, t) => s + t.amount, 0);
   const totalIncome = incomes.reduce((s, t) => s + t.amount, 0);
+
+  // Identify investment category to separate from expenses
+  const investmentCatIds = new Set(
+    mainCategories.filter((c) => c.name === "Investments" || c.name === "Инвестиции").map((c) => c.id)
+  );
+
+  // Expenses = all expense-like MINUS investments
+  const expenses = allExpenseLike.filter(
+    (t) => !investmentCatIds.has(t.subcategories?.main_categories?.id)
+  );
+  const totalExpenses = expenses.reduce((s, t) => s + t.amount, 0);
+
+  // Investments total
+  const investmentExpenses = allExpenseLike.filter(
+    (t) => investmentCatIds.has(t.subcategories?.main_categories?.id)
+  );
+  const totalInvestments = investmentExpenses.reduce((s, t) => s + t.amount, 0);
+
+  // Net Savings = Investments + (Income - Expenses)
+  const netSavings = totalInvestments + (totalIncome - totalExpenses);
+
+  // For pie charts, use ALL expense-like (including investments) so investments still show in breakdown
+  const allExpenses = allExpenseLike;
 
   // Monthly trend data
   const trendData = useMemo(() => {
@@ -209,7 +230,7 @@ export default function AnalyticsPage() {
       return eachMonthOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((monthDate) => {
         const m = monthDate.getMonth();
         const y = monthDate.getFullYear();
-        const monthTxns = expenses.filter((t) => {
+        const monthTxns = allExpenses.filter((t) => {
           const d = new Date(t.date);
           return d.getMonth() === m && d.getFullYear() === y;
         });
@@ -222,7 +243,7 @@ export default function AnalyticsPage() {
     } else {
       return eachDayOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((day) => {
         const dayStr = format(day, "yyyy-MM-dd");
-        const dayTxns = expenses.filter((t) => t.date === dayStr);
+        const dayTxns = allExpenses.filter((t) => t.date === dayStr);
         const entry: Record<string, any> = { label: format(day, activePreset === "week" ? "EEE d" : "d MMM") };
         mainCategories.forEach((c) => {
           entry[c.name] = dayTxns.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0);
@@ -230,12 +251,12 @@ export default function AnalyticsPage() {
         return entry;
       });
     }
-  }, [expenses, mainCategories, activePreset, dateFilter]);
+  }, [allExpenses, mainCategories, activePreset, dateFilter]);
 
   // Pie data by subcategory — colors derived from parent main category
   const subcategoryPieData = useMemo(() => {
     const map: Record<string, { name: string; value: number; icon: string; mainCatColor: string; mainCat: string }> = {};
-    expenses.forEach((t) => {
+    allExpenses.forEach((t) => {
       const subId = t.subcategory_id || "uncategorized";
       const subName = t.subcategories?.name || "Uncategorized";
       const subIcon = t.subcategories?.icon || "circle";
@@ -259,16 +280,17 @@ export default function AnalyticsPage() {
       const shade = getSubcategoryShade(item.mainCatColor, indexInGroup, group.length);
       return { ...item, color: shade };
     });
-  }, [expenses]);
+  }, [allExpenses]);
 
   // Main category pie data
   const mainCatPieData = useMemo(() => {
+    const totalAllExpenses = allExpenses.reduce((s, t) => s + t.amount, 0);
     return mainCategories.map((c) => ({
       name: c.name,
-      value: expenses.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0),
+      value: allExpenses.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0),
       color: `hsl(${c.color})`,
     })).filter((c) => c.value > 0);
-  }, [expenses, mainCategories]);
+  }, [allExpenses, mainCategories]);
 
   const customTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
@@ -406,8 +428,8 @@ export default function AnalyticsPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Net Savings</p>
-            <p className={`text-2xl font-semibold font-mono-numbers mt-1 ${totalIncome - totalExpenses >= 0 ? "text-income" : "text-expense"}`}>
-              {formatCurrency(totalIncome - totalExpenses)}
+            <p className={`text-2xl font-semibold font-mono-numbers mt-1 ${netSavings >= 0 ? "text-income" : "text-expense"}`}>
+              {formatCurrency(netSavings)}
             </p>
           </CardContent>
         </Card>
@@ -546,7 +568,8 @@ export default function AnalyticsPage() {
                           <Pie
                             data={mainCatPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={0} dataKey="value"
                             label={({ cx, cy, midAngle, innerRadius, outerRadius, index }) => {
-                              const pct = totalExpenses > 0 ? Math.round((mainCatPieData[index].value / totalExpenses) * 100) : 0;
+                              const totalAll = mainCatPieData.reduce((s, c) => s + c.value, 0);
+                              const pct = totalAll > 0 ? Math.round((mainCatPieData[index].value / totalAll) * 100) : 0;
                               if (pct < 5) return null;
                               const RADIAN = Math.PI / 180;
                               const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
@@ -600,7 +623,8 @@ export default function AnalyticsPage() {
                           <Pie
                             data={subcategoryPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={0} dataKey="value"
                             label={({ cx, cy, midAngle, innerRadius, outerRadius, index }) => {
-                              const pct = totalExpenses > 0 ? Math.round((subcategoryPieData[index].value / totalExpenses) * 100) : 0;
+                              const totalAll = subcategoryPieData.reduce((s, c) => s + c.value, 0);
+                              const pct = totalAll > 0 ? Math.round((subcategoryPieData[index].value / totalAll) * 100) : 0;
                               if (pct < 5) return null;
                               const RADIAN = Math.PI / 180;
                               const radius = innerRadius + (outerRadius - innerRadius) * 0.5;

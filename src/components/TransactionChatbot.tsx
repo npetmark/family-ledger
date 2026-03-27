@@ -7,8 +7,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, ImagePlus, Check, X, Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Send, ImagePlus, Check, X, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
+import { DynamicIcon } from "@/components/DynamicIcon";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -51,7 +55,17 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
   const { data: subcategories = [] } = useQuery({
     queryKey: ["subcategories", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("subcategories").select("*, main_categories(name)").eq("is_active", true).order("sort_order");
+      const { data, error } = await supabase.from("subcategories").select("*, main_categories(id, name, color)").eq("is_active", true).order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && open,
+  });
+
+  const { data: mainCategories = [] } = useQuery({
+    queryKey: ["main_categories", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("main_categories").select("*").order("sort_order");
       if (error) throw error;
       return data;
     },
@@ -103,7 +117,6 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
     setInput("");
     setImagePreview(null);
 
-    // Build conversation history (skip system greeting and images)
     const history = newMessages
       .filter((m) => m.role === "user" || (m.role === "assistant" && !m.transactions?.length))
       .map((m) => ({ role: m.role, content: m.content }));
@@ -120,6 +133,15 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
     }
 
     setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }), 100);
+  };
+
+  const handleUpdateTransaction = (msgIndex: number, txIndex: number, field: string, value: string | null) => {
+    setMessages((prev) => prev.map((msg, mi) => {
+      if (mi !== msgIndex || !msg.transactions) return msg;
+      const updated = [...msg.transactions];
+      updated[txIndex] = { ...updated[txIndex], [field]: value };
+      return { ...msg, transactions: updated };
+    }));
   };
 
   const handleConfirm = (transactions: ParsedTransaction[]) => {
@@ -141,10 +163,12 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
   };
 
   const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name || "Unknown";
-  const getSubcategoryName = (id: string | null) => {
-    if (!id) return null;
-    return subcategories.find((s: any) => s.id === id)?.name || null;
-  };
+
+  // Group subcategories by main category for the picker
+  const groupedSubcategories = mainCategories.map((mc) => ({
+    ...mc,
+    subs: subcategories.filter((s: any) => s.main_category_id === mc.id),
+  }));
 
   return (
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) { setMessages([messages[0]]); setInput(""); setImagePreview(null); } }}>
@@ -167,25 +191,15 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
                   )}
                   {msg.content}
                   {msg.transactions && msg.transactions.length > 0 && (
-                    <div className="mt-2 space-y-1.5">
+                    <div className="mt-2 space-y-2">
                       {msg.transactions.map((t, j) => (
-                        <div key={j} className="rounded bg-background/50 p-2 text-xs space-y-0.5">
-                          <div className="flex justify-between items-center">
-                            <span className={`font-medium capitalize ${
-                              t.transaction_type === "income" ? "text-income" :
-                              t.transaction_type === "transfer" ? "text-transfer" : "text-expense"
-                            }`}>{t.transaction_type}</span>
-                            <span className="font-bold">{formatCurrency(t.amount)}</span>
-                          </div>
-                          <div className="text-muted-foreground">
-                            {getAccountName(t.account_id)}
-                            {t.transfer_to_account_id && ` → ${getAccountName(t.transfer_to_account_id)}`}
-                          </div>
-                          {getSubcategoryName(t.subcategory_id) && (
-                            <div className="text-muted-foreground">📁 {getSubcategoryName(t.subcategory_id)}</div>
-                          )}
-                          {t.note && <div className="text-muted-foreground">📝 {t.note}</div>}
-                        </div>
+                        <TransactionCard
+                          key={j}
+                          transaction={t}
+                          accounts={accounts}
+                          groupedSubcategories={groupedSubcategories}
+                          onUpdate={(field, value) => handleUpdateTransaction(i, j, field, value)}
+                        />
                       ))}
                       <div className="flex gap-2 mt-2">
                         <Button size="sm" variant="default" className="h-7 text-xs bg-income hover:bg-income/90 text-income-foreground" onClick={() => handleConfirm(msg.transactions!)} disabled={saveMutation.isPending}>
@@ -234,5 +248,162 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function TransactionCard({
+  transaction: t,
+  accounts,
+  groupedSubcategories,
+  onUpdate,
+}: {
+  transaction: ParsedTransaction;
+  accounts: any[];
+  groupedSubcategories: any[];
+  onUpdate: (field: string, value: string | null) => void;
+}) {
+  const [catOpen, setCatOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteValue, setNoteValue] = useState(t.note);
+
+  const getSubcategoryName = (id: string | null) => {
+    if (!id) return null;
+    for (const g of groupedSubcategories) {
+      const s = g.subs.find((s: any) => s.id === id);
+      if (s) return s.name;
+    }
+    return null;
+  };
+
+  const getSubcategoryInfo = (id: string | null) => {
+    if (!id) return null;
+    for (const g of groupedSubcategories) {
+      const s = g.subs.find((s: any) => s.id === id);
+      if (s) return { name: s.name, icon: s.icon, mainCatName: g.name };
+    }
+    return null;
+  };
+
+  const subInfo = getSubcategoryInfo(t.subcategory_id);
+
+  return (
+    <div className="rounded bg-background/50 p-2.5 text-xs space-y-1.5">
+      <div className="flex justify-between items-center">
+        <span className={`font-medium capitalize ${
+          t.transaction_type === "income" ? "text-income" :
+          t.transaction_type === "transfer" ? "text-transfer" : "text-expense"
+        }`}>{t.transaction_type}</span>
+        <span className="font-bold">{formatCurrency(t.amount)}</span>
+      </div>
+
+      {/* Editable Account */}
+      <div className="space-y-0.5">
+        <label className="text-muted-foreground text-[10px] uppercase tracking-wide">Account</label>
+        <Select value={t.account_id} onValueChange={(v) => onUpdate("account_id", v)}>
+          <SelectTrigger className="h-7 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {accounts.map((a) => (
+              <SelectItem key={a.id} value={a.id}>
+                <div className="flex items-center gap-1.5">
+                  <DynamicIcon name={a.icon} className="h-3 w-3" />
+                  {a.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Editable Transfer destination */}
+      {t.transaction_type === "transfer" && (
+        <div className="space-y-0.5">
+          <label className="text-muted-foreground text-[10px] uppercase tracking-wide">Transfer to</label>
+          <Select value={t.transfer_to_account_id || ""} onValueChange={(v) => onUpdate("transfer_to_account_id", v)}>
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {accounts.filter((a) => a.id !== t.account_id).map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  <div className="flex items-center gap-1.5">
+                    <DynamicIcon name={a.icon} className="h-3 w-3" />
+                    {a.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Editable Category */}
+      {t.transaction_type !== "transfer" && (
+        <div className="space-y-0.5">
+          <label className="text-muted-foreground text-[10px] uppercase tracking-wide">Category</label>
+          <Popover open={catOpen} onOpenChange={setCatOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="w-full h-7 text-xs justify-between font-normal">
+                {subInfo ? (
+                  <span className="flex items-center gap-1.5">
+                    <DynamicIcon name={subInfo.icon} className="h-3 w-3" />
+                    {subInfo.name}
+                    <span className="text-muted-foreground">({subInfo.mainCatName})</span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">Select category</span>
+                )}
+                <ChevronDown className="h-3 w-3 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-1 max-h-60 overflow-y-auto" align="start">
+              {groupedSubcategories.map((mc) => (
+                <Collapsible key={mc.id} defaultOpen>
+                  <CollapsibleTrigger className="flex items-center gap-1.5 w-full px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: `hsl(${mc.color})` }} />
+                    {mc.name}
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    {mc.subs.map((s: any) => (
+                      <button
+                        key={s.id}
+                        className={`flex items-center gap-1.5 w-full px-3 py-1.5 text-xs rounded hover:bg-accent ${s.id === t.subcategory_id ? "bg-accent font-medium" : ""}`}
+                        onClick={() => { onUpdate("subcategory_id", s.id); setCatOpen(false); }}
+                      >
+                        <DynamicIcon name={s.icon} className="h-3 w-3" />
+                        {s.name}
+                      </button>
+                    ))}
+                  </CollapsibleContent>
+                </Collapsible>
+              ))}
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
+
+      {/* Editable Note */}
+      <div className="space-y-0.5">
+        <label className="text-muted-foreground text-[10px] uppercase tracking-wide">Note</label>
+        {editingNote ? (
+          <Input
+            value={noteValue}
+            onChange={(e) => setNoteValue(e.target.value)}
+            onBlur={() => { onUpdate("note", noteValue); setEditingNote(false); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { onUpdate("note", noteValue); setEditingNote(false); } }}
+            className="h-7 text-xs"
+            autoFocus
+          />
+        ) : (
+          <button
+            onClick={() => { setNoteValue(t.note); setEditingNote(true); }}
+            className="w-full text-left px-2 py-1 rounded border border-transparent hover:border-border text-xs min-h-[28px] flex items-center"
+          >
+            {t.note || <span className="text-muted-foreground italic">Add note...</span>}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
