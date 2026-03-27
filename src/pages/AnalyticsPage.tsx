@@ -164,14 +164,35 @@ export default function AnalyticsPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  // Computed data
   // Include fund transfers (transfers with subcategory_id) alongside expenses
-  const expenses = filteredYearTransactions.filter(
+  const allExpenseLike = filteredYearTransactions.filter(
     (t) => t.transaction_type === "expense" || (t.transaction_type === "transfer" && t.subcategory_id)
   );
   const incomes = filteredYearTransactions.filter((t) => t.transaction_type === "income");
-  const totalExpenses = expenses.reduce((s, t) => s + t.amount, 0);
   const totalIncome = incomes.reduce((s, t) => s + t.amount, 0);
+
+  // Identify investment category to separate from expenses
+  const investmentCatIds = new Set(
+    mainCategories.filter((c) => c.name === "Investments" || c.name === "Инвестиции").map((c) => c.id)
+  );
+
+  // Expenses = all expense-like MINUS investments
+  const expenses = allExpenseLike.filter(
+    (t) => !investmentCatIds.has(t.subcategories?.main_categories?.id)
+  );
+  const totalExpenses = expenses.reduce((s, t) => s + t.amount, 0);
+
+  // Investments total
+  const investmentExpenses = allExpenseLike.filter(
+    (t) => investmentCatIds.has(t.subcategories?.main_categories?.id)
+  );
+  const totalInvestments = investmentExpenses.reduce((s, t) => s + t.amount, 0);
+
+  // Net Savings = Investments + (Income - Expenses)
+  const netSavings = totalInvestments + (totalIncome - totalExpenses);
+
+  // For pie charts, use ALL expense-like (including investments) so investments still show in breakdown
+  const allExpenses = allExpenseLike;
 
   // Monthly trend data
   const trendData = useMemo(() => {
