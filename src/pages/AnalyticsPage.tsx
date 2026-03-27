@@ -256,7 +256,7 @@ export default function AnalyticsPage() {
   // Pie data by subcategory — colors derived from parent main category
   const subcategoryPieData = useMemo(() => {
     const map: Record<string, { name: string; value: number; icon: string; mainCatColor: string; mainCat: string }> = {};
-    expenses.forEach((t) => {
+    allExpenses.forEach((t) => {
       const subId = t.subcategory_id || "uncategorized";
       const subName = t.subcategories?.name || "Uncategorized";
       const subIcon = t.subcategories?.icon || "circle";
