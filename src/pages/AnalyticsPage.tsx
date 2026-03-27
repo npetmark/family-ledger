@@ -427,8 +427,8 @@ export default function AnalyticsPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Net Savings</p>
-            <p className={`text-2xl font-semibold font-mono-numbers mt-1 ${totalIncome - totalExpenses >= 0 ? "text-income" : "text-expense"}`}>
-              {formatCurrency(totalIncome - totalExpenses)}
+            <p className={`text-2xl font-semibold font-mono-numbers mt-1 ${netSavings >= 0 ? "text-income" : "text-expense"}`}>
+              {formatCurrency(netSavings)}
             </p>
           </CardContent>
         </Card>
