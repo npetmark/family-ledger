@@ -568,7 +568,8 @@ export default function AnalyticsPage() {
                           <Pie
                             data={mainCatPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={0} dataKey="value"
                             label={({ cx, cy, midAngle, innerRadius, outerRadius, index }) => {
-                              const pct = totalExpenses > 0 ? Math.round((mainCatPieData[index].value / totalExpenses) * 100) : 0;
+                              const totalAll = mainCatPieData.reduce((s, c) => s + c.value, 0);
+                              const pct = totalAll > 0 ? Math.round((mainCatPieData[index].value / totalAll) * 100) : 0;
                               if (pct < 5) return null;
                               const RADIAN = Math.PI / 180;
                               const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
