@@ -188,8 +188,8 @@ export default function AnalyticsPage() {
   );
   const totalInvestments = investmentExpenses.reduce((s, t) => s + t.amount, 0);
 
-  // Net Savings = Investments + (Income - Expenses)
-  const netSavings = totalInvestments + (totalIncome - totalExpenses);
+  // Net Savings = Investments only
+  const netSavings = totalInvestments;
 
   // For pie charts, use ALL expense-like (including investments) so investments still show in breakdown
   const allExpenses = allExpenseLike;

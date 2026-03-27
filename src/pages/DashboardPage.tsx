@@ -112,8 +112,8 @@ export default function DashboardPage() {
     .filter((t) => investmentCatIds.has(t.subcategories?.main_categories?.id))
     .reduce((sum, t) => sum + t.amount, 0);
 
-  // Net Savings = Investments + (Income - Total Expenses)
-  const netSavings = investmentTotal + (income - totalExpenses);
+  // Net Savings = Investments only
+  const netSavings = investmentTotal;
 
   const categoryBreakdown = mainCategories.map((cat) => {
     const catExpenses = expenseLike.filter(
