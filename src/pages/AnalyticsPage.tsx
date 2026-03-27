@@ -280,16 +280,17 @@ export default function AnalyticsPage() {
       const shade = getSubcategoryShade(item.mainCatColor, indexInGroup, group.length);
       return { ...item, color: shade };
     });
-  }, [expenses]);
+  }, [allExpenses]);
 
   // Main category pie data
   const mainCatPieData = useMemo(() => {
+    const totalAllExpenses = allExpenses.reduce((s, t) => s + t.amount, 0);
     return mainCategories.map((c) => ({
       name: c.name,
-      value: expenses.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0),
+      value: allExpenses.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0),
       color: `hsl(${c.color})`,
     })).filter((c) => c.value > 0);
-  }, [expenses, mainCategories]);
+  }, [allExpenses, mainCategories]);
 
   const customTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
