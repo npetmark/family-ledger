@@ -251,7 +251,7 @@ export default function AnalyticsPage() {
         return entry;
       });
     }
-  }, [expenses, mainCategories, activePreset, dateFilter]);
+  }, [allExpenses, mainCategories, activePreset, dateFilter]);
 
   // Pie data by subcategory — colors derived from parent main category
   const subcategoryPieData = useMemo(() => {
