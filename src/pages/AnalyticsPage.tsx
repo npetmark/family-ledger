@@ -243,7 +243,7 @@ export default function AnalyticsPage() {
     } else {
       return eachDayOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((day) => {
         const dayStr = format(day, "yyyy-MM-dd");
-        const dayTxns = expenses.filter((t) => t.date === dayStr);
+        const dayTxns = allExpenses.filter((t) => t.date === dayStr);
         const entry: Record<string, any> = { label: format(day, activePreset === "week" ? "EEE d" : "d MMM") };
         mainCategories.forEach((c) => {
           entry[c.name] = dayTxns.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0);
