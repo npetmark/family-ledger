@@ -379,6 +379,7 @@ function TransactionCard({
                   </CollapsibleContent>
                 </Collapsible>
               ))}
+              </div>
             </PopoverContent>
           </Popover>
         </div>
