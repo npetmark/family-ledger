@@ -252,7 +252,8 @@ export default function DashboardPage() {
                         paddingAngle={0}
                         dataKey="value"
                         label={({ cx, cy, midAngle, innerRadius, outerRadius, index }) => {
-                          const pct = totalExpenses > 0 ? Math.round((categoryBreakdown[index].value / totalExpenses) * 100) : 0;
+                          const allExpensesForChart = expenseLike.reduce((sum, t) => sum + t.amount, 0);
+                          const pct = allExpensesForChart > 0 ? Math.round((categoryBreakdown[index].value / allExpensesForChart) * 100) : 0;
                           if (pct < 5) return null;
                           const RADIAN = Math.PI / 180;
                           const radius = innerRadius + (outerRadius - innerRadius) * 0.5;

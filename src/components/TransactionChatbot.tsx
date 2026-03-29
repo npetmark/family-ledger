@@ -6,7 +6,7 @@ import { formatCurrency } from "@/lib/financial";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -177,7 +177,7 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
           <DialogTitle>AI Transaction Assistant</DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 pr-2" ref={scrollRef}>
+        <div className="flex-1 min-h-0 overflow-y-auto pr-2" ref={scrollRef}>
           <div className="space-y-3 pb-2">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -222,7 +222,7 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {imagePreview && (
           <div className="relative inline-block">
@@ -357,7 +357,8 @@ function TransactionCard({
                 <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-56 p-1 max-h-60 overflow-y-auto" align="start">
+            <PopoverContent className="w-56 p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+              <div className="max-h-64 overflow-y-auto overscroll-contain touch-pan-y p-1" onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()}>
               {groupedSubcategories.map((mc) => (
                 <Collapsible key={mc.id} defaultOpen>
                   <CollapsibleTrigger className="flex items-center gap-1.5 w-full px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground">
@@ -378,6 +379,7 @@ function TransactionCard({
                   </CollapsibleContent>
                 </Collapsible>
               ))}
+              </div>
             </PopoverContent>
           </Popover>
         </div>
