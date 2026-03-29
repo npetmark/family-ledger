@@ -248,7 +248,8 @@ export function QuickAddTransaction() {
                               ))}
                             </CollapsibleContent>
                           </Collapsible>
-                        ));
+                        );
+                        });
                       })()}
                     </div>
                   </PopoverContent>
