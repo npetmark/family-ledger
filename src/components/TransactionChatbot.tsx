@@ -177,7 +177,7 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
           <DialogTitle>AI Transaction Assistant</DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 pr-2" ref={scrollRef}>
+        <div className="flex-1 min-h-0 overflow-y-auto pr-2" ref={scrollRef}>
           <div className="space-y-3 pb-2">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
