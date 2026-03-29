@@ -206,7 +206,7 @@ export function BudgetBurndown() {
                       <span className="text-sm font-medium">{cat.name}</span>
                     </div>
                     <div className="text-xs text-right">
-                      <span className={`font-mono-numbers font-medium ${getBurndownTextColor(cat.pct, avgThreshold)}`}>
+                      <span className={`font-mono-numbers font-medium ${getBurndownTextColor(cat.pct, avgThreshold, cat.isInvestment)}`}>
                         {formatCurrency(cat.totalSpent)}
                       </span>
                       <span className="text-muted-foreground"> / {formatCurrency(cat.totalBudget)}</span>
@@ -214,7 +214,7 @@ export function BudgetBurndown() {
                   </CollapsibleTrigger>
                   <Progress
                     value={clampedPct}
-                    className={`h-1.5 ${getBurndownColor(cat.pct, avgThreshold)}`}
+                    className={`h-1.5 ${getBurndownColor(cat.pct, avgThreshold, cat.isInvestment)}`}
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>
