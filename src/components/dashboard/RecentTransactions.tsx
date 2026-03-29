@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { getFundSubcategoryId } from "@/lib/fund-accounts";
+// fund-accounts import removed - not needed for simple edit
 
 interface RecentTransactionsProps {
   transactions: any[];
