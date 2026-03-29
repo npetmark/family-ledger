@@ -138,7 +138,8 @@ export function BudgetBurndown() {
       const totalBudget = items.reduce((s, b) => s + b.budget, 0);
       const totalSpent = items.reduce((s, b) => s + b.spent, 0);
       const pct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-      sortedCategories.push({ name, items, totalBudget, totalSpent, remaining: totalBudget - totalSpent, pct });
+      const isInvestment = investmentNames.includes(name);
+      sortedCategories.push({ name, items, totalBudget, totalSpent, remaining: totalBudget - totalSpent, pct, isInvestment });
     }
   });
 
