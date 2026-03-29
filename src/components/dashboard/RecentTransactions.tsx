@@ -102,18 +102,16 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
     mutationFn: async () => {
       if (!editingTx) return;
       const amount = parseCurrencyToCents(form.amount);
-      const fundSubId = await getFundSubcategoryId(supabase, user!.id);
       const isTransfer = form.transaction_type === "transfer";
-      const isFundTransfer = !isTransfer && form.subcategory_id === fundSubId;
 
       const payload: any = {
-        transaction_type: isFundTransfer ? "transfer" : form.transaction_type,
+        transaction_type: form.transaction_type,
         amount,
         date: format(form.date, "yyyy-MM-dd"),
         account_id: form.account_id,
-        subcategory_id: isFundTransfer ? fundSubId : (isTransfer ? null : (form.subcategory_id || null)),
+        subcategory_id: isTransfer ? null : (form.subcategory_id || null),
         note: form.note || "",
-        transfer_to_account_id: isTransfer ? (form.transfer_to_account_id || null) : (isFundTransfer ? (form.transfer_to_account_id || null) : null),
+        transfer_to_account_id: isTransfer ? (form.transfer_to_account_id || null) : null,
       };
 
       const { error } = await supabase
