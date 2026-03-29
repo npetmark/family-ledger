@@ -237,7 +237,7 @@ export function BudgetBurndown() {
                               <span className="text-sm">{item.name}</span>
                             </div>
                             <div className="text-xs text-right">
-                              <span className={`font-mono-numbers font-medium ${getBurndownTextColor(item.pct, item.alertThreshold)}`}>
+                              <span className={`font-mono-numbers font-medium ${getBurndownTextColor(item.pct, item.alertThreshold, cat.isInvestment)}`}>
                                 {formatCurrency(item.spent)}
                               </span>
                               <span className="text-muted-foreground"> / {formatCurrency(item.budget)}</span>
@@ -245,7 +245,7 @@ export function BudgetBurndown() {
                           </div>
                           <Progress
                             value={itemClampedPct}
-                            className={`h-1.5 ${getBurndownColor(item.pct, item.alertThreshold)}`}
+                            className={`h-1.5 ${getBurndownColor(item.pct, item.alertThreshold, cat.isInvestment)}`}
                           />
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>
