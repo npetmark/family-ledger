@@ -51,7 +51,7 @@ export function QuickAddTransaction() {
   const { data: subcategories = [] } = useQuery({
     queryKey: ["subcategories", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("subcategories").select("*, main_categories(name)").eq("is_active", true).order("sort_order");
+      const { data, error } = await supabase.from("subcategories").select("*, main_categories(name, color)").eq("is_active", true).order("sort_order");
       if (error) throw error;
       return data;
     },
