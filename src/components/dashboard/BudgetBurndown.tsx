@@ -9,23 +9,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { ChevronRight } from "lucide-react";
 
-function getBurndownColor(pct: number, alertThreshold: number, isInvestment = false): string {
-  if (isInvestment) {
-    if (pct >= 80) return "[&>div]:bg-income";
-    if (pct >= 50) return "[&>div]:bg-warning";
-    return "[&>div]:bg-destructive";
-  }
+function getBurndownColor(pct: number, alertThreshold: number): string {
   if (pct >= 100) return "[&>div]:bg-destructive";
   if (pct >= alertThreshold) return "[&>div]:bg-warning";
   return "[&>div]:bg-income";
 }
 
-function getBurndownTextColor(pct: number, alertThreshold: number, isInvestment = false): string {
-  if (isInvestment) {
-    if (pct >= 80) return "text-income";
-    if (pct >= 50) return "text-warning";
-    return "text-destructive";
-  }
+function getBurndownTextColor(pct: number, alertThreshold: number): string {
   if (pct >= 100) return "text-destructive";
   if (pct >= alertThreshold) return "text-warning";
   return "text-income";
@@ -119,8 +109,6 @@ export function BudgetBurndown() {
   // Sort subcategories within each group by pct descending
   Object.values(grouped).forEach((items) => items.sort((a, b) => b.pct - a.pct));
 
-  const investmentNames = ["Инвестиции", "Investments"];
-
   const sortedCategories = mainCategoryOrder
     .filter((name) => grouped[name])
     .map((name) => {
@@ -128,8 +116,7 @@ export function BudgetBurndown() {
       const totalBudget = items.reduce((s, b) => s + b.budget, 0);
       const totalSpent = items.reduce((s, b) => s + b.spent, 0);
       const pct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-      const isInvestment = investmentNames.includes(name);
-      return { name, items, totalBudget, totalSpent, remaining: totalBudget - totalSpent, pct, isInvestment };
+      return { name, items, totalBudget, totalSpent, remaining: totalBudget - totalSpent, pct };
     });
 
   // Add any remaining categories not in the predefined order
@@ -138,8 +125,7 @@ export function BudgetBurndown() {
       const totalBudget = items.reduce((s, b) => s + b.budget, 0);
       const totalSpent = items.reduce((s, b) => s + b.spent, 0);
       const pct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-      const isInvestment = investmentNames.includes(name);
-      sortedCategories.push({ name, items, totalBudget, totalSpent, remaining: totalBudget - totalSpent, pct, isInvestment });
+      sortedCategories.push({ name, items, totalBudget, totalSpent, remaining: totalBudget - totalSpent, pct });
     }
   });
 
@@ -206,7 +192,7 @@ export function BudgetBurndown() {
                       <span className="text-sm font-medium">{cat.name}</span>
                     </div>
                     <div className="text-xs text-right">
-                      <span className={`font-mono-numbers font-medium ${getBurndownTextColor(cat.pct, avgThreshold, cat.isInvestment)}`}>
+                      <span className={`font-mono-numbers font-medium ${getBurndownTextColor(cat.pct, avgThreshold)}`}>
                         {formatCurrency(cat.totalSpent)}
                       </span>
                       <span className="text-muted-foreground"> / {formatCurrency(cat.totalBudget)}</span>
@@ -214,7 +200,7 @@ export function BudgetBurndown() {
                   </CollapsibleTrigger>
                   <Progress
                     value={clampedPct}
-                    className={`h-1.5 ${getBurndownColor(cat.pct, avgThreshold, cat.isInvestment)}`}
+                    className={`h-1.5 ${getBurndownColor(cat.pct, avgThreshold)}`}
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>
@@ -237,7 +223,7 @@ export function BudgetBurndown() {
                               <span className="text-sm">{item.name}</span>
                             </div>
                             <div className="text-xs text-right">
-                              <span className={`font-mono-numbers font-medium ${getBurndownTextColor(item.pct, item.alertThreshold, cat.isInvestment)}`}>
+                              <span className={`font-mono-numbers font-medium ${getBurndownTextColor(item.pct, item.alertThreshold)}`}>
                                 {formatCurrency(item.spent)}
                               </span>
                               <span className="text-muted-foreground"> / {formatCurrency(item.budget)}</span>
@@ -245,7 +231,7 @@ export function BudgetBurndown() {
                           </div>
                           <Progress
                             value={itemClampedPct}
-                            className={`h-1.5 ${getBurndownColor(item.pct, item.alertThreshold, cat.isInvestment)}`}
+                            className={`h-1.5 ${getBurndownColor(item.pct, item.alertThreshold)}`}
                           />
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>
