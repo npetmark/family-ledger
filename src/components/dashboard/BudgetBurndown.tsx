@@ -9,13 +9,23 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { ChevronRight } from "lucide-react";
 
-function getBurndownColor(pct: number, alertThreshold: number): string {
+function getBurndownColor(pct: number, alertThreshold: number, isInvestment = false): string {
+  if (isInvestment) {
+    if (pct >= 80) return "[&>div]:bg-income";
+    if (pct >= 50) return "[&>div]:bg-warning";
+    return "[&>div]:bg-destructive";
+  }
   if (pct >= 100) return "[&>div]:bg-destructive";
   if (pct >= alertThreshold) return "[&>div]:bg-warning";
   return "[&>div]:bg-income";
 }
 
-function getBurndownTextColor(pct: number, alertThreshold: number): string {
+function getBurndownTextColor(pct: number, alertThreshold: number, isInvestment = false): string {
+  if (isInvestment) {
+    if (pct >= 80) return "text-income";
+    if (pct >= 50) return "text-warning";
+    return "text-destructive";
+  }
   if (pct >= 100) return "text-destructive";
   if (pct >= alertThreshold) return "text-warning";
   return "text-income";
