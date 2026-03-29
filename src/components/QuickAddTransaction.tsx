@@ -216,10 +216,17 @@ export function QuickAddTransaction() {
                         Object.entries(grouped).forEach(([name, subs]) => {
                           if (!categoryOrder.includes(name)) sortedEntries.push([name, subs]);
                         });
-                        return sortedEntries.map(([mainName, subs]) => (
+                         return sortedEntries.map(([mainName, subs]) => {
+                          const mainCat = Object.values(grouped).length > 0
+                            ? subcategories.find((s: any) => s.main_categories?.name === mainName)?.main_categories
+                            : null;
+                          return (
                           <Collapsible key={mainName}>
                             <CollapsibleTrigger className="flex w-full items-center justify-between px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-accent rounded-sm">
-                              {mainName}
+                              <span className="flex items-center gap-1.5">
+                                {mainCat?.color && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: `hsl(${mainCat.color})` }} />}
+                                {mainName}
+                              </span>
                               <ChevronRight className="h-3 w-3 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
                             </CollapsibleTrigger>
                             <CollapsibleContent>
