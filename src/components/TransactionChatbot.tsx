@@ -357,7 +357,8 @@ function TransactionCard({
                 <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-56 p-1 max-h-60 overflow-y-auto" align="start">
+            <PopoverContent className="w-56 p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+              <div className="max-h-64 overflow-y-auto overscroll-contain touch-pan-y p-1" onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()}>
               {groupedSubcategories.map((mc) => (
                 <Collapsible key={mc.id} defaultOpen>
                   <CollapsibleTrigger className="flex items-center gap-1.5 w-full px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground">
