@@ -119,6 +119,8 @@ export function BudgetBurndown() {
   // Sort subcategories within each group by pct descending
   Object.values(grouped).forEach((items) => items.sort((a, b) => b.pct - a.pct));
 
+  const investmentNames = ["Инвестиции", "Investments"];
+
   const sortedCategories = mainCategoryOrder
     .filter((name) => grouped[name])
     .map((name) => {
@@ -126,7 +128,8 @@ export function BudgetBurndown() {
       const totalBudget = items.reduce((s, b) => s + b.budget, 0);
       const totalSpent = items.reduce((s, b) => s + b.spent, 0);
       const pct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-      return { name, items, totalBudget, totalSpent, remaining: totalBudget - totalSpent, pct };
+      const isInvestment = investmentNames.includes(name);
+      return { name, items, totalBudget, totalSpent, remaining: totalBudget - totalSpent, pct, isInvestment };
     });
 
   // Add any remaining categories not in the predefined order
