@@ -359,46 +359,7 @@ export default function DashboardPage() {
       <BudgetBurndown />
 
       {/* Recent Transactions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-medium">Recent Transactions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {recentTransactions.length > 0 ? (
-            <div className="space-y-2">
-              {recentTransactions.map((t) => (
-                <div key={t.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                      t.transaction_type === "income" ? "bg-income/10" :
-                      t.transaction_type === "transfer" ? "bg-transfer/10" : "bg-expense/10"
-                    }`}>
-                      {t.transaction_type === "income" ? <ArrowUpRight className="h-4 w-4 text-income" /> :
-                       t.transaction_type === "transfer" ? <ArrowLeftRight className="h-4 w-4 text-transfer" /> :
-                       <ArrowDownRight className="h-4 w-4 text-expense" />}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{t.subcategories?.name || t.note || "Transaction"}</p>
-                      <p className="text-xs text-muted-foreground">{new Date(t.date).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  <span className={`font-mono-numbers text-sm font-medium ${
-                    t.transaction_type === "income" ? "text-income" :
-                    t.transaction_type === "transfer" ? "text-transfer" : "text-expense"
-                  }`}>
-                    {t.transaction_type === "income" ? "+" : t.transaction_type === "expense" ? "-" : ""}
-                    {formatCurrency(t.amount)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
-              No transactions this month yet
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <RecentTransactions transactions={recentTransactions} accounts={accounts} />
     </div>
   );
 }
