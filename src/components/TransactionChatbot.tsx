@@ -222,7 +222,7 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {imagePreview && (
           <div className="relative inline-block">
