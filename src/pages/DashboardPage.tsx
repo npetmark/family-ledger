@@ -130,6 +130,7 @@ export default function DashboardPage() {
 
   const recentTransactions = visibleTransactions.slice(0, 5);
 
+  const visibleAccounts = accounts.filter((a) => a.is_visible);
   return (
     <div className="space-y-6 max-w-7xl animate-fade-in">
       <div>
