@@ -398,11 +398,22 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Saving..." : "Save"}
+          <DialogFooter className="flex-row justify-between sm:justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => { setEditOpen(false); setDeleteOpen(true); }}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
             </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
