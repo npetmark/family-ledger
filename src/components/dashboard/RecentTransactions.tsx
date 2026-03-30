@@ -164,9 +164,10 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                 const mainCatColor = t.subcategories?.main_categories?.color;
 
                 return (
-                  <div
+                  <button
                     key={t.id}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors group"
+                    onClick={() => openEdit(t)}
+                    className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors w-full text-left"
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div
@@ -206,7 +207,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <span>{accountName}</span>
+                          <span className="truncate">{accountName}</span>
                           {t.note && categoryName && (
                             <>
                               <span>·</span>
@@ -214,49 +215,23 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                             </>
                           )}
                           <span>·</span>
-                          <span>{format(new Date(t.date), "MMM d")}</span>
+                          <span className="flex-shrink-0">{format(new Date(t.date), "MMM d")}</span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span
-                        className={`font-mono-numbers text-sm font-medium ${
-                          t.transaction_type === "income"
-                            ? "text-income"
-                            : t.transaction_type === "transfer"
-                            ? "text-transfer"
-                            : "text-expense"
-                        }`}
-                      >
-                        {t.transaction_type === "income" ? "+" : t.transaction_type === "expense" ? "-" : ""}
-                        {formatCurrency(t.amount)}
-                      </span>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(t)}>
-                            <Pencil className="h-3.5 w-3.5 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => openDelete(t)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
+                    <span
+                      className={`font-mono-numbers text-sm font-medium flex-shrink-0 ml-2 ${
+                        t.transaction_type === "income"
+                          ? "text-income"
+                          : t.transaction_type === "transfer"
+                          ? "text-transfer"
+                          : "text-expense"
+                      }`}
+                    >
+                      {t.transaction_type === "income" ? "+" : t.transaction_type === "expense" ? "-" : ""}
+                      {formatCurrency(t.amount)}
+                    </span>
+                  </button>
                 );
               })}
             </div>
