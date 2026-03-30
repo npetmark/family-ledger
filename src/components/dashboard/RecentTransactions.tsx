@@ -33,6 +33,7 @@ interface RecentTransactionsProps {
 }
 
 export function RecentTransactions({ transactions, accounts }: RecentTransactionsProps) {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
