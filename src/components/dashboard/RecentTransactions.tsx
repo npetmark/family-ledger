@@ -16,11 +16,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { DynamicIcon } from "@/components/DynamicIcon";
 import {
   ArrowUpRight, ArrowDownRight, ArrowLeftRight,
-  Pencil, Trash2, CalendarIcon, ChevronRight, MoreHorizontal,
+  Trash2, CalendarIcon, ChevronRight,
 } from "lucide-react";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { useNavigate } from "react-router-dom";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
