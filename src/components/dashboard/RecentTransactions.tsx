@@ -240,6 +240,15 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
               No transactions this month yet
             </div>
           )}
+          {recentTransactions.length > 0 && (
+            <Button
+              variant="ghost"
+              className="w-full mt-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => navigate("/transactions")}
+            >
+              Show more
+            </Button>
+          )}
         </CardContent>
       </Card>
 
