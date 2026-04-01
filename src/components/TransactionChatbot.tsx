@@ -42,7 +42,7 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", content: "Hi! Tell me about your transaction or send a screenshot of a receipt/notification. For example:\n\n• \"Spent 25 EUR on coffee at Starbucks\"\n• \"Got 1500 salary on my bank account\"\n• \"Transfer 200 from Card to Cash\"" },
+    { role: "assistant", content: "Hi! I can help with transactions and budgets. Examples:\n\n• \"Spent 25 EUR on coffee at Starbucks\"\n• \"Got 1500 salary on my bank account\"\n• \"Create a budget for April: Ипотека 1182, Сметки 300\"\n• Send a receipt screenshot" },
   ]);
   const [input, setInput] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
