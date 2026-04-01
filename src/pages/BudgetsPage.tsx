@@ -70,11 +70,10 @@ export default function BudgetsPage() {
   });
 
   const { data: transactions = [] } = useQuery({
-    queryKey: ["transactions", user?.id, "current-month"],
+    queryKey: ["transactions-for-budgets", user?.id, monthYear],
     queryFn: async () => {
-      const now = new Date();
-      const y = now.getFullYear(),
-        m = now.getMonth();
+      const y = currentDate.getFullYear(),
+        m = currentDate.getMonth();
       const startOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-01`;
       const lastDay = new Date(y, m + 1, 0).getDate();
       const endOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
@@ -88,6 +87,53 @@ export default function BudgetsPage() {
       return data;
     },
     enabled: !!user,
+  });
+
+  const prevMonthYear = getMonthYear(subMonths(currentDate, 1));
+  const { data: prevBudgets = [] } = useQuery({
+    queryKey: ["budgets", user?.id, prevMonthYear],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("budgets").select("*").eq("month_year", prevMonthYear);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const copyFromPreviousMonth = useMutation({
+    mutationFn: async () => {
+      if (prevBudgets.length === 0) throw new Error("No budgets found in previous month");
+      const existing = budgets.map((b) => b.subcategory_id);
+      const toInsert = prevBudgets
+        .filter((pb) => !existing.includes(pb.subcategory_id))
+        .map((pb) => ({
+          user_id: user!.id,
+          subcategory_id: pb.subcategory_id,
+          month_year: monthYear,
+          amount: pb.amount,
+          alert_threshold: pb.alert_threshold,
+        }));
+      const toUpdate = prevBudgets.filter((pb) => existing.includes(pb.subcategory_id));
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from("budgets").insert(toInsert);
+        if (error) throw error;
+      }
+      for (const pb of toUpdate) {
+        const existingBudget = budgets.find((b) => b.subcategory_id === pb.subcategory_id);
+        if (existingBudget) {
+          const { error } = await supabase
+            .from("budgets")
+            .update({ amount: pb.amount, alert_threshold: pb.alert_threshold })
+            .eq("id", existingBudget.id);
+          if (error) throw error;
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+      toast.success("Budget copied from previous month");
+    },
+    onError: (e) => toast.error(e.message),
   });
 
   const setBudgetMutation = useMutation({
