@@ -19,6 +19,7 @@ type ChatMessage = {
   content: string;
   image?: string;
   transactions?: ParsedTransaction[];
+  budgetUpdates?: BudgetUpdate[];
 };
 
 type ParsedTransaction = {
@@ -29,6 +30,12 @@ type ParsedTransaction = {
   transfer_to_account_id: string | null;
   note: string;
   date: string;
+};
+
+type BudgetUpdate = {
+  subcategory_id: string;
+  amount: number;
+  month_year: string;
 };
 
 export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
