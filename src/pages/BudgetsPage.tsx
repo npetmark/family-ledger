@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Bell, AlertTriangle, Copy } from "lucide-react";
+import { ChevronLeft, ChevronRight, Bell, AlertTriangle, Copy, Trash2 } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
 
 const BUDGET_TARGETS: Record<string, number> = {
