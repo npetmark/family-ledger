@@ -230,6 +230,20 @@ export default function BudgetsPage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => {
+              if (confirm("Clear all budget values for this month?")) {
+                clearBudgetsMutation.mutate();
+              }
+            }}
+            disabled={budgets.length === 0 || clearBudgetsMutation.isPending}
+            className="text-xs gap-1.5 text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Clear
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => copyFromPreviousMonth.mutate()}
             disabled={prevBudgets.length === 0 || copyFromPreviousMonth.isPending}
             className="text-xs gap-1.5"
