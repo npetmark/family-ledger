@@ -123,6 +123,8 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const saveMutation = useMutation({
     mutationFn: async (transactions: ParsedTransaction[]) => {
       const payload = transactions.map((t) => ({
         user_id: user!.id,
