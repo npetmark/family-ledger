@@ -224,8 +224,19 @@ export default function BudgetsPage() {
 
   return (
     <div className="space-y-6 max-w-4xl animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h1 className="text-2xl font-semibold">Budgets</h1>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Budgets</h1>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium min-w-[100px] text-center">{format(currentDate, "MMM yyyy")}</span>
+            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -250,13 +261,6 @@ export default function BudgetsPage() {
           >
             <Copy className="h-3.5 w-3.5" />
             Copy from {format(subMonths(currentDate, 1), "MMM")}
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium min-w-[120px] text-center">{format(currentDate, "MMMM yyyy")}</span>
-          <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
-            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
