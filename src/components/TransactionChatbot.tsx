@@ -238,7 +238,7 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) { setMessages([messages[0]]); setInput(""); setImagePreview(null); } }}>
       <DialogContent className="flex flex-col max-h-[80vh] sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>AI Transaction Assistant</DialogTitle>
+          <DialogTitle>AI Financial Assistant</DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto pr-2" ref={scrollRef}>
