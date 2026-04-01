@@ -19,6 +19,7 @@ type ChatMessage = {
   content: string;
   image?: string;
   transactions?: ParsedTransaction[];
+  budgetUpdates?: BudgetUpdate[];
 };
 
 type ParsedTransaction = {
@@ -31,11 +32,17 @@ type ParsedTransaction = {
   date: string;
 };
 
+type BudgetUpdate = {
+  subcategory_id: string;
+  amount: number;
+  month_year: string;
+};
+
 export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", content: "Hi! Tell me about your transaction or send a screenshot of a receipt/notification. For example:\n\n• \"Spent 25 EUR on coffee at Starbucks\"\n• \"Got 1500 salary on my bank account\"\n• \"Transfer 200 from Card to Cash\"" },
+    { role: "assistant", content: "Hi! I can help with transactions and budgets. Examples:\n\n• \"Spent 25 EUR on coffee at Starbucks\"\n• \"Got 1500 salary on my bank account\"\n• \"Create a budget for April: Ипотека 1182, Сметки 300\"\n• Send a receipt screenshot" },
   ]);
   const [input, setInput] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -79,8 +86,42 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      return data as { transactions: ParsedTransaction[]; message: string; needs_clarification?: boolean };
+      return data as { action?: string; transactions: ParsedTransaction[]; budget_updates?: BudgetUpdate[]; message: string; needs_clarification?: boolean };
     },
+  });
+
+  const saveBudgetMutation = useMutation({
+    mutationFn: async (updates: BudgetUpdate[]) => {
+      for (const bu of updates) {
+        // Check if budget already exists for this subcategory + month
+        const { data: existing } = await supabase
+          .from("budgets")
+          .select("id")
+          .eq("subcategory_id", bu.subcategory_id)
+          .eq("month_year", bu.month_year)
+          .eq("user_id", user!.id)
+          .maybeSingle();
+
+        if (existing) {
+          const { error } = await supabase.from("budgets").update({ amount: bu.amount }).eq("id", existing.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("budgets").insert({
+            user_id: user!.id,
+            subcategory_id: bu.subcategory_id,
+            month_year: bu.month_year,
+            amount: bu.amount,
+            alert_threshold: 90,
+          });
+          if (error) throw error;
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+      toast.success("Budget updated!");
+    },
+    onError: (e) => toast.error(e.message),
   });
 
   const saveMutation = useMutation({
@@ -118,16 +159,24 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
     setImagePreview(null);
 
     const history = newMessages
-      .filter((m) => m.role === "user" || (m.role === "assistant" && !m.transactions?.length))
+      .filter((m) => m.role === "user" || (m.role === "assistant" && !m.transactions?.length && !m.budgetUpdates?.length))
       .map((m) => ({ role: m.role, content: m.content }));
 
     try {
       const result = await parseMutation.mutateAsync({ message: msg || undefined, image: img || undefined, history });
-      const showTransactions = !result.needs_clarification && result.transactions?.length > 0;
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: result.message, transactions: showTransactions ? result.transactions : undefined },
-      ]);
+      
+      if (result.action === "budget" && !result.needs_clarification && result.budget_updates?.length) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: result.message, budgetUpdates: result.budget_updates },
+        ]);
+      } else {
+        const showTransactions = !result.needs_clarification && result.transactions?.length > 0;
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: result.message, transactions: showTransactions ? result.transactions : undefined },
+        ]);
+      }
     } catch (e: any) {
       setMessages((prev) => [...prev, { role: "assistant", content: `Sorry, something went wrong: ${e.message}` }]);
     }
@@ -147,6 +196,21 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
   const handleConfirm = (transactions: ParsedTransaction[]) => {
     saveMutation.mutate(transactions);
     setMessages((prev) => [...prev, { role: "assistant", content: `✅ ${transactions.length} transaction${transactions.length > 1 ? "s" : ""} saved successfully!` }]);
+  };
+
+  const handleConfirmBudget = (updates: BudgetUpdate[]) => {
+    saveBudgetMutation.mutate(updates);
+    setMessages((prev) => [...prev, { role: "assistant", content: `✅ ${updates.length} budget${updates.length > 1 ? "s" : ""} updated successfully!` }]);
+  };
+
+  const getSubcategoryName = (id: string) => {
+    const sub = subcategories.find((s: any) => s.id === id);
+    return sub ? (sub as any).name : "Unknown";
+  };
+
+  const getSubcategoryIcon = (id: string) => {
+    const sub = subcategories.find((s: any) => s.id === id);
+    return sub ? (sub as any).icon : "circle";
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -174,7 +238,7 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) { setMessages([messages[0]]); setInput(""); setImagePreview(null); } }}>
       <DialogContent className="flex flex-col max-h-[80vh] sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>AI Transaction Assistant</DialogTitle>
+          <DialogTitle>AI Financial Assistant</DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto pr-2" ref={scrollRef}>
@@ -206,6 +270,34 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
                           <Check className="h-3 w-3 mr-1" /> Confirm
                         </Button>
                         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setMessages((prev) => [...prev, { role: "assistant", content: "Cancelled. Tell me again or try differently." }])}>
+                          <X className="h-3 w-3 mr-1" /> Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {msg.budgetUpdates && msg.budgetUpdates.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      <div className="rounded bg-background/50 p-2.5 text-xs space-y-1">
+                        <div className="font-medium text-foreground mb-1">Budget Updates ({msg.budgetUpdates[0].month_year})</div>
+                        {msg.budgetUpdates.map((bu, j) => (
+                          <div key={j} className="flex items-center justify-between py-0.5">
+                            <span className="flex items-center gap-1.5">
+                              <DynamicIcon name={getSubcategoryIcon(bu.subcategory_id)} className="h-3 w-3 text-muted-foreground" />
+                              {getSubcategoryName(bu.subcategory_id)}
+                            </span>
+                            <span className="font-mono-numbers font-medium">{formatCurrency(bu.amount)}</span>
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-between pt-1 border-t border-border mt-1">
+                          <span className="font-medium">Total</span>
+                          <span className="font-mono-numbers font-bold">{formatCurrency(msg.budgetUpdates.reduce((s, b) => s + b.amount, 0))}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Button size="sm" variant="default" className="h-7 text-xs bg-income hover:bg-income/90 text-income-foreground" onClick={() => handleConfirmBudget(msg.budgetUpdates!)} disabled={saveBudgetMutation.isPending}>
+                          <Check className="h-3 w-3 mr-1" /> Apply
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setMessages((prev) => [...prev, { role: "assistant", content: "Budget update cancelled." }])}>
                           <X className="h-3 w-3 mr-1" /> Cancel
                         </Button>
                       </div>

@@ -67,7 +67,9 @@ serve(async (req) => {
     const accountsList = accounts.map((a: any) => `- "${a.name}" (id: ${a.id}, type: ${a.account_type})`).join("\n");
     const categoriesList = subcategories.map((s: any) => `- "${s.name}" under "${s.main_categories?.name}" (id: ${s.id})`).join("\n");
 
-    const systemPrompt = `You are a financial transaction parser for a personal finance app. Your job is to extract transaction details from user messages (text or receipt/notification screenshots).
+    const systemPrompt = `You are a financial assistant for a personal finance app. You can:
+1. Parse transactions from text or receipt/notification screenshots
+2. Create/update budget plans
 
 Available accounts:
 ${accountsList}
@@ -75,6 +77,7 @@ ${accountsList}
 Available subcategories (with main category):
 ${categoriesList}
 
+## Transaction Parsing
 For each transaction found, extract:
 - transaction_type: "expense", "income", or "transfer"
 - amount: number in cents (e.g. 35.23 EUR = 3523)
@@ -90,16 +93,32 @@ Rules:
 - If multiple transactions are found (e.g. from a screenshot with multiple notifications), return ALL of them
 - Amounts should be in cents (multiply by 100)
 - Today's date is ${new Date().toISOString().split("T")[0]}
-- IMPORTANT: If the user did NOT specify which account the transaction is from (for expenses/income) or the source/destination accounts (for transfers), do NOT guess. Instead, set "needs_clarification" to true and ask the user in the "message" field which account to use. List the available account names in your question.
+- IMPORTANT: If the user did NOT specify which account the transaction is from (for expenses/income) or the source/destination accounts (for transfers), do NOT guess. Instead, set "needs_clarification" to true and ask the user in the "message" field which account to use.
 - Similarly if amount is missing, ask for it.
 - Only set "needs_clarification" to false when you have all required info.
 
+## Budget Management
+When the user asks to create, update, or set budgets:
+- Set "action" to "budget" in the response
+- Return "budget_updates": an array of { subcategory_id, amount (in cents), month_year (YYYY-MM format) }
+- Match subcategory names to their IDs from the list above
+- If the user says "total budget is X" and specifies some categories, distribute the remainder proportionally among unspecified categories within the same main category groups
+- The month_year should default to the current month (${new Date().toISOString().slice(0, 7)}) unless specified
+- If the user mentions a specific month (e.g. "April", "for next month"), use that month
+- IMPORTANT: Do NOT include subcategories from the "Приходи" (Income) main category in budgets
+
 Return ONLY valid JSON with this structure:
 {
+  "action": "transaction" or "budget",
   "needs_clarification": true/false,
   "transactions": [{ transaction_type, amount, account_id, subcategory_id, transfer_to_account_id, note, date }],
+  "budget_updates": [{ subcategory_id, amount, month_year }],
   "message": "friendly summary or clarification question"
-}`;
+}
+
+Use "action": "transaction" for transaction parsing (include "transactions" array).
+Use "action": "budget" for budget management (include "budget_updates" array).
+If unclear whether user wants a transaction or budget, ask for clarification.`;
 
     const aiMessages: any[] = [
       { role: "system", content: systemPrompt },
@@ -175,11 +194,14 @@ Return ONLY valid JSON with this structure:
       const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(cleaned);
     } catch {
-      parsed = { transactions: [], message: "I couldn't parse that. Could you rephrase?" };
+      parsed = { action: "transaction", transactions: [], message: "I couldn't parse that. Could you rephrase?" };
     }
 
+    // Default action
+    if (!parsed.action) parsed.action = "transaction";
+
     // Validate transactions
-    if (parsed.transactions && Array.isArray(parsed.transactions)) {
+    if (parsed.action === "transaction" && parsed.transactions && Array.isArray(parsed.transactions)) {
       parsed.transactions = parsed.transactions.map((t: any) => ({
         transaction_type: ["expense", "income", "transfer"].includes(t.transaction_type) ? t.transaction_type : "expense",
         amount: typeof t.amount === "number" && t.amount > 0 ? Math.round(t.amount) : 0,
@@ -189,8 +211,19 @@ Return ONLY valid JSON with this structure:
         note: typeof t.note === "string" ? t.note.slice(0, 500) : "",
         date: t.date || new Date().toISOString().split("T")[0],
       }));
-      // Filter out invalid
       parsed.transactions = parsed.transactions.filter((t: any) => t.amount > 0 && t.account_id);
+    }
+
+    // Validate budget updates
+    if (parsed.action === "budget" && parsed.budget_updates && Array.isArray(parsed.budget_updates)) {
+      parsed.budget_updates = parsed.budget_updates
+        .filter((b: any) => subcategories.some((s: any) => s.id === b.subcategory_id))
+        .map((b: any) => ({
+          subcategory_id: b.subcategory_id,
+          amount: typeof b.amount === "number" && b.amount > 0 ? Math.round(b.amount) : 0,
+          month_year: typeof b.month_year === "string" && /^\d{4}-\d{2}$/.test(b.month_year) ? b.month_year : new Date().toISOString().slice(0, 7),
+        }))
+        .filter((b: any) => b.amount > 0);
     }
 
     return new Response(JSON.stringify(parsed), {
