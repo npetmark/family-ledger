@@ -210,9 +210,19 @@ export default function BudgetsPage() {
 
   return (
     <div className="space-y-6 max-w-4xl animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-semibold">Budgets</h1>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => copyFromPreviousMonth.mutate()}
+            disabled={prevBudgets.length === 0 || copyFromPreviousMonth.isPending}
+            className="text-xs gap-1.5"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Copy from {format(subMonths(currentDate, 1), "MMM")}
+          </Button>
           <Button variant="ghost" size="icon" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
