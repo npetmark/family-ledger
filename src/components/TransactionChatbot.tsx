@@ -86,11 +86,43 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      return data as { transactions: ParsedTransaction[]; message: string; needs_clarification?: boolean };
+      return data as { action?: string; transactions: ParsedTransaction[]; budget_updates?: BudgetUpdate[]; message: string; needs_clarification?: boolean };
     },
   });
 
-  const saveMutation = useMutation({
+  const saveBudgetMutation = useMutation({
+    mutationFn: async (updates: BudgetUpdate[]) => {
+      for (const bu of updates) {
+        // Check if budget already exists for this subcategory + month
+        const { data: existing } = await supabase
+          .from("budgets")
+          .select("id")
+          .eq("subcategory_id", bu.subcategory_id)
+          .eq("month_year", bu.month_year)
+          .eq("user_id", user!.id)
+          .maybeSingle();
+
+        if (existing) {
+          const { error } = await supabase.from("budgets").update({ amount: bu.amount }).eq("id", existing.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("budgets").insert({
+            user_id: user!.id,
+            subcategory_id: bu.subcategory_id,
+            month_year: bu.month_year,
+            amount: bu.amount,
+            alert_threshold: 90,
+          });
+          if (error) throw error;
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+      toast.success("Budget updated!");
+    },
+    onError: (e) => toast.error(e.message),
+  });
     mutationFn: async (transactions: ParsedTransaction[]) => {
       const payload = transactions.map((t) => ({
         user_id: user!.id,
