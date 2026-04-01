@@ -275,6 +275,34 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
                       </div>
                     </div>
                   )}
+                  {msg.budgetUpdates && msg.budgetUpdates.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      <div className="rounded bg-background/50 p-2.5 text-xs space-y-1">
+                        <div className="font-medium text-foreground mb-1">Budget Updates ({msg.budgetUpdates[0].month_year})</div>
+                        {msg.budgetUpdates.map((bu, j) => (
+                          <div key={j} className="flex items-center justify-between py-0.5">
+                            <span className="flex items-center gap-1.5">
+                              <DynamicIcon name={getSubcategoryIcon(bu.subcategory_id)} className="h-3 w-3 text-muted-foreground" />
+                              {getSubcategoryName(bu.subcategory_id)}
+                            </span>
+                            <span className="font-mono-numbers font-medium">{formatCurrency(bu.amount)}</span>
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-between pt-1 border-t border-border mt-1">
+                          <span className="font-medium">Total</span>
+                          <span className="font-mono-numbers font-bold">{formatCurrency(msg.budgetUpdates.reduce((s, b) => s + b.amount, 0))}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Button size="sm" variant="default" className="h-7 text-xs bg-income hover:bg-income/90 text-income-foreground" onClick={() => handleConfirmBudget(msg.budgetUpdates!)} disabled={saveBudgetMutation.isPending}>
+                          <Check className="h-3 w-3 mr-1" /> Apply
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setMessages((prev) => [...prev, { role: "assistant", content: "Budget update cancelled." }])}>
+                          <X className="h-3 w-3 mr-1" /> Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
