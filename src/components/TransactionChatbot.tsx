@@ -198,6 +198,21 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
     setMessages((prev) => [...prev, { role: "assistant", content: `✅ ${transactions.length} transaction${transactions.length > 1 ? "s" : ""} saved successfully!` }]);
   };
 
+  const handleConfirmBudget = (updates: BudgetUpdate[]) => {
+    saveBudgetMutation.mutate(updates);
+    setMessages((prev) => [...prev, { role: "assistant", content: `✅ ${updates.length} budget${updates.length > 1 ? "s" : ""} updated successfully!` }]);
+  };
+
+  const getSubcategoryName = (id: string) => {
+    const sub = subcategories.find((s: any) => s.id === id);
+    return sub ? (sub as any).name : "Unknown";
+  };
+
+  const getSubcategoryIcon = (id: string) => {
+    const sub = subcategories.find((s: any) => s.id === id);
+    return sub ? (sub as any).icon : "circle";
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
