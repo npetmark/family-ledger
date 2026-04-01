@@ -237,7 +237,17 @@ export default function BudgetsPage() {
             </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => copyFromPreviousMonth.mutate()}
+            disabled={prevBudgets.length === 0 || copyFromPreviousMonth.isPending}
+            className="text-xs gap-1.5"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Copy from {format(subMonths(currentDate, 1), "MMM")}
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -251,16 +261,6 @@ export default function BudgetsPage() {
           >
             <Trash2 className="h-3.5 w-3.5" />
             Clear
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => copyFromPreviousMonth.mutate()}
-            disabled={prevBudgets.length === 0 || copyFromPreviousMonth.isPending}
-            className="text-xs gap-1.5"
-          >
-            <Copy className="h-3.5 w-3.5" />
-            Copy from {format(subMonths(currentDate, 1), "MMM")}
           </Button>
         </div>
       </div>
