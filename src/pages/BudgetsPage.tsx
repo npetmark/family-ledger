@@ -186,6 +186,20 @@ export default function BudgetsPage() {
     onError: (e) => toast.error(e.message),
   });
 
+  const clearBudgetsMutation = useMutation({
+    mutationFn: async () => {
+      if (budgets.length === 0) throw new Error("No budgets to clear");
+      const ids = budgets.map((b) => b.id);
+      const { error } = await supabase.from("budgets").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+      toast.success("All budgets cleared for this month");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   // Group by main category
   const grouped = subcategories
     .filter((sub) => (sub as any).main_categories?.name !== INCOME_CATEGORY)
