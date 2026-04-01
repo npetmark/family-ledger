@@ -159,16 +159,24 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
     setImagePreview(null);
 
     const history = newMessages
-      .filter((m) => m.role === "user" || (m.role === "assistant" && !m.transactions?.length))
+      .filter((m) => m.role === "user" || (m.role === "assistant" && !m.transactions?.length && !m.budgetUpdates?.length))
       .map((m) => ({ role: m.role, content: m.content }));
 
     try {
       const result = await parseMutation.mutateAsync({ message: msg || undefined, image: img || undefined, history });
-      const showTransactions = !result.needs_clarification && result.transactions?.length > 0;
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: result.message, transactions: showTransactions ? result.transactions : undefined },
-      ]);
+      
+      if (result.action === "budget" && !result.needs_clarification && result.budget_updates?.length) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: result.message, budgetUpdates: result.budget_updates },
+        ]);
+      } else {
+        const showTransactions = !result.needs_clarification && result.transactions?.length > 0;
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: result.message, transactions: showTransactions ? result.transactions : undefined },
+        ]);
+      }
     } catch (e: any) {
       setMessages((prev) => [...prev, { role: "assistant", content: `Sorry, something went wrong: ${e.message}` }]);
     }
