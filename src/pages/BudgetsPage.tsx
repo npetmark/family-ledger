@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Bell, AlertTriangle, Copy } from "lucide-react";
+import { ChevronLeft, ChevronRight, Bell, AlertTriangle, Copy, Trash2 } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
 
 const BUDGET_TARGETS: Record<string, number> = {
@@ -186,6 +186,20 @@ export default function BudgetsPage() {
     onError: (e) => toast.error(e.message),
   });
 
+  const clearBudgetsMutation = useMutation({
+    mutationFn: async () => {
+      if (budgets.length === 0) throw new Error("No budgets to clear");
+      const ids = budgets.map((b) => b.id);
+      const { error } = await supabase.from("budgets").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+      toast.success("All budgets cleared for this month");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   // Group by main category
   const grouped = subcategories
     .filter((sub) => (sub as any).main_categories?.name !== INCOME_CATEGORY)
@@ -213,6 +227,20 @@ export default function BudgetsPage() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-semibold">Budgets</h1>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (confirm("Clear all budget values for this month?")) {
+                clearBudgetsMutation.mutate();
+              }
+            }}
+            disabled={budgets.length === 0 || clearBudgetsMutation.isPending}
+            className="text-xs gap-1.5 text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Clear
+          </Button>
           <Button
             variant="outline"
             size="sm"
