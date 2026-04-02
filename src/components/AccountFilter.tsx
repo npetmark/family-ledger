@@ -110,7 +110,7 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
             )}
           </button>
         </div>
-        <ScrollArea className="max-h-[240px]">
+        <ScrollArea className="h-auto" style={{ maxHeight: 240 }}>
           <div className="p-1.5 space-y-0.5">
             {accounts.map((a) => {
               const checked = isAccountSelected(a.id);
