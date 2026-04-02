@@ -131,7 +131,7 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
               );
             })}
           </div>
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
