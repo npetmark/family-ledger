@@ -343,6 +343,7 @@ export default function BudgetsPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <Input
+                              key={`${sub.id}-${budgetVersion}-${budget}`}
                               type="number"
                               step="0.01"
                               min="0"
