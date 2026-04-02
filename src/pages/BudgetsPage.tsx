@@ -224,6 +224,22 @@ export default function BudgetsPage() {
   const getBudget = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.amount || 0;
   const getAlertThreshold = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.alert_threshold ?? 90;
 
+  // Income for the month (transactions in income categories)
+  const incomeTotal = visibleTransactions
+    .filter((t) => {
+      const mainName = (t as any).subcategories?.main_categories?.name;
+      return mainName === INCOME_CATEGORY;
+    })
+    .reduce((s, t) => s + t.amount, 0);
+
+  // Totals across all expense subcategories
+  const expenseSubIds = subcategories
+    .filter((sub) => (sub as any).main_categories?.name !== INCOME_CATEGORY)
+    .map((sub) => sub.id);
+  const totalBudget = expenseSubIds.reduce((s, id) => s + getBudget(id), 0);
+  const totalSpent = expenseSubIds.reduce((s, id) => s + getSpent(id), 0);
+  const budgetExceedsIncome = totalBudget > 0 && incomeTotal > 0 && totalBudget > incomeTotal;
+
   return (
     <div className="space-y-6 max-w-4xl animate-fade-in">
       <div className="space-y-3">
