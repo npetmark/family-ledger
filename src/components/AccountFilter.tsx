@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DynamicIcon } from "@/components/DynamicIcon";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Filter, Check } from "lucide-react";
 
 export type AccountFilterMode = "all-visible" | "custom";
