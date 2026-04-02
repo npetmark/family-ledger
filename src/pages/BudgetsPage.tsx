@@ -318,6 +318,7 @@ export default function BudgetsPage() {
         </CardContent>
       </Card>
 
+      {Object.keys(grouped).length === 0 && (
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
