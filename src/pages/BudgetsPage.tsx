@@ -21,11 +21,6 @@ const BUDGET_TARGETS: Record<string, number> = {
 
 const INCOME_CATEGORY = "Приходи";
 
-const ALERT_THRESHOLDS = [
-  { value: "75", label: "75%" },
-  { value: "90", label: "90%" },
-  { value: "100", label: "100%" },
-];
 
 export default function BudgetsPage() {
   const { user } = useAuth();
