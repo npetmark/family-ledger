@@ -283,7 +283,41 @@ export default function BudgetsPage() {
         </div>
       </div>
 
-      {Object.keys(grouped).length === 0 && (
+      {/* Total Budget Summary */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">Total Budget</div>
+            <div className="flex items-center gap-4 text-sm">
+              <div className="text-right">
+                <div className="text-xs text-muted-foreground">Budget</div>
+                <span className={`font-mono-numbers font-semibold ${budgetExceedsIncome ? "text-destructive animate-pulse" : ""}`}>
+                  {formatCurrency(totalBudget)}
+                </span>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-muted-foreground">Spent</div>
+                <span className={`font-mono-numbers font-semibold ${totalSpent > totalBudget && totalBudget > 0 ? "text-destructive" : ""}`}>
+                  {formatCurrency(totalSpent)}
+                </span>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-muted-foreground">Income</div>
+                <span className={`font-mono-numbers font-semibold ${budgetExceedsIncome ? "text-destructive animate-pulse" : ""}`}>
+                  {formatCurrency(incomeTotal)}
+                </span>
+              </div>
+            </div>
+          </div>
+          {totalBudget > 0 && (
+            <Progress
+              value={Math.min((totalSpent / totalBudget) * 100, 100)}
+              className={`h-2 mt-3 ${totalSpent > totalBudget ? "[&>div]:bg-destructive" : ""}`}
+            />
+          )}
+        </CardContent>
+      </Card>
+
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
