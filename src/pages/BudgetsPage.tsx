@@ -195,6 +195,7 @@ export default function BudgetsPage() {
       if (error) throw error;
     },
     onSuccess: () => {
+      setBudgetVersion((v) => v + 1);
       queryClient.invalidateQueries({ queryKey: ["budgets"] });
       toast.success("All budgets cleared for this month");
     },
