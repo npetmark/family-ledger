@@ -33,6 +33,7 @@ export default function BudgetsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [budgetVersion, setBudgetVersion] = useState(0);
   const monthYear = getMonthYear(currentDate);
 
   const { data: accounts = [] } = useQuery({
@@ -194,6 +195,7 @@ export default function BudgetsPage() {
       if (error) throw error;
     },
     onSuccess: () => {
+      setBudgetVersion((v) => v + 1);
       queryClient.invalidateQueries({ queryKey: ["budgets"] });
       toast.success("All budgets cleared for this month");
     },
@@ -221,6 +223,22 @@ export default function BudgetsPage() {
     visibleTransactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
   const getBudget = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.amount || 0;
   const getAlertThreshold = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.alert_threshold ?? 90;
+
+  // Income for the month (transactions in income categories)
+  const incomeTotal = visibleTransactions
+    .filter((t) => {
+      const mainName = (t as any).subcategories?.main_categories?.name;
+      return mainName === INCOME_CATEGORY;
+    })
+    .reduce((s, t) => s + t.amount, 0);
+
+  // Totals across all expense subcategories
+  const expenseSubIds = subcategories
+    .filter((sub) => (sub as any).main_categories?.name !== INCOME_CATEGORY)
+    .map((sub) => sub.id);
+  const totalBudget = expenseSubIds.reduce((s, id) => s + getBudget(id), 0);
+  const totalSpent = expenseSubIds.reduce((s, id) => s + getSpent(id), 0);
+  const budgetExceedsIncome = totalBudget > 0 && incomeTotal > 0 && totalBudget > incomeTotal;
 
   return (
     <div className="space-y-6 max-w-4xl animate-fade-in">
@@ -264,6 +282,41 @@ export default function BudgetsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Total Budget Summary */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">Total Budget</div>
+            <div className="flex items-center gap-4 text-sm">
+              <div className="text-right">
+                <div className="text-xs text-muted-foreground">Budget</div>
+                <span className={`font-mono-numbers font-semibold ${budgetExceedsIncome ? "text-destructive animate-pulse" : ""}`}>
+                  {formatCurrency(totalBudget)}
+                </span>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-muted-foreground">Spent</div>
+                <span className={`font-mono-numbers font-semibold ${totalSpent > totalBudget && totalBudget > 0 ? "text-destructive" : ""}`}>
+                  {formatCurrency(totalSpent)}
+                </span>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-muted-foreground">Income</div>
+                <span className={`font-mono-numbers font-semibold ${budgetExceedsIncome ? "text-destructive animate-pulse" : ""}`}>
+                  {formatCurrency(incomeTotal)}
+                </span>
+              </div>
+            </div>
+          </div>
+          {totalBudget > 0 && (
+            <Progress
+              value={Math.min((totalSpent / totalBudget) * 100, 100)}
+              className={`h-2 mt-3 ${totalSpent > totalBudget ? "[&>div]:bg-destructive" : ""}`}
+            />
+          )}
+        </CardContent>
+      </Card>
 
       {Object.keys(grouped).length === 0 && (
         <Card>
@@ -341,6 +394,7 @@ export default function BudgetsPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <Input
+                              key={`${sub.id}-${budgetVersion}-${budget}`}
                               type="number"
                               step="0.01"
                               min="0"
