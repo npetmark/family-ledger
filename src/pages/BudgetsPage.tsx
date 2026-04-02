@@ -186,20 +186,6 @@ export default function BudgetsPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  const setAlertMutation = useMutation({
-    mutationFn: async ({ subcategory_id, alert_threshold }: { subcategory_id: string; alert_threshold: number }) => {
-      const existing = budgets.find((b) => b.subcategory_id === subcategory_id);
-      if (existing) {
-        const { error } = await supabase.from("budgets").update({ alert_threshold }).eq("id", existing.id);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["budgets"] });
-      toast.success("Alert threshold updated");
-    },
-    onError: (e) => toast.error(e.message),
-  });
 
   const clearBudgetsMutation = useMutation({
     mutationFn: async () => {
