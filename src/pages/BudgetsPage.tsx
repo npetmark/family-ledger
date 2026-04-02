@@ -33,6 +33,7 @@ export default function BudgetsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [budgetVersion, setBudgetVersion] = useState(0);
   const monthYear = getMonthYear(currentDate);
 
   const { data: accounts = [] } = useQuery({
