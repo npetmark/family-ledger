@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DynamicIcon } from "@/components/DynamicIcon";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Filter, Check } from "lucide-react";
 
 export type AccountFilterMode = "all-visible" | "custom";
@@ -110,7 +109,7 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
             )}
           </button>
         </div>
-        <ScrollArea className="max-h-[240px]">
+        <div className="max-h-[240px] overflow-y-auto">
           <div className="p-1.5 space-y-0.5">
             {accounts.map((a) => {
               const checked = isAccountSelected(a.id);
@@ -132,7 +131,7 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
               );
             })}
           </div>
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );
