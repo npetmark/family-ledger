@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DynamicIcon } from "@/components/DynamicIcon";
-import { Filter } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Filter, Check } from "lucide-react";
 
 export type AccountFilterMode = "all-visible" | "custom";
 
@@ -39,82 +39,101 @@ export function getFilteredAccountIds(
 }
 
 export function AccountFilter({ accounts, value, onChange }: AccountFilterProps) {
-  const [customOpen, setCustomOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  const label = (() => {
-    switch (value.mode) {
-      case "all-visible":
-        return "All Visible";
-      case "custom":
-        return `${value.customAccountIds?.length || 0} selected`;
+  const visibleAccounts = accounts.filter((a) => a.is_visible);
+  const isAllVisible = value.mode === "all-visible";
+  const selectedCount = isAllVisible
+    ? visibleAccounts.length
+    : (value.customAccountIds?.length || 0);
+
+  const label = isAllVisible
+    ? "All accounts"
+    : selectedCount === accounts.length
+      ? "All accounts"
+      : `${selectedCount} account${selectedCount !== 1 ? "s" : ""}`;
+
+  const toggleAccount = (accountId: string) => {
+    const currentIds = value.mode === "all-visible"
+      ? visibleAccounts.map((a) => a.id)
+      : (value.customAccountIds || []);
+
+    const isSelected = currentIds.includes(accountId);
+    const nextIds = isSelected
+      ? currentIds.filter((id) => id !== accountId)
+      : [...currentIds, accountId];
+
+    // If all visible are selected, go back to "all-visible" mode
+    const allVisibleSelected = visibleAccounts.every((a) => nextIds.includes(a.id))
+      && nextIds.length === visibleAccounts.length;
+
+    if (allVisibleSelected) {
+      onChange({ mode: "all-visible" });
+    } else {
+      onChange({ mode: "custom", customAccountIds: nextIds });
     }
-  })();
+  };
+
+  const selectAll = () => {
+    onChange({ mode: "all-visible" });
+  };
+
+  const isAccountSelected = (accountId: string) => {
+    if (value.mode === "all-visible") {
+      return accounts.find((a) => a.id === accountId)?.is_visible ?? false;
+    }
+    return value.customAccountIds?.includes(accountId) ?? false;
+  };
 
   return (
-    <div className="flex items-center gap-2">
-      <Select
-        value={value.mode}
-        onValueChange={(mode: AccountFilterMode) => {
-          if (mode === "all-visible") {
-            onChange({ mode });
-          } else {
-            onChange({
-              mode,
-              customAccountIds: accounts.filter((a) => a.is_visible).map((a) => a.id),
-            });
-          }
-        }}
-      >
-        <SelectTrigger className="w-[180px] h-8">
-          <Filter className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-          <span className="text-xs text-muted-foreground mr-1">Accounts:</span>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all-visible">All Visible</SelectItem>
-          <SelectItem value="custom">Custom</SelectItem>
-        </SelectContent>
-      </Select>
-
-      {value.mode === "custom" && (
-        <Popover open={customOpen} onOpenChange={setCustomOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8">
-              {label}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-56 p-3" align="start">
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground mb-2">Select accounts</p>
-              {accounts.map((a) => {
-                const checked = value.customAccountIds?.includes(a.id) ?? false;
-                return (
-                  <label
-                    key={a.id}
-                    className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-1 py-1"
-                  >
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={(c) => {
-                        const current = value.customAccountIds || [];
-                        const next = c
-                          ? [...current, a.id]
-                          : current.filter((id) => id !== a.id);
-                        onChange({ ...value, customAccountIds: next });
-                      }}
-                    />
-                    <DynamicIcon name={a.icon} className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-sm">{a.name}</span>
-                    {!a.is_visible && (
-                      <span className="text-xs text-muted-foreground">(hidden)</span>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-          </PopoverContent>
-        </Popover>
-      )}
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 gap-1.5">
+          <Filter className="h-3.5 w-3.5" />
+          <span className="text-xs">{label}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-60 p-0" align="end">
+        <div className="p-2 border-b border-border">
+          <button
+            type="button"
+            className="w-full text-left text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted/50 transition-colors"
+            onClick={selectAll}
+          >
+            {isAllVisible ? (
+              <span className="flex items-center gap-1.5">
+                <Check className="h-3 w-3 text-primary" />
+                All accounts selected
+              </span>
+            ) : (
+              "Select all"
+            )}
+          </button>
+        </div>
+        <ScrollArea className="max-h-[240px]">
+          <div className="p-1.5 space-y-0.5">
+            {accounts.map((a) => {
+              const checked = isAccountSelected(a.id);
+              return (
+                <label
+                  key={a.id}
+                  className="flex items-center gap-2.5 cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5 transition-colors"
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={() => toggleAccount(a.id)}
+                  />
+                  <DynamicIcon name={a.icon} className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm truncate">{a.name}</span>
+                  {!a.is_visible && (
+                    <span className="text-[10px] text-muted-foreground ml-auto shrink-0">(hidden)</span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
   );
 }
