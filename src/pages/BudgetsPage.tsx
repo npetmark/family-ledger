@@ -373,8 +373,8 @@ export default function BudgetsPage() {
                     const spent = getSpent(sub.id);
                     const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
                     const isOver = spent > budget && budget > 0;
-                    const alertThreshold = getAlertThreshold(sub.id);
-                    const isAlerted = budget > 0 && (spent / budget) * 100 >= alertThreshold;
+                    const isAlerted = budget > 0 && (spent / budget) * 100 >= 90;
+                    const prevSpent = getPrevSpent(sub.id);
 
                     return (
                       <div key={sub.id} className="space-y-1">
