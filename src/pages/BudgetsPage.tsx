@@ -410,23 +410,12 @@ export default function BudgetsPage() {
                                 }
                               }}
                             />
-                            <Select
-                              value={alertThreshold.toString()}
-                              onValueChange={(v) =>
-                                setAlertMutation.mutate({ subcategory_id: sub.id, alert_threshold: parseInt(v) })
-                              }
-                            >
-                              <SelectTrigger className="w-20 h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ALERT_THRESHOLDS.map((t) => (
-                                  <SelectItem key={t.value} value={t.value}>
-                                    {t.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="flex items-center gap-1 min-w-[80px] justify-end opacity-60" title={`Spent in ${format(subMonths(currentDate, 1), "MMM yyyy")}`}>
+                              <History className="h-3 w-3 text-muted-foreground shrink-0" />
+                              <span className="text-xs font-mono-numbers text-muted-foreground italic">
+                                {prevSpent > 0 ? formatCurrency(prevSpent) : "—"}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
