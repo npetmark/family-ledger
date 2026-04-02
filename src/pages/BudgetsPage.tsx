@@ -222,7 +222,10 @@ export default function BudgetsPage() {
   const getSpent = (subId: string) =>
     visibleTransactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
   const getBudget = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.amount || 0;
-  const getAlertThreshold = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.alert_threshold ?? 90;
+
+  const prevVisibleTransactions = prevTransactions.filter((t) => visibleAccountIds.has(t.account_id));
+  const getPrevSpent = (subId: string) =>
+    prevVisibleTransactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
 
   // Income for the month (transactions in income categories)
   const incomeTotal = visibleTransactions
