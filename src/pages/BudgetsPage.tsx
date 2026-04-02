@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Bell, AlertTriangle, Copy, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Bell, AlertTriangle, Copy, Trash2, History } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
 
 const BUDGET_TARGETS: Record<string, number> = {
