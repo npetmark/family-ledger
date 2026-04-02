@@ -94,6 +94,27 @@ export default function BudgetsPage() {
     enabled: !!user,
   });
 
+  // Previous month transactions for reference spending
+  const { data: prevTransactions = [] } = useQuery({
+    queryKey: ["prev-transactions-for-budgets", user?.id, prevMonthYear],
+    queryFn: async () => {
+      const prevDate = subMonths(currentDate, 1);
+      const y = prevDate.getFullYear(),
+        m = prevDate.getMonth();
+      const startOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+      const lastDay = new Date(y, m + 1, 0).getDate();
+      const endOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*, subcategories(*, main_categories(*))")
+        .gte("date", startOfMonth)
+        .lte("date", endOfMonth);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const copyFromPreviousMonth = useMutation({
     mutationFn: async () => {
       if (prevBudgets.length === 0) throw new Error("No budgets found in previous month");
