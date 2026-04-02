@@ -7,12 +7,10 @@ import { DynamicIcon } from "@/components/DynamicIcon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Bell, AlertTriangle, Copy, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Bell, AlertTriangle, Copy, Trash2, History } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
 
 const BUDGET_TARGETS: Record<string, number> = {
@@ -23,11 +21,6 @@ const BUDGET_TARGETS: Record<string, number> = {
 
 const INCOME_CATEGORY = "Приходи";
 
-const ALERT_THRESHOLDS = [
-  { value: "75", label: "75%" },
-  { value: "90", label: "90%" },
-  { value: "100", label: "100%" },
-];
 
 export default function BudgetsPage() {
   const { user } = useAuth();
@@ -95,6 +88,27 @@ export default function BudgetsPage() {
     queryKey: ["budgets", user?.id, prevMonthYear],
     queryFn: async () => {
       const { data, error } = await supabase.from("budgets").select("*").eq("month_year", prevMonthYear);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  // Previous month transactions for reference spending
+  const { data: prevTransactions = [] } = useQuery({
+    queryKey: ["prev-transactions-for-budgets", user?.id, prevMonthYear],
+    queryFn: async () => {
+      const prevDate = subMonths(currentDate, 1);
+      const y = prevDate.getFullYear(),
+        m = prevDate.getMonth();
+      const startOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+      const lastDay = new Date(y, m + 1, 0).getDate();
+      const endOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*, subcategories(*, main_categories(*))")
+        .gte("date", startOfMonth)
+        .lte("date", endOfMonth);
       if (error) throw error;
       return data;
     },
@@ -172,20 +186,6 @@ export default function BudgetsPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  const setAlertMutation = useMutation({
-    mutationFn: async ({ subcategory_id, alert_threshold }: { subcategory_id: string; alert_threshold: number }) => {
-      const existing = budgets.find((b) => b.subcategory_id === subcategory_id);
-      if (existing) {
-        const { error } = await supabase.from("budgets").update({ alert_threshold }).eq("id", existing.id);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["budgets"] });
-      toast.success("Alert threshold updated");
-    },
-    onError: (e) => toast.error(e.message),
-  });
 
   const clearBudgetsMutation = useMutation({
     mutationFn: async () => {
@@ -222,7 +222,10 @@ export default function BudgetsPage() {
   const getSpent = (subId: string) =>
     visibleTransactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
   const getBudget = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.amount || 0;
-  const getAlertThreshold = (subId: string) => budgets.find((b) => b.subcategory_id === subId)?.alert_threshold ?? 90;
+
+  const prevVisibleTransactions = prevTransactions.filter((t) => visibleAccountIds.has(t.account_id));
+  const getPrevSpent = (subId: string) =>
+    prevVisibleTransactions.filter((t) => t.subcategory_id === subId).reduce((s, t) => s + t.amount, 0);
 
   // Income for the month (transactions in income categories)
   const incomeTotal = visibleTransactions
@@ -370,8 +373,8 @@ export default function BudgetsPage() {
                     const spent = getSpent(sub.id);
                     const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
                     const isOver = spent > budget && budget > 0;
-                    const alertThreshold = getAlertThreshold(sub.id);
-                    const isAlerted = budget > 0 && (spent / budget) * 100 >= alertThreshold;
+                    const isAlerted = budget > 0 && (spent / budget) * 100 >= 90;
+                    const prevSpent = getPrevSpent(sub.id);
 
                     return (
                       <div key={sub.id} className="space-y-1">
@@ -407,23 +410,12 @@ export default function BudgetsPage() {
                                 }
                               }}
                             />
-                            <Select
-                              value={alertThreshold.toString()}
-                              onValueChange={(v) =>
-                                setAlertMutation.mutate({ subcategory_id: sub.id, alert_threshold: parseInt(v) })
-                              }
-                            >
-                              <SelectTrigger className="w-20 h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ALERT_THRESHOLDS.map((t) => (
-                                  <SelectItem key={t.value} value={t.value}>
-                                    {t.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="flex items-center gap-1 min-w-[80px] justify-end opacity-60" title={`Spent in ${format(subMonths(currentDate, 1), "MMM yyyy")}`}>
+                              <History className="h-3 w-3 text-muted-foreground shrink-0" />
+                              <span className="text-xs font-mono-numbers text-muted-foreground italic">
+                                {prevSpent > 0 ? formatCurrency(prevSpent) : "—"}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
