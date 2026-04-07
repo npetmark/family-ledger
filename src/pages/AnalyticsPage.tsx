@@ -668,18 +668,11 @@ export default function AnalyticsPage() {
                     </div>
                     <div className="w-full space-y-1.5 max-h-[200px] overflow-y-auto">
                       {subcategoryPieData.map((sub, i) => (
-                        <div key={i} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: `hsl(${sub.color} / 0.15)` }}>
-                              <DynamicIcon name={sub.icon} className="h-3.5 w-3.5" style={{ color: `hsl(${sub.color})` }} />
-                            </div>
-                            <div>
-                              <span className="text-sm">{sub.name}</span>
-                              <span className="text-xs text-muted-foreground ml-1.5">({sub.mainCat})</span>
-                            </div>
-                          </div>
-                          <span className="text-sm font-mono-numbers font-medium">{formatCurrency(sub.value)}</span>
-                        </div>
+                        <SubcategoryRow
+                          key={i}
+                          sub={sub}
+                          topTransactions={topTransactionsBySubcategory[sub.subId] || []}
+                        />
                       ))}
                     </div>
                   </div>
