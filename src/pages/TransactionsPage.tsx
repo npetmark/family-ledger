@@ -581,8 +581,9 @@ export default function TransactionsPage() {
           const allTransactions = [...Object.values(group.subGroups).flatMap((sg) => sg.transactions), ...group.ungrouped];
           const totalAmount = allTransactions.reduce((s, t) => s + t.amount, 0);
 
+          const isIncome = group.name === "Income" || group.name === "Приходи";
           return (
-            <Collapsible key={group.name} defaultOpen>
+            <Collapsible key={group.name} defaultOpen={!isIncome}>
               <Card>
                 <CollapsibleTrigger className="w-full">
                   <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors rounded-t-lg">
