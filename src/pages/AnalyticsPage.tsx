@@ -41,6 +41,61 @@ function getPresetRange(preset: FilterPreset, year?: number, month?: number): { 
   }
 }
 
+function SubcategoryRow({ sub, topTransactions }: {
+  sub: { name: string; value: number; icon: string; color: string; mainCat: string };
+  topTransactions: { note: string; amount: number; date: string }[];
+}) {
+  const [showPopover, setShowPopover] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTouchStart = useCallback(() => {
+    longPressTimer.current = setTimeout(() => setShowPopover(true), 500);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  }, []);
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setShowPopover(true)}
+      onMouseLeave={() => setShowPopover(false)}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div className="flex items-center justify-between cursor-pointer">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: `hsl(${sub.color} / 0.15)` }}>
+            <DynamicIcon name={sub.icon} className="h-3.5 w-3.5" style={{ color: `hsl(${sub.color})` }} />
+          </div>
+          <div>
+            <span className="text-sm">{sub.name}</span>
+            <span className="text-xs text-muted-foreground ml-1.5">({sub.mainCat})</span>
+          </div>
+        </div>
+        <span className="text-sm font-mono-numbers font-medium">{formatCurrency(sub.value)}</span>
+      </div>
+      {showPopover && topTransactions.length > 0 && (
+        <div className="absolute right-0 bottom-full mb-1 z-50 bg-popover border border-border rounded-lg p-3 shadow-lg min-w-[220px] max-w-[280px]">
+          <p className="text-xs font-medium text-muted-foreground mb-2">Top {topTransactions.length} transactions</p>
+          <div className="space-y-1.5">
+            {topTransactions.map((tx, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 text-sm">
+                <span className="truncate text-foreground">{tx.note}</span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="font-mono-numbers text-xs text-muted-foreground">{format(new Date(tx.date), "MMM d")}</span>
+                  <span className="font-mono-numbers font-medium">{formatCurrency(tx.amount)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AnalyticsPage() {
   const { user } = useAuth();
   const [activePreset, setActivePreset] = useState<FilterPreset>("month");
