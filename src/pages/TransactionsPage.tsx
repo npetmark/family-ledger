@@ -607,9 +607,9 @@ export default function TransactionsPage() {
                       .map((sg) => {
                         // Sort transactions within subcategory by date desc
                         const sortedTxns = [...sg.transactions].sort((a, b) => b.date.localeCompare(a.date) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-                        const subTotal = sg.transactions.reduce((s, t) => s + t.amount, 0);
-                        if (sg.transactions.length === 1) {
-                          return renderTransaction(sg.transactions[0], group.color);
+                        const subTotal = sortedTxns.reduce((s, t) => s + t.amount, 0);
+                        if (sortedTxns.length === 1) {
+                          return renderTransaction(sortedTxns[0], group.color);
                         }
                         return (
                           <Collapsible key={sg.name}>
@@ -624,7 +624,7 @@ export default function TransactionsPage() {
                                   </div>
                                   <div className="text-left">
                                     <p className="text-sm font-medium">{sg.name}</p>
-                                    <p className="text-xs text-muted-foreground">{sg.transactions.length} transactions</p>
+                                    <p className="text-xs text-muted-foreground">{sortedTxns.length} transactions</p>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -637,7 +637,7 @@ export default function TransactionsPage() {
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                               <div className="ml-6 border-l border-border/50 pl-2 space-y-0.5">
-                                {sg.transactions.map((t) => renderTransaction(t, group.color))}
+                                {sortedTxns.map((t) => renderTransaction(t, group.color))}
                               </div>
                             </CollapsibleContent>
                           </Collapsible>
