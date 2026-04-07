@@ -77,7 +77,7 @@ function SubcategoryRow({ sub, topTransactions }: {
         <span className="text-sm font-mono-numbers font-medium">{formatCurrency(sub.value)}</span>
       </div>
       {showPopover && topTransactions.length > 0 && (
-        <div className="absolute right-0 bottom-full mb-1 z-50 bg-popover border border-border rounded-lg p-3 shadow-lg min-w-[220px] max-w-[280px]">
+        <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-lg p-3 shadow-lg min-w-[220px] max-w-[280px]">
           <p className="text-xs font-medium text-muted-foreground mb-2">Top {topTransactions.length} transactions</p>
           <div className="space-y-1.5">
             {topTransactions.map((tx, i) => (

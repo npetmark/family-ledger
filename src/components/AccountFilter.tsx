@@ -111,7 +111,7 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
         </div>
         <div className="max-h-[240px] overflow-y-auto">
           <div className="p-1.5 space-y-0.5">
-            {accounts.map((a) => {
+            {[...accounts].sort((a, b) => (a.is_visible === b.is_visible ? 0 : a.is_visible ? -1 : 1)).map((a) => {
               const checked = isAccountSelected(a.id);
               return (
                 <label
