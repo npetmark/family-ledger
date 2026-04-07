@@ -255,14 +255,14 @@ export default function AnalyticsPage() {
 
   // Pie data by subcategory — colors derived from parent main category
   const subcategoryPieData = useMemo(() => {
-    const map: Record<string, { name: string; value: number; icon: string; mainCatColor: string; mainCat: string }> = {};
+    const map: Record<string, { name: string; value: number; icon: string; mainCatColor: string; mainCat: string; subId: string }> = {};
     allExpenses.forEach((t) => {
       const subId = t.subcategory_id || "uncategorized";
       const subName = t.subcategories?.name || "Uncategorized";
       const subIcon = t.subcategories?.icon || "circle";
       const mainCatColor = t.subcategories?.main_categories?.color || "0 0% 50%";
       const mainCatName = t.subcategories?.main_categories?.name || "Other";
-      if (!map[subId]) map[subId] = { name: subName, value: 0, icon: subIcon, mainCatColor, mainCat: mainCatName };
+      if (!map[subId]) map[subId] = { name: subName, value: 0, icon: subIcon, mainCatColor, mainCat: mainCatName, subId };
       map[subId].value += t.amount;
     });
     const sorted = Object.values(map).sort((a, b) => b.value - a.value);
@@ -280,6 +280,26 @@ export default function AnalyticsPage() {
       const shade = getSubcategoryShade(item.mainCatColor, indexInGroup, group.length);
       return { ...item, color: shade };
     });
+  }, [allExpenses]);
+
+  // Top 5 transactions per subcategory for tooltip
+  const topTransactionsBySubcategory = useMemo(() => {
+    const map: Record<string, { note: string; amount: number; date: string }[]> = {};
+    allExpenses.forEach((t) => {
+      const subId = t.subcategory_id || "uncategorized";
+      if (!map[subId]) map[subId] = [];
+      map[subId].push({
+        note: t.note || t.subcategories?.name || "Transaction",
+        amount: t.amount,
+        date: t.date,
+      });
+    });
+    // Sort each by amount desc, keep top 5
+    Object.keys(map).forEach((k) => {
+      map[k].sort((a, b) => b.amount - a.amount);
+      map[k] = map[k].slice(0, 5);
+    });
+    return map;
   }, [allExpenses]);
 
   // Main category pie data
