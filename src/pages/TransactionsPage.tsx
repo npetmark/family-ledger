@@ -468,8 +468,20 @@ export default function TransactionsPage() {
 
       {(() => {
         // Group transactions by main category, then by subcategory
-        type SubGroup = { name: string; icon: string; color: string; transactions: typeof transactions };
-        type MainGroup = { name: string; color: string; subGroups: Record<string, SubGroup>; ungrouped: typeof transactions };
+        type SubGroup = { name: string; icon: string; color: string; sortOrder: number; transactions: typeof transactions };
+        type MainGroup = { name: string; color: string; sortOrder: number; subGroups: Record<string, SubGroup>; ungrouped: typeof transactions };
+
+        // Fixed main category order: Income, Needs, Wants, Investments, Transfers
+        const MAIN_CAT_ORDER: Record<string, number> = {
+          "Income": 0, "Приходи": 0,
+          "Needs": 1, "Нужди": 1,
+          "Wants": 2, "Желания": 2,
+          "Investments": 3, "Инвестиции": 3,
+          "Transfers": 4,
+          "Uncategorized": 5,
+        };
+
+        const getMainSortOrder = (name: string) => MAIN_CAT_ORDER[name] ?? 99;
 
         const mainGroups: Record<string, MainGroup> = {};
 
@@ -478,26 +490,31 @@ export default function TransactionsPage() {
           const mainCatColor = t.subcategories?.main_categories?.color || (t.transaction_type === "income" ? "145 45% 42%" : "0 0% 50%");
 
           if (!mainGroups[mainCatName]) {
-            mainGroups[mainCatName] = { name: mainCatName, color: mainCatColor, subGroups: {}, ungrouped: [] };
+            mainGroups[mainCatName] = { name: mainCatName, color: mainCatColor, sortOrder: getMainSortOrder(mainCatName), subGroups: {}, ungrouped: [] };
           }
 
           const subName = t.subcategories?.name;
           if (subName) {
-            if (!mainGroups[mainCatName].subGroups[subName]) {
-              mainGroups[mainCatName].subGroups[subName] = {
+            const subId = t.subcategory_id || subName;
+            if (!mainGroups[mainCatName].subGroups[subId]) {
+              // Find the subcategory's sort_order from the subcategories query
+              const subMeta = subcategories.find((s: any) => s.id === t.subcategory_id);
+              mainGroups[mainCatName].subGroups[subId] = {
                 name: subName,
                 icon: t.subcategories?.icon || "circle",
                 color: t.subcategories?.color || mainCatColor,
+                sortOrder: subMeta?.sort_order ?? 999,
                 transactions: [],
               };
             }
-            mainGroups[mainCatName].subGroups[subName].transactions.push(t);
+            mainGroups[mainCatName].subGroups[subId].transactions.push(t);
           } else {
             mainGroups[mainCatName].ungrouped.push(t);
           }
         });
 
-        const groups = Object.values(mainGroups);
+        // Sort main groups by fixed order
+        const groups = Object.values(mainGroups).sort((a, b) => a.sortOrder - b.sortOrder);
         if (groups.length === 0) {
           return (
             <Card>
