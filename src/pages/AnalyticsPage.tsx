@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { AccountFilter, AccountFilterValue, getFilteredAccountIds } from "@/components/AccountFilter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,6 +39,61 @@ function getPresetRange(preset: FilterPreset, year?: number, month?: number): { 
       return { from: startOfMonth(d), to: endOfMonth(d) };
     }
   }
+}
+
+function SubcategoryRow({ sub, topTransactions }: {
+  sub: { name: string; value: number; icon: string; color: string; mainCat: string };
+  topTransactions: { note: string; amount: number; date: string }[];
+}) {
+  const [showPopover, setShowPopover] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTouchStart = useCallback(() => {
+    longPressTimer.current = setTimeout(() => setShowPopover(true), 500);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  }, []);
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setShowPopover(true)}
+      onMouseLeave={() => setShowPopover(false)}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div className="flex items-center justify-between cursor-pointer">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: `hsl(${sub.color} / 0.15)` }}>
+            <DynamicIcon name={sub.icon} className="h-3.5 w-3.5" style={{ color: `hsl(${sub.color})` }} />
+          </div>
+          <div>
+            <span className="text-sm">{sub.name}</span>
+            <span className="text-xs text-muted-foreground ml-1.5">({sub.mainCat})</span>
+          </div>
+        </div>
+        <span className="text-sm font-mono-numbers font-medium">{formatCurrency(sub.value)}</span>
+      </div>
+      {showPopover && topTransactions.length > 0 && (
+        <div className="absolute right-0 bottom-full mb-1 z-50 bg-popover border border-border rounded-lg p-3 shadow-lg min-w-[220px] max-w-[280px]">
+          <p className="text-xs font-medium text-muted-foreground mb-2">Top {topTransactions.length} transactions</p>
+          <div className="space-y-1.5">
+            {topTransactions.map((tx, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 text-sm">
+                <span className="truncate text-foreground">{tx.note}</span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="font-mono-numbers text-xs text-muted-foreground">{format(new Date(tx.date), "MMM d")}</span>
+                  <span className="font-mono-numbers font-medium">{formatCurrency(tx.amount)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function AnalyticsPage() {
@@ -255,14 +310,14 @@ export default function AnalyticsPage() {
 
   // Pie data by subcategory — colors derived from parent main category
   const subcategoryPieData = useMemo(() => {
-    const map: Record<string, { name: string; value: number; icon: string; mainCatColor: string; mainCat: string }> = {};
+    const map: Record<string, { name: string; value: number; icon: string; mainCatColor: string; mainCat: string; subId: string }> = {};
     allExpenses.forEach((t) => {
       const subId = t.subcategory_id || "uncategorized";
       const subName = t.subcategories?.name || "Uncategorized";
       const subIcon = t.subcategories?.icon || "circle";
       const mainCatColor = t.subcategories?.main_categories?.color || "0 0% 50%";
       const mainCatName = t.subcategories?.main_categories?.name || "Other";
-      if (!map[subId]) map[subId] = { name: subName, value: 0, icon: subIcon, mainCatColor, mainCat: mainCatName };
+      if (!map[subId]) map[subId] = { name: subName, value: 0, icon: subIcon, mainCatColor, mainCat: mainCatName, subId };
       map[subId].value += t.amount;
     });
     const sorted = Object.values(map).sort((a, b) => b.value - a.value);
@@ -280,6 +335,26 @@ export default function AnalyticsPage() {
       const shade = getSubcategoryShade(item.mainCatColor, indexInGroup, group.length);
       return { ...item, color: shade };
     });
+  }, [allExpenses]);
+
+  // Top 5 transactions per subcategory for tooltip
+  const topTransactionsBySubcategory = useMemo(() => {
+    const map: Record<string, { note: string; amount: number; date: string }[]> = {};
+    allExpenses.forEach((t) => {
+      const subId = t.subcategory_id || "uncategorized";
+      if (!map[subId]) map[subId] = [];
+      map[subId].push({
+        note: t.note || t.subcategories?.name || "Transaction",
+        amount: t.amount,
+        date: t.date,
+      });
+    });
+    // Sort each by amount desc, keep top 5
+    Object.keys(map).forEach((k) => {
+      map[k].sort((a, b) => b.amount - a.amount);
+      map[k] = map[k].slice(0, 5);
+    });
+    return map;
   }, [allExpenses]);
 
   // Main category pie data
@@ -648,18 +723,11 @@ export default function AnalyticsPage() {
                     </div>
                     <div className="w-full space-y-1.5 max-h-[200px] overflow-y-auto">
                       {subcategoryPieData.map((sub, i) => (
-                        <div key={i} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: `hsl(${sub.color} / 0.15)` }}>
-                              <DynamicIcon name={sub.icon} className="h-3.5 w-3.5" style={{ color: `hsl(${sub.color})` }} />
-                            </div>
-                            <div>
-                              <span className="text-sm">{sub.name}</span>
-                              <span className="text-xs text-muted-foreground ml-1.5">({sub.mainCat})</span>
-                            </div>
-                          </div>
-                          <span className="text-sm font-mono-numbers font-medium">{formatCurrency(sub.value)}</span>
-                        </div>
+                        <SubcategoryRow
+                          key={i}
+                          sub={sub}
+                          topTransactions={topTransactionsBySubcategory[sub.subId] || []}
+                        />
                       ))}
                     </div>
                   </div>
