@@ -602,7 +602,11 @@ export default function TransactionsPage() {
                 <CollapsibleContent>
                   <CardContent className="pt-0 pb-2">
                     <div className="space-y-0.5">
-                      {Object.values(group.subGroups).map((sg) => {
+                    {Object.values(group.subGroups)
+                      .sort((a, b) => a.sortOrder - b.sortOrder)
+                      .map((sg) => {
+                        // Sort transactions within subcategory by date desc
+                        const sortedTxns = [...sg.transactions].sort((a, b) => b.date.localeCompare(a.date) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
                         const subTotal = sg.transactions.reduce((s, t) => s + t.amount, 0);
                         if (sg.transactions.length === 1) {
                           return renderTransaction(sg.transactions[0], group.color);
