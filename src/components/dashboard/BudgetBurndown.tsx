@@ -68,7 +68,7 @@ export function BudgetBurndown() {
       const endOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
       const { data, error } = await supabase
         .from("transactions")
-        .select("subcategory_id, amount, account_id, transaction_type")
+        .select("subcategory_id, amount, account_id, transaction_type, subcategories(id, name, icon, main_categories(id, name, sort_order))")
         .gte("date", startOfMonth)
         .lte("date", endOfMonth);
       if (error) throw error;
@@ -76,6 +76,8 @@ export function BudgetBurndown() {
     },
     enabled: !!user,
   });
+
+  const INCOME_CATEGORY = "Приходи";
 
   // Filter by visible accounts only
   const visibleAccountIds = new Set(accounts.filter((a) => a.is_visible).map((a) => a.id));
@@ -95,6 +97,7 @@ export function BudgetBurndown() {
       const sub = (b as any).subcategories;
       return {
         id: b.id,
+        subcategoryId: b.subcategory_id,
         name: sub?.name || "Unknown",
         icon: sub?.icon || "circle",
         mainCategory: sub?.main_categories?.name || "",
@@ -105,19 +108,59 @@ export function BudgetBurndown() {
         remaining,
         pct,
         alertThreshold: b.alert_threshold,
+        unbudgeted: false,
       };
     });
 
+  // Add unbudgeted subcategories that have spending this month (excluding income)
+  const budgetedSubIds = new Set(budgetItems.map((i) => i.subcategoryId));
+  const unbudgetedMap = new Map<string, typeof budgetItems[number]>();
+  expenseLike.forEach((t: any) => {
+    const sub = t.subcategories;
+    if (!sub) return;
+    if (budgetedSubIds.has(t.subcategory_id)) return;
+    const mainName = sub.main_categories?.name || "";
+    if (mainName === INCOME_CATEGORY) return;
+    const existing = unbudgetedMap.get(t.subcategory_id);
+    if (existing) {
+      existing.spent += t.amount;
+      existing.remaining = -existing.spent;
+    } else {
+      unbudgetedMap.set(t.subcategory_id, {
+        id: `unbudgeted-${t.subcategory_id}`,
+        subcategoryId: t.subcategory_id,
+        name: sub.name || "Unknown",
+        icon: sub.icon || "circle",
+        mainCategory: mainName,
+        mainCategoryId: sub.main_categories?.id || "",
+        mainCategorySortOrder: sub.main_categories?.sort_order ?? 999,
+        budget: 0,
+        spent: t.amount,
+        remaining: -t.amount,
+        pct: 0,
+        alertThreshold: 90,
+        unbudgeted: true,
+      });
+    }
+  });
+  const allItems = [...budgetItems, ...Array.from(unbudgetedMap.values())];
+
   // Group by main category
   const mainCategoryOrder = ["Нужди", "Желания", "Инвестиции"];
-  const grouped: Record<string, typeof budgetItems> = {};
-  budgetItems.forEach((item) => {
+  const grouped: Record<string, typeof allItems> = {};
+  allItems.forEach((item) => {
     if (!grouped[item.mainCategory]) grouped[item.mainCategory] = [];
     grouped[item.mainCategory].push(item);
   });
 
-  // Sort subcategories within each group by pct descending
-  Object.values(grouped).forEach((items) => items.sort((a, b) => b.pct - a.pct));
+  // Sort subcategories within each group: budgeted first by pct desc, unbudgeted at end by spent desc
+  Object.values(grouped).forEach((items) =>
+    items.sort((a, b) => {
+      if (a.unbudgeted !== b.unbudgeted) return a.unbudgeted ? 1 : -1;
+      if (a.unbudgeted) return b.spent - a.spent;
+      return b.pct - a.pct;
+    })
+  );
 
   const investmentNames = ["Инвестиции", "Investments"];
 
@@ -143,11 +186,11 @@ export function BudgetBurndown() {
     }
   });
 
-  const totalBudget = budgetItems.reduce((s, b) => s + b.budget, 0);
-  const totalSpent = budgetItems.reduce((s, b) => s + b.spent, 0);
+  const totalBudget = allItems.reduce((s, b) => s + b.budget, 0);
+  const totalSpent = allItems.reduce((s, b) => s + b.spent, 0);
   const totalPct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
-  if (budgetItems.length === 0) {
+  if (allItems.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -229,6 +272,25 @@ export function BudgetBurndown() {
                   <div className="ml-5 mt-2 space-y-3 border-l border-border pl-3">
                     {cat.items.map((item) => {
                       const itemClampedPct = Math.min(item.pct, 100);
+                      if (item.unbudgeted) {
+                        return (
+                          <div key={item.id} className="space-y-1 opacity-80">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <DynamicIcon name={item.icon} className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="text-sm">{item.name}</span>
+                                <span className="text-[10px] uppercase tracking-wide text-warning font-medium">Unbudgeted</span>
+                              </div>
+                              <div className="text-xs text-right">
+                                <span className="font-mono-numbers font-medium text-warning">
+                                  {formatCurrency(item.spent)}
+                                </span>
+                                <span className="text-muted-foreground"> / —</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
                       return (
                         <div key={item.id} className="space-y-1">
                           <div className="flex items-center justify-between">

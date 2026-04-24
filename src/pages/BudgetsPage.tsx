@@ -374,6 +374,7 @@ export default function BudgetsPage() {
                     const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
                     const isOver = spent > budget && budget > 0;
                     const isAlerted = budget > 0 && (spent / budget) * 100 >= 90;
+                    const isUnbudgetedSpend = budget === 0 && spent > 0;
                     const prevSpent = getPrevSpent(sub.id);
 
                     return (
@@ -383,15 +384,22 @@ export default function BudgetsPage() {
                             <DynamicIcon name={sub.icon} className="h-4 w-4 text-muted-foreground" />
                             <span className="text-sm">{sub.name}</span>
                             {isAlerted && <Bell className="h-3 w-3 text-warning" />}
-                            <span className={`text-xs font-mono-numbers sm:hidden ${isOver ? "text-destructive" : ""}`}>
+                            {isUnbudgetedSpend && (
+                              <span className="text-[10px] uppercase tracking-wide text-warning font-medium">Unbudgeted</span>
+                            )}
+                            <span className={`text-xs font-mono-numbers sm:hidden ${isOver ? "text-destructive" : isUnbudgetedSpend ? "text-warning" : ""}`}>
                               {formatCurrency(spent)}
                             </span>
                           </div>
                           <div className="flex-1">
-                            <Progress value={pct} className={`h-1.5 ${isOver ? "[&>div]:bg-destructive" : ""}`} />
+                            {isUnbudgetedSpend ? (
+                              <Progress value={100} className="h-1.5 [&>div]:bg-warning" />
+                            ) : (
+                              <Progress value={pct} className={`h-1.5 ${isOver ? "[&>div]:bg-destructive" : ""}`} />
+                            )}
                           </div>
                           <div className="hidden sm:block text-right min-w-[90px]">
-                            <span className={`text-xs font-mono-numbers ${isOver ? "text-destructive" : ""}`}>
+                            <span className={`text-xs font-mono-numbers ${isOver ? "text-destructive" : isUnbudgetedSpend ? "text-warning" : ""}`}>
                               {formatCurrency(spent)}
                             </span>
                           </div>
