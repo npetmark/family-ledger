@@ -68,7 +68,7 @@ export function BudgetBurndown() {
       const endOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
       const { data, error } = await supabase
         .from("transactions")
-        .select("subcategory_id, amount, account_id, transaction_type")
+        .select("subcategory_id, amount, account_id, transaction_type, subcategories(id, name, icon, main_categories(id, name, sort_order))")
         .gte("date", startOfMonth)
         .lte("date", endOfMonth);
       if (error) throw error;
@@ -76,6 +76,8 @@ export function BudgetBurndown() {
     },
     enabled: !!user,
   });
+
+  const INCOME_CATEGORY = "Приходи";
 
   // Filter by visible accounts only
   const visibleAccountIds = new Set(accounts.filter((a) => a.is_visible).map((a) => a.id));
