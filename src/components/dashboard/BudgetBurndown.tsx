@@ -272,6 +272,25 @@ export function BudgetBurndown() {
                   <div className="ml-5 mt-2 space-y-3 border-l border-border pl-3">
                     {cat.items.map((item) => {
                       const itemClampedPct = Math.min(item.pct, 100);
+                      if (item.unbudgeted) {
+                        return (
+                          <div key={item.id} className="space-y-1 opacity-80">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <DynamicIcon name={item.icon} className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="text-sm">{item.name}</span>
+                                <span className="text-[10px] uppercase tracking-wide text-warning font-medium">Unbudgeted</span>
+                              </div>
+                              <div className="text-xs text-right">
+                                <span className="font-mono-numbers font-medium text-warning">
+                                  {formatCurrency(item.spent)}
+                                </span>
+                                <span className="text-muted-foreground"> / —</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
                       return (
                         <div key={item.id} className="space-y-1">
                           <div className="flex items-center justify-between">
