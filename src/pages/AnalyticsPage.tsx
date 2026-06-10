@@ -286,7 +286,7 @@ export default function AnalyticsPage() {
       return eachMonthOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((monthDate) => {
         const m = monthDate.getMonth();
         const y = monthDate.getFullYear();
-        const monthTxns = allExpenses.filter((t) => {
+        const monthTxns = allCategoryItems.filter((t) => {
           const d = new Date(t.date);
           return d.getMonth() === m && d.getFullYear() === y;
         });
@@ -299,7 +299,7 @@ export default function AnalyticsPage() {
     } else {
       return eachDayOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((day) => {
         const dayStr = format(day, "yyyy-MM-dd");
-        const dayTxns = allExpenses.filter((t) => t.date === dayStr);
+        const dayTxns = allCategoryItems.filter((t) => t.date === dayStr);
         const entry: Record<string, any> = { label: format(day, activePreset === "week" ? "EEE d" : "d MMM") };
         mainCategories.forEach((c) => {
           entry[c.name] = dayTxns.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0);
