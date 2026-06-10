@@ -529,6 +529,18 @@ export default function AnalyticsPage() {
             </p>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">{averageMode === "daily" ? "Daily" : "Monthly"} Average Expense</p>
+            <p className="text-2xl font-semibold font-mono-numbers mt-1 text-expense">{formatCurrency(avgExpense)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">{averageMode === "daily" ? "Daily" : "Monthly"} Average Income</p>
+            <p className="text-2xl font-semibold font-mono-numbers mt-1 text-income">{formatCurrency(avgIncome)}</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* AI Analysis Results */}
