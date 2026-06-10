@@ -343,17 +343,29 @@ export default function BudgetsPage() {
           const mainSpentTotal = subs.reduce((s, sub) => s + getSpent(sub.id), 0);
           const mainPct = mainBudgetTotal > 0 ? Math.min((mainSpentTotal / mainBudgetTotal) * 100, 100) : 0;
           const isMainOver = mainSpentTotal > mainBudgetTotal && mainBudgetTotal > 0;
+          const targetPct = BUDGET_TARGETS[mainName];
+          const denom = incomeTotal > 0 ? incomeTotal : totalBudget;
+          const actualPct = denom > 0 ? (mainSpentTotal / denom) * 100 : 0;
+          const actualOverTarget = targetPct !== undefined && actualPct > targetPct;
 
           return (
             <Card key={mainName}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <CardTitle className="text-base font-medium">{mainName}</CardTitle>
-                    {BUDGET_TARGETS[mainName] && (
-                      <Badge variant="secondary" className="text-xs font-mono-numbers">
-                        {BUDGET_TARGETS[mainName]}%
-                      </Badge>
+                    {targetPct !== undefined && (
+                      <>
+                        <Badge variant="secondary" className="text-xs font-mono-numbers">
+                          Target {targetPct}%
+                        </Badge>
+                        <Badge
+                          variant={actualOverTarget ? "destructive" : "outline"}
+                          className="text-xs font-mono-numbers"
+                        >
+                          Actual {actualPct.toFixed(1)}%
+                        </Badge>
+                      </>
                     )}
                     {isMainOver && <AlertTriangle className="h-4 w-4 text-destructive" />}
                   </div>

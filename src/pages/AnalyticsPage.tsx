@@ -308,10 +308,13 @@ export default function AnalyticsPage() {
     }
   }, [allExpenses, mainCategories, activePreset, dateFilter]);
 
+  // For pie charts, include income alongside expense-like so all main categories are represented
+  const allCategoryItems = useMemo(() => [...allExpenses, ...incomes], [allExpenses, incomes]);
+
   // Pie data by subcategory — colors derived from parent main category
   const subcategoryPieData = useMemo(() => {
     const map: Record<string, { name: string; value: number; icon: string; mainCatColor: string; mainCat: string; subId: string }> = {};
-    allExpenses.forEach((t) => {
+    allCategoryItems.forEach((t) => {
       const subId = t.subcategory_id || "uncategorized";
       const subName = t.subcategories?.name || "Uncategorized";
       const subIcon = t.subcategories?.icon || "circle";
@@ -335,7 +338,7 @@ export default function AnalyticsPage() {
       const shade = getSubcategoryShade(item.mainCatColor, indexInGroup, group.length);
       return { ...item, color: shade };
     });
-  }, [allExpenses]);
+  }, [allCategoryItems]);
 
   // Top 5 transactions per subcategory for tooltip
   const topTransactionsBySubcategory = useMemo(() => {
@@ -359,13 +362,12 @@ export default function AnalyticsPage() {
 
   // Main category pie data
   const mainCatPieData = useMemo(() => {
-    const totalAllExpenses = allExpenses.reduce((s, t) => s + t.amount, 0);
     return mainCategories.map((c) => ({
       name: c.name,
-      value: allExpenses.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0),
+      value: allCategoryItems.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0),
       color: `hsl(${c.color})`,
     })).filter((c) => c.value > 0);
-  }, [allExpenses, mainCategories]);
+  }, [allCategoryItems, mainCategories]);
 
   const customTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
