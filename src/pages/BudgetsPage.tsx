@@ -344,8 +344,7 @@ export default function BudgetsPage() {
           const mainPct = mainBudgetTotal > 0 ? Math.min((mainSpentTotal / mainBudgetTotal) * 100, 100) : 0;
           const isMainOver = mainSpentTotal > mainBudgetTotal && mainBudgetTotal > 0;
           const targetPct = BUDGET_TARGETS[mainName];
-          const denom = incomeTotal > 0 ? incomeTotal : totalBudget;
-          const actualPct = denom > 0 ? (mainSpentTotal / denom) * 100 : 0;
+          const actualPct = incomeTotal > 0 ? (mainBudgetTotal / incomeTotal) * 100 : 0;
           const actualOverTarget = targetPct !== undefined && actualPct > targetPct;
 
           return (
