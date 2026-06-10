@@ -309,8 +309,8 @@ export default function AnalyticsPage() {
     }
   }, [allExpenses, mainCategories, activePreset, dateFilter]);
 
-  // For pie charts, include income alongside expense-like so all main categories are represented
-  const allCategoryItems = useMemo(() => [...allExpenses, ...incomes], [allExpenses, incomes]);
+
+
 
   // Pie data by subcategory — colors derived from parent main category
   const subcategoryPieData = useMemo(() => {
