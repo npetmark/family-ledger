@@ -338,7 +338,7 @@ export default function AnalyticsPage() {
       const shade = getSubcategoryShade(item.mainCatColor, indexInGroup, group.length);
       return { ...item, color: shade };
     });
-  }, [allExpenses]);
+  }, [allCategoryItems]);
 
   // Top 5 transactions per subcategory for tooltip
   const topTransactionsBySubcategory = useMemo(() => {
