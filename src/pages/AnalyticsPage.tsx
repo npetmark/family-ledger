@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, Sparkles, Loader2, AlertTriangle, CheckCircle, Info, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, eachDayOfInterval, eachMonthOfInterval } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, eachDayOfInterval, eachMonthOfInterval, differenceInDays } from "date-fns";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const AVAILABLE_YEARS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
@@ -370,6 +370,24 @@ export default function AnalyticsPage() {
     })).filter((c) => c.value > 0);
   }, [allCategoryItems, mainCategories]);
 
+  // Average mode and period count
+  const averageMode = useMemo(() => {
+    if (activePreset === "week" || activePreset === "month") return "daily";
+    if (activePreset === "year") return "monthly";
+    // custom: longer than a month → monthly, else daily
+    return differenceInDays(dateFilter.to, dateFilter.from) + 1 > 30 ? "monthly" : "daily";
+  }, [activePreset, dateFilter]);
+
+  const periodCount = useMemo(() => {
+    if (averageMode === "daily") {
+      return eachDayOfInterval({ start: dateFilter.from, end: dateFilter.to }).length;
+    }
+    return eachMonthOfInterval({ start: dateFilter.from, end: dateFilter.to }).length;
+  }, [averageMode, dateFilter]);
+
+  const avgExpense = periodCount > 0 ? Math.round(totalExpenses / periodCount) : 0;
+  const avgIncome = periodCount > 0 ? Math.round(totalIncome / periodCount) : 0;
+
   const customTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
@@ -490,7 +508,7 @@ export default function AnalyticsPage() {
       </Dialog>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Income</p>
@@ -509,6 +527,18 @@ export default function AnalyticsPage() {
             <p className={`text-2xl font-semibold font-mono-numbers mt-1 ${netSavings >= 0 ? "text-income" : "text-expense"}`}>
               {formatCurrency(netSavings)}
             </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">{averageMode === "daily" ? "Daily" : "Monthly"} Average Expense</p>
+            <p className="text-2xl font-semibold font-mono-numbers mt-1 text-expense">{formatCurrency(avgExpense)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">{averageMode === "daily" ? "Daily" : "Monthly"} Average Income</p>
+            <p className="text-2xl font-semibold font-mono-numbers mt-1 text-income">{formatCurrency(avgIncome)}</p>
           </CardContent>
         </Card>
       </div>
