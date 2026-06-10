@@ -606,7 +606,7 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-medium">
-                {activePreset === "year" ? "Monthly" : "Daily"} Expenses by Category
+                {activePreset === "year" ? "Monthly" : "Daily"} by Category
               </CardTitle>
             </CardHeader>
             <CardContent>
