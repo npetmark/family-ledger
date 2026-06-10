@@ -344,8 +344,7 @@ export default function BudgetsPage() {
           const mainPct = mainBudgetTotal > 0 ? Math.min((mainSpentTotal / mainBudgetTotal) * 100, 100) : 0;
           const isMainOver = mainSpentTotal > mainBudgetTotal && mainBudgetTotal > 0;
           const targetPct = BUDGET_TARGETS[mainName];
-          const actualPct = incomeTotal > 0 ? (mainBudgetTotal / incomeTotal) * 100 : 0;
-          const actualOverTarget = targetPct !== undefined && actualPct > targetPct;
+          const budgetedPct = incomeTotal > 0 ? (mainBudgetTotal / incomeTotal) * 100 : 0;
 
           return (
             <Card key={mainName}>
@@ -359,10 +358,10 @@ export default function BudgetsPage() {
                           Target {targetPct}%
                         </Badge>
                         <Badge
-                          variant={actualOverTarget ? "destructive" : "outline"}
+                          variant="outline"
                           className="text-xs font-mono-numbers"
                         >
-                          Actual {actualPct.toFixed(1)}%
+                          Budgeted {budgetedPct.toFixed(1)}%
                         </Badge>
                       </>
                     )}
