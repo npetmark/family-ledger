@@ -308,10 +308,13 @@ export default function AnalyticsPage() {
     }
   }, [allExpenses, mainCategories, activePreset, dateFilter]);
 
+  // For pie charts, include income alongside expense-like so all main categories are represented
+  const allCategoryItems = useMemo(() => [...allExpenses, ...incomes], [allExpenses, incomes]);
+
   // Pie data by subcategory — colors derived from parent main category
   const subcategoryPieData = useMemo(() => {
     const map: Record<string, { name: string; value: number; icon: string; mainCatColor: string; mainCat: string; subId: string }> = {};
-    allExpenses.forEach((t) => {
+    allCategoryItems.forEach((t) => {
       const subId = t.subcategory_id || "uncategorized";
       const subName = t.subcategories?.name || "Uncategorized";
       const subIcon = t.subcategories?.icon || "circle";
