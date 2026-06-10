@@ -362,13 +362,12 @@ export default function AnalyticsPage() {
 
   // Main category pie data
   const mainCatPieData = useMemo(() => {
-    const totalAllExpenses = allExpenses.reduce((s, t) => s + t.amount, 0);
     return mainCategories.map((c) => ({
       name: c.name,
-      value: allExpenses.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0),
+      value: allCategoryItems.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0),
       color: `hsl(${c.color})`,
     })).filter((c) => c.value > 0);
-  }, [allExpenses, mainCategories]);
+  }, [allCategoryItems, mainCategories]);
 
   const customTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
