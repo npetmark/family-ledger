@@ -246,8 +246,9 @@ export default function AnalyticsPage() {
   // Net Savings = Investments only
   const netSavings = totalInvestments;
 
-  // For pie charts, use ALL expense-like (including investments) so investments still show in breakdown
+  // For pie/category charts, use ALL expense-like (including investments) and income so all categories appear
   const allExpenses = allExpenseLike;
+  const allCategoryItems = [...allExpenseLike, ...incomes];
 
   // Monthly trend data
   const trendData = useMemo(() => {
@@ -285,7 +286,7 @@ export default function AnalyticsPage() {
       return eachMonthOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((monthDate) => {
         const m = monthDate.getMonth();
         const y = monthDate.getFullYear();
-        const monthTxns = allExpenses.filter((t) => {
+        const monthTxns = allCategoryItems.filter((t) => {
           const d = new Date(t.date);
           return d.getMonth() === m && d.getFullYear() === y;
         });
@@ -298,7 +299,7 @@ export default function AnalyticsPage() {
     } else {
       return eachDayOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((day) => {
         const dayStr = format(day, "yyyy-MM-dd");
-        const dayTxns = allExpenses.filter((t) => t.date === dayStr);
+        const dayTxns = allCategoryItems.filter((t) => t.date === dayStr);
         const entry: Record<string, any> = { label: format(day, activePreset === "week" ? "EEE d" : "d MMM") };
         mainCategories.forEach((c) => {
           entry[c.name] = dayTxns.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0);
@@ -308,8 +309,8 @@ export default function AnalyticsPage() {
     }
   }, [allExpenses, mainCategories, activePreset, dateFilter]);
 
-  // For pie charts, include income alongside expense-like so all main categories are represented
-  const allCategoryItems = useMemo(() => [...allExpenses, ...incomes], [allExpenses, incomes]);
+
+
 
   // Pie data by subcategory — colors derived from parent main category
   const subcategoryPieData = useMemo(() => {
@@ -606,7 +607,7 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-medium">
-                {activePreset === "year" ? "Monthly" : "Daily"} Expenses by Category
+                {activePreset === "year" ? "Monthly" : "Daily"} by Category
               </CardTitle>
             </CardHeader>
             <CardContent>
