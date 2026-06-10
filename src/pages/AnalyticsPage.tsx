@@ -370,6 +370,24 @@ export default function AnalyticsPage() {
     })).filter((c) => c.value > 0);
   }, [allCategoryItems, mainCategories]);
 
+  // Average mode and period count
+  const averageMode = useMemo(() => {
+    if (activePreset === "week" || activePreset === "month") return "daily";
+    if (activePreset === "year") return "monthly";
+    // custom: longer than a month → monthly, else daily
+    return differenceInDays(dateFilter.to, dateFilter.from) + 1 > 30 ? "monthly" : "daily";
+  }, [activePreset, dateFilter]);
+
+  const periodCount = useMemo(() => {
+    if (averageMode === "daily") {
+      return eachDayOfInterval({ start: dateFilter.from, end: dateFilter.to }).length;
+    }
+    return eachMonthOfInterval({ start: dateFilter.from, end: dateFilter.to }).length;
+  }, [averageMode, dateFilter]);
+
+  const avgExpense = periodCount > 0 ? Math.round(totalExpenses / periodCount) : 0;
+  const avgIncome = periodCount > 0 ? Math.round(totalIncome / periodCount) : 0;
+
   const customTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
