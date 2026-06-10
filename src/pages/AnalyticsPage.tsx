@@ -246,8 +246,9 @@ export default function AnalyticsPage() {
   // Net Savings = Investments only
   const netSavings = totalInvestments;
 
-  // For pie charts, use ALL expense-like (including investments) so investments still show in breakdown
+  // For pie/category charts, use ALL expense-like (including investments) and income so all categories appear
   const allExpenses = allExpenseLike;
+  const allCategoryItems = [...allExpenseLike, ...incomes];
 
   // Monthly trend data
   const trendData = useMemo(() => {
