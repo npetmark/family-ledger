@@ -345,9 +345,10 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE);
     const { data: items, error: itemsErr } = await admin
       .from("shopping_items")
-      .select("id, name, user_id")
+      .select("id, name, user_id, quantity, unit")
       .in("id", itemIds)
       .eq("user_id", user.id);
+
     if (itemsErr) throw itemsErr;
     if (!items || items.length === 0) {
       return new Response(JSON.stringify({ updated: 0 }), {
