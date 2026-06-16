@@ -710,7 +710,9 @@ export default function ShoppingPage() {
                           ))}
                           {it.promo_price_cents != null && (
                             <span className="text-xs font-mono-numbers font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                              from {formatCurrency(it.promo_price_cents)}
+                              {it.quantity && it.quantity > 1
+                                ? `${formatCurrency(it.promo_price_cents)}${it.unit ? `/${it.unit}` : ""} · ${formatCurrency(Math.round(it.promo_price_cents * it.quantity))}`
+                                : `from ${formatCurrency(it.promo_price_cents)}`}
                             </span>
                           )}
                         </div>
