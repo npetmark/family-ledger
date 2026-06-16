@@ -68,6 +68,8 @@ export default function ShoppingPage() {
   const [refreshingPromos, setRefreshingPromos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const autoPackRefreshed = useRef<Set<string>>(new Set());
+
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 150);
