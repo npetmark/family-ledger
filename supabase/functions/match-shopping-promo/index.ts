@@ -387,18 +387,23 @@ Deno.serve(async (req) => {
         ? (bestHit.packSize ?? defaultPackSize(bestHit.title, it.name))
         : null;
 
-      // If the best deal comes in fixed multi-piece packs and the user's item
-      // is counted in pieces (or has no unit), round the quantity UP to a full
-      // multiple of the pack size. e.g. user asked for 10 eggs but the best
-      // per-piece price is on a 20-pack → bump quantity to 20.
-      const isPieceUnit = !it.unit || /^(piece|pieces|pcs|бр|broi|broya)$/i.test(it.unit);
+      // Quantity normalization for piece-counted items.
+      // - Fractional pieces don't make sense ("2.5 eggs" → buy 3).
+      // - If the best deal is a multi-piece pack, round UP to a whole multiple
+      //   of the pack size (10 eggs + 20-pack deal → bump to 20).
+      // Weight/volume units (kg, g, l, ml) are left untouched so 0.5 kg etc. stays.
+      const isPieceUnit = !it.unit || /^(piece|pieces|pc|pcs|pack|packs|box|boxes|can|cans|bag|bags|бр|броя|пак)$/i.test(it.unit);
       let nextQuantity: number | null = null;
-      if (resolvedPack && resolvedPack > 1 && isPieceUnit) {
-        const currentQty = Number(it.quantity ?? 0) || 0;
-        const packs = Math.max(1, Math.ceil(currentQty / resolvedPack));
-        const adjusted = packs * resolvedPack;
-        if (adjusted !== currentQty) nextQuantity = adjusted;
+      if (isPieceUnit) {
+        const rawQty = Number(it.quantity ?? 0) || 0;
+        if (rawQty > 0) {
+          const integerQty = Math.ceil(rawQty);
+          const pack = resolvedPack && resolvedPack > 1 ? resolvedPack : 1;
+          const adjusted = Math.max(pack, Math.ceil(integerQty / pack) * pack);
+          if (adjusted !== rawQty) nextQuantity = adjusted;
+        }
       }
+
 
       await admin
         .from("shopping_items")
