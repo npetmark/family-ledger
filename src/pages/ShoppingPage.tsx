@@ -707,7 +707,7 @@ export default function ShoppingPage() {
                             </Badge>
                           ))}
                           {it.promo_price_cents != null && (
-                            <span className="text-[11px] font-mono-numbers text-emerald-700 dark:text-emerald-400">
+                            <span className="text-xs font-mono-numbers font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
                               from {formatCurrency(it.promo_price_cents)}
                             </span>
                           )}
@@ -715,7 +715,7 @@ export default function ShoppingPage() {
                       )}
                     </button>
                     {it.price_cents != null && (
-                      <span className="text-xs font-mono-numbers text-muted-foreground">
+                      <span className="text-sm font-mono-numbers font-medium text-foreground">
                         {formatCurrency(it.price_cents)}
                       </span>
                     )}
@@ -735,13 +735,13 @@ export default function ShoppingPage() {
 
       {/* Promo footnote */}
       {storeRanking.promoItemCount > 0 ? (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
-          <ShoppingBag className="h-3.5 w-3.5" />
-          <span>
-            Best at <span className="font-medium text-foreground">{topStore.store}</span> —{" "}
-            {topStore.count} of {storeRanking.promoItemCount} items for {" "}
-            <span className="font-mono-numbers">{formatCurrency(topStore.total)}</span>
-            {" "} (lowest possible: <span className="font-mono-numbers">{formatCurrency(storeRanking.bestPossibleTotal)}</span>)
+        <div className="flex items-center gap-3 text-sm border rounded-md px-3 py-2 bg-muted/30">
+          <ShoppingBag className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+          <span className="text-foreground">
+            Best at <span className="font-semibold">{topStore.store}</span> —{" "}
+            {topStore.count} of {storeRanking.promoItemCount} items for{" "}
+            <span className="font-mono-numbers font-semibold">{formatCurrency(topStore.total)}</span>
+            {" "} (lowest possible: <span className="font-mono-numbers font-semibold">{formatCurrency(storeRanking.bestPossibleTotal)}</span>)
           </span>
         </div>
       ) : items.length > 0 ? (
