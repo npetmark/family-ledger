@@ -227,6 +227,7 @@ export default function ShoppingPage() {
             category_id: categoryId,
             usage_count: 1,
             last_used_at: new Date().toISOString(),
+            translation_key: norm,
           })
           .select()
           .maybeSingle();
