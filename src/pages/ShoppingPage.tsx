@@ -45,7 +45,9 @@ type PromoOffer = {
   price_cents: number;
   pack_size: number | null;
   title: string;
+  unit?: "kg" | "g" | "l" | "ml" | "piece" | null;
 };
+
 type Item = {
   id: string; trip_id: string; category_id: string | null; name: string;
   normalized_name: string; quantity: number; unit: string | null;
