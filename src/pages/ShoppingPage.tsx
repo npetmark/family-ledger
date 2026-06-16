@@ -632,10 +632,10 @@ export default function ShoppingPage() {
                       className={`flex-1 text-left text-sm truncate ${it.checked ? "line-through text-muted-foreground" : ""}`}
                     >
                       {it.name}
-                      {it.quantity && it.quantity !== 1 ? (
-                        <span className="text-muted-foreground text-xs ml-2">×{it.quantity}{it.unit ? ` ${it.unit}` : ""}</span>
-                      ) : it.unit ? (
-                        <span className="text-muted-foreground text-xs ml-2">{it.unit}</span>
+                      {(it.quantity != null && it.quantity !== 1) || it.unit ? (
+                        <span className="text-muted-foreground text-xs ml-2">
+                          {it.unit ? `${it.quantity} ${it.unit}` : `×${it.quantity}`}
+                        </span>
                       ) : null}
                     </button>
                     {it.price_cents != null && (
