@@ -673,7 +673,7 @@ function ItemEditDialog({
   item: Item | null;
   categories: Category[];
   onClose: () => void;
-  onSave: (patch: Partial<Item> & { id: string }) => void;
+  onSave: (patch: Partial<Item> & { id: string; _prevCategoryId?: string | null }) => void;
 }) {
   const [name, setName] = useState("");
   const [qty, setQty] = useState("1");
