@@ -1,0 +1,1 @@
+ALTER TABLE public.shopping_items ADD COLUMN IF NOT EXISTS promo_pack_size integer;

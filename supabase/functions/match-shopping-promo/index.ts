@@ -26,6 +26,8 @@ type Promo = {
   discountPct: number | null;
   categorySlug: string | null;
   parentCategorySlug: string | null;
+  /** Pieces per pack parsed from the title (e.g. "Яйца L 10 бр" → 10). null = not a multi-piece pack. */
+  packSize: number | null;
 };
 
 type CategoryTree = Array<{
@@ -44,6 +46,46 @@ function normalize(input: string): string {
 
 function tokenize(s: string): string[] {
   return normalize(s).split(" ").filter((t) => t.length >= 3);
+}
+
+/**
+ * Parse pack size from a promo title for items sold in fixed multi-piece bundles
+ * (eggs in boxes of 10, beers in 6-packs, etc). Returns null when the price is
+ * per kg, per litre, or the title doesn't mention a piece count — in those
+ * cases the promo price is already per unit and no division/multiplication
+ * adjustment is needed.
+ *
+ * Examples:
+ *   "Яйца размер L 10 бр"        → 10
+ *   "Кренвирши 6 бройки"          → 6
+ *   "Бира 6x500 мл"               → 6
+ *   "Coca-Cola 6 pcs"             → 6
+ *   "Мляко 1 л"                   → null (per-litre, not a pack)
+ *   "Пилешко филе кг"             → null
+ */
+export function parsePackSize(title: string): number | null {
+  const t = (title ?? "").toLowerCase();
+
+  // Reject obvious per-weight/per-volume titles where there is no piece count.
+  // We still allow piece counts to win if both are present (e.g. "6x500 мл").
+
+  // 1) "<N> бр" / "<N> броя" / "<N> бройки" / "<N> pcs" / "<N> pieces" / "<N> ct"
+  const piecesRe = /(\d{1,3})\s*(бр(?:оя|ойки|\.)?|pcs?\b|pieces?\b|ct\b|count\b)/u;
+  const m1 = t.match(piecesRe);
+  if (m1) {
+    const n = parseInt(m1[1], 10);
+    if (n >= 2 && n <= 200) return n;
+  }
+
+  // 2) "<N>x<size>" / "<N>×<size>" style multipacks ("6x500 мл", "4×0.5 л")
+  const multiRe = /(?:^|\s)(\d{1,3})\s*[x×]\s*\d/u;
+  const m2 = t.match(multiRe);
+  if (m2) {
+    const n = parseInt(m2[1], 10);
+    if (n >= 2 && n <= 200) return n;
+  }
+
+  return null;
 }
 
 async function fetchAllPromos(): Promise<Promo[]> {
@@ -67,6 +109,7 @@ async function fetchAllPromos(): Promise<Promo[]> {
         discountPct: it.discount != null ? Number(it.discount) : null,
         categorySlug: it.categorySlug ?? null,
         parentCategorySlug: it.parentCategorySlug ?? null,
+        packSize: parsePackSize(it.title),
       });
     }
     const totalPages = Number(data?.totalPages ?? 1);
@@ -96,7 +139,7 @@ async function fetchCategoryTree(): Promise<CategoryTree> {
   }
 }
 
-async function getPromos(admin: ReturnType<typeof createClient>): Promise<Promo[]> {
+async function getPromos(admin: any): Promise<Promo[]> {
   const { data: cache } = await admin
     .from("shopping_promotions_cache")
     .select("promos, updated_at")
@@ -108,7 +151,9 @@ async function getPromos(admin: ReturnType<typeof createClient>): Promise<Promo[
   const cached = cache?.promos as Promo[] | undefined;
   const hasCategoryInfo = Array.isArray(cached) && cached.length > 0 &&
     cached.some((p) => p && (p.categorySlug || p.parentCategorySlug));
-  if (cached && ageMs < CACHE_TTL_MS && cached.length > 0 && hasCategoryInfo) {
+  const hasPackInfo = Array.isArray(cached) && cached.length > 0 &&
+    cached.some((p) => p && "packSize" in p);
+  if (cached && ageMs < CACHE_TTL_MS && cached.length > 0 && hasCategoryInfo && hasPackInfo) {
     return cached;
   }
   try {
@@ -307,12 +352,24 @@ Deno.serve(async (req) => {
       const bgName = cls?.bg ?? it.name;
       const hits = matchPromos(bgName, cls, promos);
       const stores = Array.from(new Set(hits.map((h) => h.store))).sort();
-      const lowest = hits.length > 0 ? Math.min(...hits.map((h) => h.priceCents)) : null;
+      // Pick the promo with the lowest PER-PIECE price so multi-pack deals
+      // (e.g. "10 eggs for €2 = €0.20/egg") win over a single-piece sticker price.
+      let bestHit: Promo | null = null;
+      let bestPerUnit = Infinity;
+      for (const h of hits) {
+        const pack = h.packSize && h.packSize > 0 ? h.packSize : 1;
+        const perUnit = h.priceCents / pack;
+        if (perUnit < bestPerUnit) {
+          bestPerUnit = perUnit;
+          bestHit = h;
+        }
+      }
       await admin
         .from("shopping_items")
         .update({
           promo_stores: stores.length > 0 ? stores : null,
-          promo_price_cents: lowest,
+          promo_price_cents: bestHit ? bestHit.priceCents : null,
+          promo_pack_size: bestHit?.packSize ?? null,
           promo_checked_at: new Date().toISOString(),
         })
         .eq("id", it.id);
@@ -321,7 +378,10 @@ Deno.serve(async (req) => {
         id: it.id, bgName,
         subSlugs: cls?.subSlugs ?? [],
         parentSlugs: cls?.parentSlugs ?? [],
-        stores, lowest, hits: hits.length,
+        stores,
+        lowest: bestHit?.priceCents ?? null,
+        packSize: bestHit?.packSize ?? null,
+        hits: hits.length,
       });
     }
 
