@@ -441,10 +441,12 @@ Deno.serve(async (req) => {
           promo_stores: stores.length > 0 ? stores : null,
           promo_price_cents: bestHit ? bestHit.priceCents : null,
           promo_pack_size: resolvedPack,
+          promo_offers: promoOffers.length > 0 ? promoOffers : null,
           promo_checked_at: new Date().toISOString(),
           ...(nextQuantity !== null ? { quantity: nextQuantity } : {}),
         })
         .eq("id", it.id);
+
       updated++;
       results.push({
         id: it.id, bgName,
