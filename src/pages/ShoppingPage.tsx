@@ -144,8 +144,10 @@ export default function ShoppingPage() {
     const stale = items.filter(
       (i) =>
         i.promo_stores && i.promo_stores.length > 0 &&
-        (i.promo_pack_size === null || i.promo_pack_size === undefined) &&
+        ((i.promo_pack_size === null || i.promo_pack_size === undefined) ||
+         !i.promo_offers || i.promo_offers.length === 0) &&
         !autoPackRefreshed.current.has(i.id)
+
     );
     if (!stale.length) return;
     stale.forEach((i) => autoPackRefreshed.current.add(i.id));
