@@ -12,12 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, CalendarIcon, ChevronRight, MessageSquare, PenLine } from "lucide-react";
+import { Plus, CalendarIcon, ChevronRight, MessageSquare, PenLine, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { getFundSubcategoryId } from "@/lib/fund-accounts";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { TransactionChatbot } from "@/components/TransactionChatbot";
+import { addShoppingItem, parseShoppingEntry } from "@/lib/shopping";
 
 export function QuickAddTransaction() {
   const { user } = useAuth();
@@ -25,6 +26,8 @@ export function QuickAddTransaction() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [shoppingOpen, setShoppingOpen] = useState(false);
+  const [shoppingText, setShoppingText] = useState("");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
 
@@ -92,6 +95,24 @@ export function QuickAddTransaction() {
 
   const resetForm = () => setForm({ transaction_type: "expense", amount: "", date: new Date(), account_id: "", subcategory_id: "", note: "", transfer_to_account_id: "" });
 
+  const addShoppingMutation = useMutation({
+    mutationFn: async (text: string) => {
+      if (!user) throw new Error("Not signed in");
+      await addShoppingItem({ userId: user.id, rawText: text });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shopping-items"] });
+      queryClient.invalidateQueries({ queryKey: ["shopping-active-trip"] });
+      queryClient.invalidateQueries({ queryKey: ["shopping-top-suggested"] });
+      setShoppingText("");
+      setShoppingOpen(false);
+      toast.success("Added to shopping list");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to add item"),
+  });
+
+  const shoppingPreview = shoppingText.trim() ? parseShoppingEntry(shoppingText) : null;
+
   return (
     <>
       {/* FAB Menu */}
@@ -114,6 +135,14 @@ export function QuickAddTransaction() {
             >
               <PenLine className="h-4 w-4" /> Add Record
             </Button>
+            <Button
+              onClick={() => { setShoppingOpen(true); setMenuOpen(false); }}
+              size="sm"
+              variant="secondary"
+              className="rounded-full shadow-lg px-4 gap-2"
+            >
+              <ShoppingCart className="h-4 w-4" /> Shopping Item
+            </Button>
           </div>
         )}
         <Button
@@ -126,6 +155,45 @@ export function QuickAddTransaction() {
       </div>
 
       <TransactionChatbot open={chatOpen} onOpenChange={setChatOpen} />
+
+      <Dialog open={shoppingOpen} onOpenChange={(v) => { setShoppingOpen(v); if (!v) setShoppingText(""); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add to shopping list</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (shoppingText.trim()) addShoppingMutation.mutate(shoppingText);
+            }}
+          >
+            <Input
+              autoFocus
+              value={shoppingText}
+              onChange={(e) => setShoppingText(e.target.value)}
+              placeholder="e.g. chicken 1 kg, мляко 2 л, eggs x10"
+            />
+            {shoppingPreview && shoppingPreview.name && (
+              <p className="text-xs text-muted-foreground">
+                Will add <span className="font-medium text-foreground">{shoppingPreview.name}</span>
+                {shoppingPreview.quantity !== 1 || shoppingPreview.unit
+                  ? ` · ${shoppingPreview.quantity}${shoppingPreview.unit ? ` ${shoppingPreview.unit}` : ""}`
+                  : ""}
+                {" "}to your active trip.
+              </p>
+            )}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!shoppingText.trim() || addShoppingMutation.isPending}
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Add to list
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
         <DialogContent>

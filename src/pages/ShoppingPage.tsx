@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { detectLanguage, normalizeName, scheduleUndoableDelete } from "@/lib/shopping";
+import { detectLanguage, normalizeName, parseShoppingEntry, scheduleUndoableDelete } from "@/lib/shopping";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 
 type Category = {
@@ -174,7 +174,15 @@ export default function ShoppingPage() {
   const addItem = useMutation({
     mutationFn: async (payload: { name: string; categoryId: string | null; dictEntry?: DictEntry }) => {
       if (!activeTrip || !user) return;
-      const display = payload.name.trim();
+      const raw = payload.name.trim();
+      if (!raw) return;
+
+      // If the user picked a suggestion, trust it verbatim; otherwise parse out qty/unit.
+      const fromSuggestion = !!payload.dictEntry;
+      const parsed = fromSuggestion
+        ? { name: raw, quantity: 1, unit: null as string | null }
+        : parseShoppingEntry(raw);
+      const display = parsed.name;
       if (!display) return;
       const norm = normalizeName(display);
       const lang = detectLanguage(display);
@@ -194,7 +202,6 @@ export default function ShoppingPage() {
         }
       }
       if (!categoryId) {
-        // fallback: Other
         const other = categories.find((c) => c.name === "Other");
         categoryId = other?.id ?? null;
       }
@@ -205,7 +212,8 @@ export default function ShoppingPage() {
         category_id: categoryId,
         name: display,
         normalized_name: norm,
-        quantity: 1,
+        quantity: parsed.quantity,
+        unit: parsed.unit,
         sort_order: items.length,
       });
       if (error) throw error;
