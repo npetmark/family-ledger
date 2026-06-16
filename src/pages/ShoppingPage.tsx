@@ -497,6 +497,28 @@ export default function ShoppingPage() {
   const totalItems = items.length;
   const totalPrice = items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
 
+  const storeRanking = useMemo(() => {
+    const promoItems = items.filter(
+      (i) => Array.isArray(i.promo_stores) && i.promo_stores.length > 0 && i.promo_price_cents != null,
+    );
+    const byStore = new Map<string, { store: string; count: number; total: number; itemIds: string[] }>();
+    for (const it of promoItems) {
+      for (const store of it.promo_stores!) {
+        const cur = byStore.get(store) ?? { store, count: 0, total: 0, itemIds: [] };
+        cur.count += 1;
+        cur.total += it.promo_price_cents!;
+        cur.itemIds.push(it.id);
+        byStore.set(store, cur);
+      }
+    }
+    const ranked = Array.from(byStore.values()).sort(
+      (a, b) => b.count - a.count || a.total - b.total || a.store.localeCompare(b.store),
+    );
+    const bestPossibleTotal = promoItems.reduce((s, i) => s + (i.promo_price_cents ?? 0), 0);
+    return { ranked, promoItemCount: promoItems.length, bestPossibleTotal };
+  }, [items]);
+  const topStore = storeRanking.ranked[0];
+
   const refreshPromos = async () => {
     if (!activeTrip || items.length === 0) return;
     setRefreshingPromos(true);
