@@ -202,6 +202,20 @@ export async function addShoppingItem(opts: {
   }
 }
 
+/**
+ * Invokes the match-shopping-promo edge function to enrich shopping items
+ * with current promotions scraped from znamcenite.bg. Fire-and-forget safe.
+ */
+export async function triggerPromoLookup(itemIds: string[]): Promise<void> {
+  if (!itemIds || itemIds.length === 0) return;
+  const { error } = await supabase.functions.invoke("match-shopping-promo", {
+    body: { item_ids: itemIds },
+  });
+  if (error) throw error;
+}
+
+
+
 
 export interface UndoableDeleteOptions {
   message: string;
