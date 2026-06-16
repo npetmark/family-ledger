@@ -68,6 +68,8 @@ export default function ShoppingPage() {
   const [refreshingPromos, setRefreshingPromos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const autoPackRefreshed = useRef<Set<string>>(new Set());
+
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 150);
@@ -126,6 +128,24 @@ export default function ShoppingPage() {
     },
     enabled: !!activeTrip?.id,
   });
+
+  // Auto-refresh promo data for items that were matched before pack-size parsing existed.
+  // Targets items with a matched promo store but no pack_size — refreshed once per item per session.
+  useEffect(() => {
+    if (!items.length) return;
+    const stale = items.filter(
+      (i) =>
+        i.promo_stores && i.promo_stores.length > 0 &&
+        (i.promo_pack_size === null || i.promo_pack_size === undefined) &&
+        !autoPackRefreshed.current.has(i.id)
+    );
+    if (!stale.length) return;
+    stale.forEach((i) => autoPackRefreshed.current.add(i.id));
+    triggerPromoLookup(stale.map((i) => i.id))
+      .then(() => queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip?.id] }))
+      .catch((e) => console.warn("auto pack refresh failed", e));
+  }, [items, activeTrip?.id, queryClient]);
+
 
   const { data: suggestions = [] } = useQuery({
     queryKey: ["shopping-suggestions", user?.id, debounced],
