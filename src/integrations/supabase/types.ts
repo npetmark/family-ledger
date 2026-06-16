@@ -320,6 +320,7 @@ export type Database = {
           language: string
           last_used_at: string | null
           normalized_name: string
+          translation_key: string | null
           updated_at: string
           usage_count: number
           user_id: string
@@ -332,6 +333,7 @@ export type Database = {
           language?: string
           last_used_at?: string | null
           normalized_name: string
+          translation_key?: string | null
           updated_at?: string
           usage_count?: number
           user_id: string
@@ -344,6 +346,7 @@ export type Database = {
           language?: string
           last_used_at?: string | null
           normalized_name?: string
+          translation_key?: string | null
           updated_at?: string
           usage_count?: number
           user_id?: string
