@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { scheduleUndoableDelete } from "@/lib/shopping";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
@@ -129,21 +130,32 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
     onError: () => toast.error("Failed to update transaction"),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      if (!editingTx) return;
-      const { error } = await supabase.from("transactions").delete().eq("id", editingTx.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
-      toast.success("Transaction deleted");
-      setDeleteOpen(false);
-      setEditingTx(null);
-    },
-    onError: () => toast.error("Failed to delete transaction"),
-  });
+  const performDelete = () => {
+    if (!editingTx) return;
+    const id = editingTx.id;
+    setDeleteOpen(false);
+    setEditingTx(null);
+    const keys = [["transactions"], ["all-transactions-for-balance"]];
+    const snapshots = keys.map((k) => [k, queryClient.getQueryData(k)] as const);
+    keys.forEach((k) => {
+      queryClient.setQueriesData({ queryKey: k }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.filter((t: any) => t.id !== id);
+      });
+    });
+    scheduleUndoableDelete({
+      message: "Transaction deleted",
+      onConfirm: async () => {
+        const { error } = await supabase.from("transactions").delete().eq("id", id);
+        if (error) throw error;
+        keys.forEach((k) => queryClient.invalidateQueries({ queryKey: k }));
+      },
+      onUndo: () => {
+        snapshots.forEach(([k, snap]) => queryClient.setQueryData(k as any, snap));
+      },
+    });
+  };
+
 
   const getAccountName = (id: string) => accounts.find((a: any) => a.id === id)?.name || "";
 
@@ -424,16 +436,16 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this transaction? This action cannot be undone.
+              You'll have 5 seconds to undo after confirming.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteMutation.mutate()}
+              onClick={performDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
