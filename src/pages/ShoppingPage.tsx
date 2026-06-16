@@ -930,16 +930,27 @@ function ItemEditDialog({
           {item.promo_offers && item.promo_offers.length > 0 && (
             <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
               <p className="text-xs font-medium text-muted-foreground">
-                Matched deals · per piece (cheapest first)
+                Matched deals · cheapest first
               </p>
               <ul className="space-y-1">
                 {item.promo_offers.map((o) => {
                   const qtyNum = parseFloat(qty) || 1;
+                  // Per-weight/volume promos quote a unit price and don't use
+                  // pack rounding — fold pack_size to null so the qty multiplies directly.
+                  const isMeasure = o.unit === "kg" || o.unit === "l" || o.unit === "g" || o.unit === "ml";
+                  const effectivePack = isMeasure ? null : o.pack_size;
                   const lineTotal = computeLineTotalCents({
                     promo_price_cents: o.price_cents,
                     quantity: qtyNum,
-                    pack_size: o.pack_size,
+                    pack_size: effectivePack,
                   });
+                  const unitLabel =
+                    o.unit === "kg" ? "/kg" :
+                    o.unit === "l"  ? "/L" :
+                    o.unit === "g"  ? "/g" :
+                    o.unit === "ml" ? "/ml" :
+                    (effectivePack && effectivePack > 1) ? `/pack of ${effectivePack}` :
+                    o.unit === "piece" ? "/piece" : "";
                   return (
                     <li key={o.store} className="flex items-center justify-between gap-2 text-sm">
                       <span className="font-medium truncate">{o.store}</span>
@@ -947,8 +958,8 @@ function ItemEditDialog({
                         <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                           {formatCurrency(o.price_cents)}
                         </span>
-                        {o.pack_size && o.pack_size > 1 && (
-                          <span className="text-muted-foreground"> /pack of {o.pack_size}</span>
+                        {unitLabel && (
+                          <span className="text-muted-foreground">{" "}{unitLabel}</span>
                         )}
                         <span className="text-muted-foreground"> · total {formatCurrency(lineTotal)}</span>
                       </span>
@@ -958,6 +969,7 @@ function ItemEditDialog({
               </ul>
             </div>
           )}
+
         </div>
 
         <DialogFooter>
