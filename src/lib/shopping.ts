@@ -1,13 +1,16 @@
 import { toast } from "sonner";
 
-/** Lowercase, strip diacritics, collapse whitespace. Works for Latin + Cyrillic. */
+/**
+ * Lowercase + collapse whitespace. Strips Latin diacritics ("café" → "cafe")
+ * but preserves Cyrillic precomposed letters like "й" (which would otherwise
+ * decompose into "и" + combining breve and break dictionary lookups).
+ */
 export function normalizeName(input: string): string {
-  return input
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
+  const hasCyrillic = /[\u0400-\u04FF]/.test(input);
+  const base = hasCyrillic
+    ? input.normalize("NFC")
+    : input.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  return base.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 /** Detect language: bg if any Cyrillic letter present, otherwise en. */
@@ -49,31 +52,57 @@ export function parseShoppingEntry(raw: string): ParsedShoppingEntry {
   const input = raw.replace(/\s+/g, " ").trim();
   if (!input) return { name: "", quantity: 1, unit: null };
 
-  // Trailing "<qty> <unit?>" optionally prefixed by × / x
-  const re = /^(.*?)(?:\s+|^)(?:[x×]\s*)?(\d+(?:[.,]\d+)?)\s*([A-Za-zА-Яа-я.]{1,6})?\s*$/u;
-  const m = input.match(re);
-  if (!m) return { name: input, quantity: 1, unit: null };
-
-  const namePart = m[1].trim();
-  const qty = parseFloat(m[2].replace(",", "."));
-  let unit = (m[3] ?? "").replace(/\.$/, "").toLowerCase() || null;
-
-  if (unit && !KNOWN_UNITS.has(unit)) {
-    // Unknown unit suffix — treat it as part of the name and drop the qty too.
-    return { name: input, quantity: 1, unit: null };
+  // Try leading quantity first: "20 eggs", "20 яйца", "2 kg chicken", "x3 apples"
+  const leading = input.match(
+    /^(?:[x×]\s*)?(\d+(?:[.,]\d+)?)\s*([A-Za-zА-Яа-я.]{1,6})?\s+(.+)$/u,
+  );
+  if (leading) {
+    const qty = parseFloat(leading[1].replace(",", "."));
+    const maybeUnit = (leading[2] ?? "").replace(/\.$/, "").toLowerCase();
+    const rest = leading[3].trim();
+    if (maybeUnit && KNOWN_UNITS.has(maybeUnit)) {
+      return {
+        name: rest,
+        quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
+        unit: UNIT_ALIASES[maybeUnit] ?? maybeUnit,
+      };
+    }
+    // No recognised unit token — the chunk after the number is the full name.
+    const name = (maybeUnit ? `${maybeUnit} ${rest}` : rest).trim();
+    if (name) {
+      return {
+        name,
+        quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
+        unit: null,
+      };
+    }
   }
-  if (unit && UNIT_ALIASES[unit]) unit = UNIT_ALIASES[unit];
 
-  if (!namePart) {
-    // Just a number / unit — not really a shopping item.
-    return { name: input, quantity: 1, unit: null };
+  // Trailing "<name> <qty> <unit?>" — "chicken 1 kg", "eggs 20", "сирене 500г"
+  const trailing = input.match(
+    /^(.+?)\s+(?:[x×]\s*)?(\d+(?:[.,]\d+)?)\s*([A-Za-zА-Яа-я.]{1,6})?\s*$/u,
+  );
+  if (trailing) {
+    const namePart = trailing[1].trim();
+    const qty = parseFloat(trailing[2].replace(",", "."));
+    let unit = (trailing[3] ?? "").replace(/\.$/, "").toLowerCase() || null;
+
+    if (unit && !KNOWN_UNITS.has(unit)) {
+      // Unrecognised trailing token — leave the input alone so we don't lose info.
+      return { name: input, quantity: 1, unit: null };
+    }
+    if (unit && UNIT_ALIASES[unit]) unit = UNIT_ALIASES[unit];
+
+    if (namePart) {
+      return {
+        name: namePart,
+        quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
+        unit,
+      };
+    }
   }
 
-  return {
-    name: namePart,
-    quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
-    unit,
-  };
+  return { name: input, quantity: 1, unit: null };
 }
 
 import { supabase } from "@/integrations/supabase/client";
