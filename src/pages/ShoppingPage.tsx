@@ -496,6 +496,20 @@ export default function ShoppingPage() {
   const totalItems = items.length;
   const totalPrice = items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
 
+  const refreshPromos = async () => {
+    if (!activeTrip || items.length === 0) return;
+    setRefreshingPromos(true);
+    try {
+      await triggerPromoLookup(items.map((i) => i.id));
+      await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
+      toast.success("Promotions refreshed");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to refresh promotions");
+    } finally {
+      setRefreshingPromos(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
