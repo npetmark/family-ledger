@@ -502,9 +502,21 @@ export default function ShoppingPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Shopping</h1>
           <p className="text-sm text-muted-foreground">One list per trip. Items auto-categorize as you type.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setPastOpen(true)}>
-          <History className="h-4 w-4 mr-2" /> Past trips
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={refreshingPromos || items.length === 0}
+            onClick={refreshPromos}
+            title="Re-check znamcenite.bg for discounts on every item"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
+            Refresh promos
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setPastOpen(true)}>
+            <History className="h-4 w-4 mr-2" /> Past trips
+          </Button>
+        </div>
       </div>
 
       {/* Active trip card */}
