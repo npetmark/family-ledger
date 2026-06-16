@@ -1,5 +1,5 @@
-// Match shopping items against znamcenite.bg promotions.
-// Caches the scraped feed for 6h; translates EN -> BG via Lovable AI when needed.
+// Match shopping items against znamcenite.bg promotions via their public JSON API.
+// Caches the full feed for 6h; translates EN -> BG via Lovable AI when needed.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
@@ -8,12 +8,13 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const PROMO_URL = "https://www.znamcenite.bg/promocii/";
+const API_URL = "https://api.znamcenite.bg/api/v1/promotions";
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
-const KNOWN_STORES = ["Billa", "Fantastico", "Kaufland", "Lidl"];
+const PAGE_SIZE = 200;
+const MAX_PAGES = 20;
 
 type Promo = {
-  name: string;
+  title: string;
   normName: string;
   store: string;
   priceCents: number;
@@ -33,42 +34,29 @@ function tokenize(s: string): string[] {
   return normalize(s).split(" ").filter((t) => t.length >= 3);
 }
 
-function parsePromoPage(html: string): Promo[] {
-  // Match each `<div id="promo-...">...</div>` block (stop at next promo or closing parent grid).
-  const blocks = html.split(/<div id="promo-/).slice(1);
+async function fetchAllPromos(): Promise<Promo[]> {
   const out: Promo[] = [];
-  for (const b of blocks) {
-    const block = "<div id=\"promo-" + b;
-    const nameMatch = block.match(/<h3[^>]*>([^<]+)<\/h3>/);
-    if (!nameMatch) continue;
-    const name = nameMatch[1].trim();
-
-    let store = "";
-    for (const s of KNOWN_STORES) {
-      const re = new RegExp(`alt="${s}"\\s+title="${s}"`, "i");
-      if (re.test(block)) { store = s; break; }
-    }
-    if (!store) continue;
-
-    const priceMatch = block.match(/<span class="text-base font-bold tabular-nums[^"]*">€([\d.,]+)<\/span>/);
-    if (!priceMatch) continue;
-    const originalMatch = block.match(/<span class="text-sm tabular-nums[^"]*line-through[^"]*">€([\d.,]+)<\/span>/);
-    const discountMatch = block.match(/>-(\d+)%</);
-
-    const priceCents = Math.round(parseFloat(priceMatch[1].replace(",", ".")) * 100);
-    const originalPriceCents = originalMatch
-      ? Math.round(parseFloat(originalMatch[1].replace(",", ".")) * 100)
-      : null;
-    const discountPct = discountMatch ? parseInt(discountMatch[1], 10) : null;
-
-    out.push({
-      name,
-      normName: normalize(name),
-      store,
-      priceCents,
-      originalPriceCents,
-      discountPct,
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url = `${API_URL}?page=${page}&pageSize=${PAGE_SIZE}`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 LovableShopBot/1.0", "Accept": "application/json" },
     });
+    if (!res.ok) throw new Error(`promotions API ${page} -> ${res.status}`);
+    const data = await res.json();
+    const items = Array.isArray(data?.items) ? data.items : [];
+    for (const it of items) {
+      if (!it?.title || !it?.supermarketName || it?.currentPrice == null) continue;
+      out.push({
+        title: it.title,
+        normName: normalize(it.title),
+        store: it.supermarketName,
+        priceCents: Math.round(Number(it.currentPrice) * 100),
+        originalPriceCents: it.originalPrice != null ? Math.round(Number(it.originalPrice) * 100) : null,
+        discountPct: it.discount != null ? Number(it.discount) : null,
+      });
+    }
+    const totalPages = Number(data?.totalPages ?? 1);
+    if (page >= totalPages) break;
   }
   return out;
 }
@@ -85,21 +73,18 @@ async function getPromos(admin: ReturnType<typeof createClient>): Promise<Promo[
   if (cache && ageMs < CACHE_TTL_MS && Array.isArray(cache.promos) && (cache.promos as Promo[]).length > 0) {
     return cache.promos as Promo[];
   }
-  // Refresh
-  const res = await fetch(PROMO_URL, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; LovableShopBot/1.0)" },
-  });
-  if (!res.ok) {
-    if (cache?.promos) return cache.promos as Promo[];
-    throw new Error(`Failed to fetch promotions: ${res.status}`);
+  try {
+    const fresh = await fetchAllPromos();
+    if (fresh.length > 0) {
+      await admin
+        .from("shopping_promotions_cache")
+        .upsert({ id: 1, promos: fresh as any, updated_at: new Date().toISOString() });
+      return fresh;
+    }
+  } catch (e) {
+    console.error("fetchAllPromos failed", e);
   }
-  const html = await res.text();
-  const promos = parsePromoPage(html);
-  if (promos.length === 0 && cache?.promos) return cache.promos as Promo[];
-  await admin
-    .from("shopping_promotions_cache")
-    .upsert({ id: 1, promos: promos as any, updated_at: new Date().toISOString() });
-  return promos;
+  return (cache?.promos as Promo[]) ?? [];
 }
 
 function detectLang(s: string): "bg" | "en" | "other" {
@@ -109,17 +94,14 @@ function detectLang(s: string): "bg" | "en" | "other" {
 }
 
 async function translateToBg(names: string[], apiKey: string): Promise<Record<string, string>> {
-  if (names.length === 0) return {};
+  if (names.length === 0 || !apiKey) return {};
   const prompt =
-    `Translate each grocery item name to Bulgarian (singular, common form, no article, no quantity). ` +
-    `Reply ONLY with a JSON object mapping the original English name to its Bulgarian translation. ` +
+    `Translate each grocery/shopping item name to Bulgarian (singular, common form, no article, no quantity). ` +
+    `Reply ONLY with a JSON object mapping each original name (verbatim key) to its Bulgarian translation. ` +
     `Items: ${JSON.stringify(names)}`;
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
@@ -149,14 +131,15 @@ function matchPromos(queryBg: string, promos: Promo[]): Promo[] {
   const qTokens = tokenize(queryBg);
   if (qTokens.length === 0) return [];
   const qNorm = normalize(queryBg);
-  // Tier 1: promo name contains the full query phrase.
-  let hits = promos.filter((p) => p.normName.includes(qNorm));
+  // Tier 1: promo name contains the full query phrase as a word boundary.
+  const phraseRe = new RegExp(`(^|\\s)${qNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`, "u");
+  let hits = promos.filter((p) => phraseRe.test(p.normName));
   if (hits.length === 0) {
-    // Tier 2: every query token appears in the promo name.
+    // Tier 2: every query token appears as a whole-word match in the promo name.
     hits = promos.filter((p) => {
-      const pTokens = new Set(tokenize(p.name));
+      const pTokens = new Set(tokenize(p.title));
       return qTokens.every((t) =>
-        Array.from(pTokens).some((pt) => pt.includes(t) || t.includes(pt)),
+        Array.from(pTokens).some((pt) => pt === t || pt.startsWith(t) || t.startsWith(pt)),
       );
     });
   }
@@ -210,15 +193,11 @@ Deno.serve(async (req) => {
 
     const promos = await getPromos(admin);
 
-    // Translation pass for non-BG names
     const toTranslate: string[] = [];
     for (const it of items) {
       if (detectLang(it.name) !== "bg") toTranslate.push(it.name);
     }
-    let translations: Record<string, string> = {};
-    if (toTranslate.length > 0 && LOVABLE_API_KEY) {
-      translations = await translateToBg(toTranslate, LOVABLE_API_KEY);
-    }
+    const translations = await translateToBg(toTranslate, LOVABLE_API_KEY);
 
     let updated = 0;
     const results: Array<Record<string, unknown>> = [];
@@ -226,9 +205,7 @@ Deno.serve(async (req) => {
       const bgName = detectLang(it.name) === "bg" ? it.name : (translations[it.name] ?? it.name);
       const hits = matchPromos(bgName, promos);
       const stores = Array.from(new Set(hits.map((h) => h.store))).sort();
-      const lowest = hits.length > 0
-        ? Math.min(...hits.map((h) => h.priceCents))
-        : null;
+      const lowest = hits.length > 0 ? Math.min(...hits.map((h) => h.priceCents)) : null;
       await admin
         .from("shopping_items")
         .update({
