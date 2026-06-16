@@ -387,6 +387,36 @@ Deno.serve(async (req) => {
         ? (bestHit.packSize ?? defaultPackSize(bestHit.title, it.name))
         : null;
 
+      // Per-store best offer (cheapest per-piece in each store) so the edit
+      // dialog can show "Lidl €1.99 · Kaufland €2.30 · Fantastico €2.10".
+      const bestByStore = new Map<string, { price_cents: number; pack_size: number | null; title: string; per_unit_cents: number }>();
+      for (const h of hits) {
+        const pack = h.packSize && h.packSize > 0 ? h.packSize : 1;
+        const perUnit = h.priceCents / pack;
+        const cur = bestByStore.get(h.store);
+        if (!cur || perUnit < cur.per_unit_cents) {
+          bestByStore.set(h.store, {
+            price_cents: h.priceCents,
+            pack_size: h.packSize ?? defaultPackSize(h.title, it.name),
+            title: h.title,
+            per_unit_cents: perUnit,
+          });
+        }
+      }
+      const promoOffers = Array.from(bestByStore.entries())
+        .map(([store, v]) => ({
+          store,
+          price_cents: v.price_cents,
+          pack_size: v.pack_size,
+          title: v.title,
+        }))
+        .sort((a, b) => {
+          const ap = (a.price_cents) / (a.pack_size && a.pack_size > 0 ? a.pack_size : 1);
+          const bp = (b.price_cents) / (b.pack_size && b.pack_size > 0 ? b.pack_size : 1);
+          return ap - bp || a.store.localeCompare(b.store);
+        });
+
+
       // Quantity normalization for piece-counted items.
       // - Fractional pieces don't make sense ("2.5 eggs" → buy 3).
       // - If the best deal is a multi-piece pack, round UP to a whole multiple
