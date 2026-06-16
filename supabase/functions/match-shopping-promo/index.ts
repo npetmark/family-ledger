@@ -151,7 +151,9 @@ async function getPromos(admin: ReturnType<typeof createClient>): Promise<Promo[
   const cached = cache?.promos as Promo[] | undefined;
   const hasCategoryInfo = Array.isArray(cached) && cached.length > 0 &&
     cached.some((p) => p && (p.categorySlug || p.parentCategorySlug));
-  if (cached && ageMs < CACHE_TTL_MS && cached.length > 0 && hasCategoryInfo) {
+  const hasPackInfo = Array.isArray(cached) && cached.length > 0 &&
+    cached.some((p) => p && "packSize" in p);
+  if (cached && ageMs < CACHE_TTL_MS && cached.length > 0 && hasCategoryInfo && hasPackInfo) {
     return cached;
   }
   try {
