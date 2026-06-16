@@ -783,6 +783,59 @@ export default function ShoppingPage() {
         onSave={(patch) => updateItem.mutate(patch)}
       />
 
+      {/* Go shopping suggestion */}
+      <Dialog open={goShoppingOpen} onOpenChange={setGoShoppingOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingBag className="h-5 w-5" /> Where to shop
+            </DialogTitle>
+          </DialogHeader>
+          {topStore ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/40 p-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Trophy className="h-4 w-4 text-amber-500" /> Best pick
+                </div>
+                <div className="mt-1 text-xl font-semibold">{topStore.store}</div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  Covers <span className="font-medium text-foreground">{topStore.count}</span> of{" "}
+                  {storeRanking.promoItemCount} discounted item{storeRanking.promoItemCount === 1 ? "" : "s"} ·{" "}
+                  total <span className="font-medium text-foreground font-mono-numbers">{formatCurrency(topStore.total)}</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">All stores</div>
+                <div className="space-y-1.5">
+                  {storeRanking.ranked.map((s, idx) => (
+                    <div
+                      key={s.store}
+                      className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${idx === 0 ? "border-primary/40 bg-primary/5" : ""}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{s.store}</span>
+                        <Badge variant="secondary" className="text-xs">{s.count} item{s.count === 1 ? "" : "s"}</Badge>
+                      </div>
+                      <span className="font-mono-numbers text-muted-foreground">{formatCurrency(s.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Ranked by most discounted items covered, then by lowest total. Prices are the best advertised promo per item.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No promotions matched yet. Add items or tap "Refresh promos" to check znamcenite.bg.
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGoShoppingOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Past trips drawer */}
       <Dialog open={pastOpen} onOpenChange={setPastOpen}>
         <DialogContent className="max-w-2xl">
