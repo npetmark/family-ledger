@@ -500,7 +500,7 @@ export default function ShoppingPage() {
     const promoItems = items.filter(
       (i) => Array.isArray(i.promo_stores) && i.promo_stores.length > 0 && i.promo_price_cents != null,
     );
-    const lineTotal = (it: ShoppingItem) =>
+    const lineTotal = (it: Item) =>
       Math.round((it.promo_price_cents ?? 0) * (it.quantity && it.quantity > 0 ? it.quantity : 1));
     const byStore = new Map<string, { store: string; count: number; total: number; itemIds: string[] }>();
     for (const it of promoItems) {
