@@ -692,13 +692,23 @@ export default function ShoppingPage() {
                               {store}
                             </Badge>
                           ))}
-                          {it.promo_price_cents != null && (
-                            <span className="text-xs font-mono-numbers font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                              {it.quantity && it.quantity > 1
-                                ? `${formatCurrency(it.promo_price_cents)}${it.unit ? `/${it.unit}` : ""} · ${formatCurrency(computeLineTotalCents(it))}`
-                                : `from ${formatCurrency(it.promo_price_cents)}`}
-                            </span>
-                          )}
+                          {it.promo_price_cents != null && (() => {
+                            const pack = it.promo_pack_size && it.promo_pack_size > 0 ? it.promo_pack_size : null;
+                            const lineTotal = computeLineTotalCents({
+                              promo_price_cents: it.promo_price_cents,
+                              quantity: it.quantity,
+                              pack_size: pack,
+                            });
+                            const unitLabel = pack ? `/pack of ${pack}` : it.unit ? `/${it.unit}` : "";
+                            const showTotal = (it.quantity ?? 1) > 1 || (pack != null && (it.quantity ?? 0) !== pack);
+                            return (
+                              <span className="text-xs font-mono-numbers font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                {showTotal
+                                  ? `${formatCurrency(it.promo_price_cents)}${unitLabel} · ${formatCurrency(lineTotal)}`
+                                  : `from ${formatCurrency(it.promo_price_cents)}${unitLabel}`}
+                              </span>
+                            );
+                          })()}
                         </div>
                       )}
                     </button>
