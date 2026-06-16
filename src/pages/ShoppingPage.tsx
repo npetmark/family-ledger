@@ -40,6 +40,12 @@ type Trip = {
   started_at: string; completed_at: string | null;
   total_cents: number | null; receipt_path: string | null; notes: string | null;
 };
+type PromoOffer = {
+  store: string;
+  price_cents: number;
+  pack_size: number | null;
+  title: string;
+};
 type Item = {
   id: string; trip_id: string; category_id: string | null; name: string;
   normalized_name: string; quantity: number; unit: string | null;
@@ -48,8 +54,10 @@ type Item = {
   promo_stores: string[] | null;
   promo_price_cents: number | null;
   promo_pack_size: number | null;
+  promo_offers: PromoOffer[] | null;
   promo_checked_at: string | null;
 };
+
 type DictEntry = {
   id: string; normalized_name: string; display_name: string;
   language: string; category_id: string | null; usage_count: number;
@@ -136,8 +144,10 @@ export default function ShoppingPage() {
     const stale = items.filter(
       (i) =>
         i.promo_stores && i.promo_stores.length > 0 &&
-        (i.promo_pack_size === null || i.promo_pack_size === undefined) &&
+        ((i.promo_pack_size === null || i.promo_pack_size === undefined) ||
+         !i.promo_offers || i.promo_offers.length === 0) &&
         !autoPackRefreshed.current.has(i.id)
+
     );
     if (!stale.length) return;
     stale.forEach((i) => autoPackRefreshed.current.add(i.id));
@@ -915,7 +925,39 @@ function ItemEditDialog({
               Add the other-language name to teach the app — both sides share the same category in suggestions.
             </p>
           </div>
+          {item.promo_offers && item.promo_offers.length > 0 && (
+            <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
+              <p className="text-xs font-medium text-muted-foreground">
+                Matched deals · per piece (cheapest first)
+              </p>
+              <ul className="space-y-1">
+                {item.promo_offers.map((o) => {
+                  const qtyNum = parseFloat(qty) || 1;
+                  const lineTotal = computeLineTotalCents({
+                    promo_price_cents: o.price_cents,
+                    quantity: qtyNum,
+                    pack_size: o.pack_size,
+                  });
+                  return (
+                    <li key={o.store} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="font-medium truncate">{o.store}</span>
+                      <span className="font-mono-numbers text-right shrink-0">
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                          {formatCurrency(o.price_cents)}
+                        </span>
+                        {o.pack_size && o.pack_size > 1 && (
+                          <span className="text-muted-foreground"> /pack of {o.pack_size}</span>
+                        )}
+                        <span className="text-muted-foreground"> · total {formatCurrency(lineTotal)}</span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
+
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={() => onSave({
