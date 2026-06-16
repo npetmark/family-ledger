@@ -371,6 +371,7 @@ export type Database = {
           normalized_name: string
           price_cents: number | null
           promo_checked_at: string | null
+          promo_offers: Json | null
           promo_pack_size: number | null
           promo_price_cents: number | null
           promo_stores: string[] | null
@@ -390,6 +391,7 @@ export type Database = {
           normalized_name: string
           price_cents?: number | null
           promo_checked_at?: string | null
+          promo_offers?: Json | null
           promo_pack_size?: number | null
           promo_price_cents?: number | null
           promo_stores?: string[] | null
@@ -409,6 +411,7 @@ export type Database = {
           normalized_name?: string
           price_cents?: number | null
           promo_checked_at?: string | null
+          promo_offers?: Json | null
           promo_pack_size?: number | null
           promo_price_cents?: number | null
           promo_stores?: string[] | null
