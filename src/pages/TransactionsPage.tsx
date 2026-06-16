@@ -19,6 +19,11 @@ import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronD
 import { toast } from "sonner";
 import { format, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths } from "date-fns";
 import { getFundSubcategoryId } from "@/lib/fund-accounts";
+import { scheduleUndoableDelete } from "@/lib/shopping";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type FilterPreset = "day" | "week" | "month" | "year" | "custom";
 
@@ -583,7 +588,7 @@ export default function TransactionsPage() {
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
-                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(t.id); }}
+                onClick={(e) => { e.stopPropagation(); setPendingDeleteTxId(t.id); }}
               >
                 <span className="text-xs">✕</span>
               </Button>
