@@ -12,12 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, CalendarIcon, ChevronRight, MessageSquare, PenLine } from "lucide-react";
+import { Plus, CalendarIcon, ChevronRight, MessageSquare, PenLine, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { getFundSubcategoryId } from "@/lib/fund-accounts";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { TransactionChatbot } from "@/components/TransactionChatbot";
+import { addShoppingItem, parseShoppingEntry } from "@/lib/shopping";
 
 export function QuickAddTransaction() {
   const { user } = useAuth();
