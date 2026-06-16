@@ -429,12 +429,14 @@ Deno.serve(async (req) => {
           price_cents: v.price_cents,
           pack_size: v.pack_size,
           title: v.title,
+          unit: detectPriceUnit(v.title),
         }))
         .sort((a, b) => {
           const ap = (a.price_cents) / (a.pack_size && a.pack_size > 0 ? a.pack_size : 1);
           const bp = (b.price_cents) / (b.pack_size && b.pack_size > 0 ? b.pack_size : 1);
           return ap - bp || a.store.localeCompare(b.store);
         });
+
 
 
       // Quantity normalization for piece-counted items.
