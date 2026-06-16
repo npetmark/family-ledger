@@ -26,6 +26,8 @@ export function QuickAddTransaction() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [shoppingOpen, setShoppingOpen] = useState(false);
+  const [shoppingText, setShoppingText] = useState("");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
 
