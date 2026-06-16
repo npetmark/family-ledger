@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/popover";
 import {
   ChevronDown, ChevronRight, Plus, Receipt, Check, Trash2,
-  History, Paperclip, X, Pencil, Tag, RefreshCw,
+  History, Paperclip, X, Pencil, Tag, RefreshCw, ShoppingBag, Trophy,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -65,6 +65,7 @@ export default function ShoppingPage() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const [refreshingPromos, setRefreshingPromos] = useState(false);
+  const [goShoppingOpen, setGoShoppingOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -496,6 +497,28 @@ export default function ShoppingPage() {
   const totalItems = items.length;
   const totalPrice = items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
 
+  const storeRanking = useMemo(() => {
+    const promoItems = items.filter(
+      (i) => Array.isArray(i.promo_stores) && i.promo_stores.length > 0 && i.promo_price_cents != null,
+    );
+    const byStore = new Map<string, { store: string; count: number; total: number; itemIds: string[] }>();
+    for (const it of promoItems) {
+      for (const store of it.promo_stores!) {
+        const cur = byStore.get(store) ?? { store, count: 0, total: 0, itemIds: [] };
+        cur.count += 1;
+        cur.total += it.promo_price_cents!;
+        cur.itemIds.push(it.id);
+        byStore.set(store, cur);
+      }
+    }
+    const ranked = Array.from(byStore.values()).sort(
+      (a, b) => b.count - a.count || a.total - b.total || a.store.localeCompare(b.store),
+    );
+    const bestPossibleTotal = promoItems.reduce((s, i) => s + (i.promo_price_cents ?? 0), 0);
+    return { ranked, promoItemCount: promoItems.length, bestPossibleTotal };
+  }, [items]);
+  const topStore = storeRanking.ranked[0];
+
   const refreshPromos = async () => {
     if (!activeTrip || items.length === 0) return;
     setRefreshingPromos(true);
@@ -527,6 +550,14 @@ export default function ShoppingPage() {
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
             Refresh promos
+          </Button>
+          <Button
+            size="sm"
+            disabled={storeRanking.promoItemCount === 0}
+            onClick={() => setGoShoppingOpen(true)}
+            title="See which store to visit based on current promos"
+          >
+            <ShoppingBag className="h-4 w-4 mr-2" /> Go shopping
           </Button>
           <Button variant="outline" size="sm" onClick={() => setPastOpen(true)}>
             <History className="h-4 w-4 mr-2" /> Past trips
@@ -751,6 +782,59 @@ export default function ShoppingPage() {
         onClose={() => setEditingItem(null)}
         onSave={(patch) => updateItem.mutate(patch)}
       />
+
+      {/* Go shopping suggestion */}
+      <Dialog open={goShoppingOpen} onOpenChange={setGoShoppingOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingBag className="h-5 w-5" /> Where to shop
+            </DialogTitle>
+          </DialogHeader>
+          {topStore ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/40 p-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Trophy className="h-4 w-4 text-amber-500" /> Best pick
+                </div>
+                <div className="mt-1 text-xl font-semibold">{topStore.store}</div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  Covers <span className="font-medium text-foreground">{topStore.count}</span> of{" "}
+                  {storeRanking.promoItemCount} discounted item{storeRanking.promoItemCount === 1 ? "" : "s"} ·{" "}
+                  total <span className="font-medium text-foreground font-mono-numbers">{formatCurrency(topStore.total)}</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">All stores</div>
+                <div className="space-y-1.5">
+                  {storeRanking.ranked.map((s, idx) => (
+                    <div
+                      key={s.store}
+                      className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${idx === 0 ? "border-primary/40 bg-primary/5" : ""}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{s.store}</span>
+                        <Badge variant="secondary" className="text-xs">{s.count} item{s.count === 1 ? "" : "s"}</Badge>
+                      </div>
+                      <span className="font-mono-numbers text-muted-foreground">{formatCurrency(s.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Ranked by most discounted items covered, then by lowest total. Prices are the best advertised promo per item.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No promotions matched yet. Add items or tap "Refresh promos" to check znamcenite.bg.
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGoShoppingOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Past trips drawer */}
       <Dialog open={pastOpen} onOpenChange={setPastOpen}>
