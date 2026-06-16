@@ -26,6 +26,8 @@ type Promo = {
   discountPct: number | null;
   categorySlug: string | null;
   parentCategorySlug: string | null;
+  /** Pieces per pack parsed from the title (e.g. "Яйца L 10 бр" → 10). null = not a multi-piece pack. */
+  packSize: number | null;
 };
 
 type CategoryTree = Array<{
