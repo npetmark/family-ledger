@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { detectLanguage, normalizeName, scheduleUndoableDelete } from "@/lib/shopping";
+import { detectLanguage, normalizeName, parseShoppingEntry, scheduleUndoableDelete } from "@/lib/shopping";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 
 type Category = {
