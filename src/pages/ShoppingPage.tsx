@@ -923,7 +923,39 @@ function ItemEditDialog({
               Add the other-language name to teach the app — both sides share the same category in suggestions.
             </p>
           </div>
+          {item.promo_offers && item.promo_offers.length > 0 && (
+            <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
+              <p className="text-xs font-medium text-muted-foreground">
+                Matched deals · per piece (cheapest first)
+              </p>
+              <ul className="space-y-1">
+                {item.promo_offers.map((o) => {
+                  const qtyNum = parseFloat(qty) || 1;
+                  const lineTotal = computeLineTotalCents({
+                    promo_price_cents: o.price_cents,
+                    quantity: qtyNum,
+                    pack_size: o.pack_size,
+                  });
+                  return (
+                    <li key={o.store} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="font-medium truncate">{o.store}</span>
+                      <span className="font-mono-numbers text-right shrink-0">
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                          {formatCurrency(o.price_cents)}
+                        </span>
+                        {o.pack_size && o.pack_size > 1 && (
+                          <span className="text-muted-foreground"> /pack of {o.pack_size}</span>
+                        )}
+                        <span className="text-muted-foreground"> · total {formatCurrency(lineTotal)}</span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
+
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={() => onSave({
