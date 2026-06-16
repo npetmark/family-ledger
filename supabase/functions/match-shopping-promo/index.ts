@@ -48,6 +48,46 @@ function tokenize(s: string): string[] {
   return normalize(s).split(" ").filter((t) => t.length >= 3);
 }
 
+/**
+ * Parse pack size from a promo title for items sold in fixed multi-piece bundles
+ * (eggs in boxes of 10, beers in 6-packs, etc). Returns null when the price is
+ * per kg, per litre, or the title doesn't mention a piece count — in those
+ * cases the promo price is already per unit and no division/multiplication
+ * adjustment is needed.
+ *
+ * Examples:
+ *   "Яйца размер L 10 бр"        → 10
+ *   "Кренвирши 6 бройки"          → 6
+ *   "Бира 6x500 мл"               → 6
+ *   "Coca-Cola 6 pcs"             → 6
+ *   "Мляко 1 л"                   → null (per-litre, not a pack)
+ *   "Пилешко филе кг"             → null
+ */
+export function parsePackSize(title: string): number | null {
+  const t = (title ?? "").toLowerCase();
+
+  // Reject obvious per-weight/per-volume titles where there is no piece count.
+  // We still allow piece counts to win if both are present (e.g. "6x500 мл").
+
+  // 1) "<N> бр" / "<N> броя" / "<N> бройки" / "<N> pcs" / "<N> pieces" / "<N> ct"
+  const piecesRe = /(\d{1,3})\s*(бр(?:оя|ойки|\.)?|pcs?\b|pieces?\b|ct\b|count\b)/u;
+  const m1 = t.match(piecesRe);
+  if (m1) {
+    const n = parseInt(m1[1], 10);
+    if (n >= 2 && n <= 200) return n;
+  }
+
+  // 2) "<N>x<size>" / "<N>×<size>" style multipacks ("6x500 мл", "4×0.5 л")
+  const multiRe = /(?:^|\s)(\d{1,3})\s*[x×]\s*\d/u;
+  const m2 = t.match(multiRe);
+  if (m2) {
+    const n = parseInt(m2[1], 10);
+    if (n >= 2 && n <= 200) return n;
+  }
+
+  return null;
+}
+
 async function fetchAllPromos(): Promise<Promo[]> {
   const out: Promo[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
