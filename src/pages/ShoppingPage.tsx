@@ -470,6 +470,22 @@ export default function ShoppingPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] }),
   });
 
+  const clearSuggestions = useMutation({
+    mutationFn: async () => {
+      if (!user) return;
+      const { error } = await supabase
+        .from("shopping_item_dictionary")
+        .update({ usage_count: 0, last_used_at: null })
+        .eq("user_id", user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shopping-top-suggested", user?.id] });
+      toast.success("Suggestions cleared");
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to clear suggestions"),
+  });
+
   // -------- delete with confirmation + undo
   const requestDelete = (id: string) => setPendingDeleteId(id);
   const confirmDelete = () => {
@@ -650,7 +666,16 @@ export default function ShoppingPage() {
           {/* Suggested chips */}
           {chipSuggestions.length > 0 && (
             <div>
-              <div className="text-xs text-muted-foreground mb-2">Suggested</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs text-muted-foreground">Suggested</div>
+                <button
+                  type="button"
+                  onClick={() => clearSuggestions.mutate()}
+                  className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  Clear suggestions
+                </button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {chipSuggestions.map((s) => {
                   const cat = categories.find((c) => c.id === s.category_id);
@@ -668,6 +693,7 @@ export default function ShoppingPage() {
               </div>
             </div>
           )}
+
         </CardContent>
       </Card>
 
