@@ -209,7 +209,7 @@ export default function ShoppingPage() {
         categoryId = other?.id ?? null;
       }
 
-      const { error } = await supabase.from("shopping_items").insert({
+      const { data: inserted, error } = await supabase.from("shopping_items").insert({
         user_id: user.id,
         trip_id: activeTrip.id,
         category_id: categoryId,
@@ -218,8 +218,15 @@ export default function ShoppingPage() {
         quantity: parsed.quantity,
         unit: parsed.unit,
         sort_order: items.length,
-      });
+      }).select("id").single();
       if (error) throw error;
+
+      // Fire-and-forget promo lookup
+      if (inserted?.id) {
+        triggerPromoLookup([inserted.id])
+          .then(() => queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] }))
+          .catch((e) => console.warn("promo lookup failed", e));
+      }
 
       // Upsert dictionary entry + bump usage
       if (dictId) {
