@@ -737,13 +737,14 @@ function ItemEditDialog({
   item: Item | null;
   categories: Category[];
   onClose: () => void;
-  onSave: (patch: Partial<Item> & { id: string; _prevCategoryId?: string | null }) => void;
+  onSave: (patch: Partial<Item> & { id: string; _prevCategoryId?: string | null; _translation?: string | null }) => void;
 }) {
   const [name, setName] = useState("");
   const [qty, setQty] = useState("1");
   const [unit, setUnit] = useState("");
   const [price, setPrice] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
+  const [translation, setTranslation] = useState("");
 
   useEffect(() => {
     if (item) {
@@ -752,10 +753,17 @@ function ItemEditDialog({
       setUnit(item.unit ?? "");
       setPrice(item.price_cents != null ? (item.price_cents / 100).toFixed(2) : "");
       setCategoryId(item.category_id ?? "");
+      setTranslation("");
     }
   }, [item]);
 
   if (!item) return null;
+  const lang = detectLanguage(name);
+  const translationLabel =
+    lang === "bg" ? "English name (optional)" :
+    lang === "en" ? "Bulgarian name (optional)" :
+    "Translation (optional)";
+
   return (
     <Dialog open={!!item} onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
@@ -777,6 +785,16 @@ function ItemEditDialog({
               ))}
             </SelectContent>
           </Select>
+          <div className="space-y-1">
+            <Input
+              value={translation}
+              onChange={(e) => setTranslation(e.target.value)}
+              placeholder={translationLabel}
+            />
+            <p className="text-xs text-muted-foreground">
+              Add the other-language name to teach the app — both sides share the same category in suggestions.
+            </p>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
@@ -789,6 +807,7 @@ function ItemEditDialog({
             price_cents: price.trim() ? parseCurrencyToCents(price) : null,
             category_id: categoryId || null,
             _prevCategoryId: item.category_id,
+            _translation: translation.trim() || null,
           })}>Save</Button>
         </DialogFooter>
       </DialogContent>
