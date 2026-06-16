@@ -227,6 +227,7 @@ export default function ShoppingPage() {
             category_id: categoryId,
             usage_count: 1,
             last_used_at: new Date().toISOString(),
+            translation_key: norm,
           })
           .select()
           .maybeSingle();
@@ -266,52 +267,115 @@ export default function ShoppingPage() {
   });
 
   const updateItem = useMutation({
-    mutationFn: async (patch: Partial<Item> & { id: string; _prevCategoryId?: string | null }) => {
-      const { id, _prevCategoryId, ...fields } = patch;
+    mutationFn: async (
+      patch: Partial<Item> & {
+        id: string;
+        _prevCategoryId?: string | null;
+        _translation?: string | null;
+      },
+    ) => {
+      const { id, _prevCategoryId, _translation, ...fields } = patch;
       const { error } = await supabase.from("shopping_items").update(fields).eq("id", id);
       if (error) throw error;
 
-      // Cross-language category learning: when the category changes, update
-      // the dictionary entry for this normalized name AND every entry that
-      // shares its translation_key (the EN/BG counterparts).
+      if (!user) return;
+
       const newCategoryId = (fields.category_id ?? null) as string | null;
       const norm = fields.normalized_name as string | undefined;
-      if (user && norm && newCategoryId && newCategoryId !== _prevCategoryId) {
-        const { data: self } = await supabase
+      const display = (fields.name as string | undefined)?.trim() || norm || "";
+      const translationDisplay = _translation?.trim() || null;
+      const translationNorm = translationDisplay ? normalizeName(translationDisplay) : null;
+
+      const categoryChanged = !!newCategoryId && newCategoryId !== _prevCategoryId;
+      // Run the dictionary sync whenever the user explicitly set a category OR
+      // typed a translation — both are signals the user is teaching the app.
+      if (!norm || (!categoryChanged && !translationNorm)) return;
+
+      // Look up the current entry for this normalized name (if any)
+      const { data: self } = await supabase
+        .from("shopping_item_dictionary")
+        .select("id, translation_key, language, category_id")
+        .eq("user_id", user.id)
+        .eq("normalized_name", norm)
+        .maybeSingle();
+
+      // Decide the translation_key:
+      // - reuse the self entry's key if it exists
+      // - otherwise reuse the translation counterpart's key if it exists
+      // - otherwise fall back to the EN-side normalized name when possible
+      let translationKey: string | null = self?.translation_key ?? null;
+
+      if (!translationKey && translationNorm) {
+        const { data: counterpart } = await supabase
           .from("shopping_item_dictionary")
           .select("id, translation_key")
           .eq("user_id", user.id)
-          .eq("normalized_name", norm)
+          .eq("normalized_name", translationNorm)
           .maybeSingle();
+        translationKey = counterpart?.translation_key ?? null;
+      }
 
-        const display = (fields.name as string | undefined)?.trim() || norm;
-        const lang = detectLanguage(display);
-        let translationKey: string | null = self?.translation_key ?? null;
+      if (!translationKey) {
+        const selfLang = detectLanguage(display);
+        const translationLang = translationNorm ? detectLanguage(translationDisplay!) : null;
+        if (selfLang === "en") translationKey = norm;
+        else if (translationLang === "en" && translationNorm) translationKey = translationNorm;
+        else translationKey = norm;
+      }
 
-        if (!self) {
-          translationKey = translationKey ?? norm;
+      const effectiveCategoryId = newCategoryId ?? self?.category_id ?? null;
+
+      // Upsert the self entry
+      if (!self) {
+        await supabase.from("shopping_item_dictionary").insert({
+          user_id: user.id,
+          normalized_name: norm,
+          display_name: display,
+          language: detectLanguage(display),
+          category_id: effectiveCategoryId,
+          translation_key: translationKey,
+        });
+      } else {
+        const update: Record<string, any> = { translation_key: translationKey };
+        if (categoryChanged) update.category_id = effectiveCategoryId;
+        await supabase.from("shopping_item_dictionary").update(update).eq("id", self.id);
+      }
+
+      // Upsert the translation counterpart if the user provided one
+      if (translationNorm && translationDisplay) {
+        const { data: counterpart } = await supabase
+          .from("shopping_item_dictionary")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("normalized_name", translationNorm)
+          .maybeSingle();
+        if (!counterpart) {
           await supabase.from("shopping_item_dictionary").insert({
             user_id: user.id,
-            normalized_name: norm,
-            display_name: display,
-            language: lang,
-            category_id: newCategoryId,
+            normalized_name: translationNorm,
+            display_name: translationDisplay,
+            language: detectLanguage(translationDisplay),
+            category_id: effectiveCategoryId,
             translation_key: translationKey,
           });
         } else {
           await supabase
             .from("shopping_item_dictionary")
-            .update({ category_id: newCategoryId })
-            .eq("id", self.id);
+            .update({
+              translation_key: translationKey,
+              ...(effectiveCategoryId ? { category_id: effectiveCategoryId } : {}),
+            })
+            .eq("id", counterpart.id);
         }
+      }
 
-        if (translationKey) {
-          await supabase
-            .from("shopping_item_dictionary")
-            .update({ category_id: newCategoryId })
-            .eq("user_id", user.id)
-            .eq("translation_key", translationKey);
-        }
+      // Propagate the category to every entry sharing this translation_key
+      if (categoryChanged && translationKey && effectiveCategoryId) {
+        await supabase
+          .from("shopping_item_dictionary")
+          .update({ category_id: effectiveCategoryId })
+          .eq("user_id", user.id)
+          .eq("translation_key", translationKey);
       }
     },
     onSuccess: () => {
@@ -673,13 +737,14 @@ function ItemEditDialog({
   item: Item | null;
   categories: Category[];
   onClose: () => void;
-  onSave: (patch: Partial<Item> & { id: string; _prevCategoryId?: string | null }) => void;
+  onSave: (patch: Partial<Item> & { id: string; _prevCategoryId?: string | null; _translation?: string | null }) => void;
 }) {
   const [name, setName] = useState("");
   const [qty, setQty] = useState("1");
   const [unit, setUnit] = useState("");
   const [price, setPrice] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
+  const [translation, setTranslation] = useState("");
 
   useEffect(() => {
     if (item) {
@@ -688,10 +753,17 @@ function ItemEditDialog({
       setUnit(item.unit ?? "");
       setPrice(item.price_cents != null ? (item.price_cents / 100).toFixed(2) : "");
       setCategoryId(item.category_id ?? "");
+      setTranslation("");
     }
   }, [item]);
 
   if (!item) return null;
+  const lang = detectLanguage(name);
+  const translationLabel =
+    lang === "bg" ? "English name (optional)" :
+    lang === "en" ? "Bulgarian name (optional)" :
+    "Translation (optional)";
+
   return (
     <Dialog open={!!item} onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
@@ -713,6 +785,16 @@ function ItemEditDialog({
               ))}
             </SelectContent>
           </Select>
+          <div className="space-y-1">
+            <Input
+              value={translation}
+              onChange={(e) => setTranslation(e.target.value)}
+              placeholder={translationLabel}
+            />
+            <p className="text-xs text-muted-foreground">
+              Add the other-language name to teach the app — both sides share the same category in suggestions.
+            </p>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
@@ -725,6 +807,7 @@ function ItemEditDialog({
             price_cents: price.trim() ? parseCurrencyToCents(price) : null,
             category_id: categoryId || null,
             _prevCategoryId: item.category_id,
+            _translation: translation.trim() || null,
           })}>Save</Button>
         </DialogFooter>
       </DialogContent>
