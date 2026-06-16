@@ -470,6 +470,22 @@ export default function ShoppingPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] }),
   });
 
+  const clearSuggestions = useMutation({
+    mutationFn: async () => {
+      if (!user) return;
+      const { error } = await supabase
+        .from("shopping_item_dictionary")
+        .update({ usage_count: 0, last_used_at: null })
+        .eq("user_id", user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shopping-top-suggested", user?.id] });
+      toast.success("Suggestions cleared");
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to clear suggestions"),
+  });
+
   // -------- delete with confirmation + undo
   const requestDelete = (id: string) => setPendingDeleteId(id);
   const confirmDelete = () => {
