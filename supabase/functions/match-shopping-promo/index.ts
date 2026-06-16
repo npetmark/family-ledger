@@ -105,6 +105,26 @@ export function defaultPackSize(promoTitle: string, itemName: string): number | 
   return null;
 }
 
+/**
+ * Detect the price's base unit from a promo title. znamcenite titles often
+ * carry a measurement keyword (кг, kg, л, l, мл, г, бр…) that tells you
+ * whether the listed price is per kilogram, per litre, or per piece/pack.
+ * Returns a short canonical label ("kg" | "g" | "l" | "ml" | "piece") or
+ * null when no unit can be confidently inferred.
+ */
+export function detectPriceUnit(title: string): "kg" | "g" | "l" | "ml" | "piece" | null {
+  const t = (title ?? "").toLowerCase();
+  // Per-weight
+  if (/(^|\s|\d)(кг|kg)(\s|$|\.)/u.test(t)) return "kg";
+  if (/(^|\s|\d)(мл|ml)(\s|$|\.)/u.test(t)) return "ml";
+  if (/(^|\s|\d)(л|l)(\s|$|\.)/u.test(t) && !/мл|ml/.test(t)) return "l";
+  if (/(^|\s|\d)(г|гр|g)(\s|$|\.)/u.test(t)) return "g";
+  // Per-piece / pack
+  if (/(\d+\s*(бр|броя|бройки|pcs?|pieces?|ct\b|count\b))/u.test(t)) return "piece";
+  return null;
+}
+
+
 
 async function fetchAllPromos(): Promise<Promo[]> {
   const out: Promo[] = [];
@@ -409,12 +429,14 @@ Deno.serve(async (req) => {
           price_cents: v.price_cents,
           pack_size: v.pack_size,
           title: v.title,
+          unit: detectPriceUnit(v.title),
         }))
         .sort((a, b) => {
           const ap = (a.price_cents) / (a.pack_size && a.pack_size > 0 ? a.pack_size : 1);
           const bp = (b.price_cents) / (b.pack_size && b.pack_size > 0 ? b.pack_size : 1);
           return ap - bp || a.store.localeCompare(b.store);
         });
+
 
 
       // Quantity normalization for piece-counted items.
