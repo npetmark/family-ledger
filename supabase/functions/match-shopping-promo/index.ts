@@ -139,7 +139,7 @@ async function fetchCategoryTree(): Promise<CategoryTree> {
   }
 }
 
-async function getPromos(admin: ReturnType<typeof createClient>): Promise<Promo[]> {
+async function getPromos(admin: any): Promise<Promo[]> {
   const { data: cache } = await admin
     .from("shopping_promotions_cache")
     .select("promos, updated_at")
