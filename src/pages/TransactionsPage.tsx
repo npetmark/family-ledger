@@ -174,17 +174,31 @@ export default function TransactionsPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("transactions").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
-      toast.success("Transaction deleted");
-    },
-  });
+  const [pendingDeleteTxId, setPendingDeleteTxId] = useState<string | null>(null);
+
+  const performDelete = (id: string) => {
+    const keys = [["transactions"], ["all-transactions-for-balance"]];
+    const snapshots = keys.map((k) => [k, queryClient.getQueryData(k)] as const);
+    // Optimistically remove from caches
+    keys.forEach((k) => {
+      queryClient.setQueriesData({ queryKey: k }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.filter((t: any) => t.id !== id);
+      });
+    });
+    scheduleUndoableDelete({
+      message: "Transaction deleted",
+      onConfirm: async () => {
+        const { error } = await supabase.from("transactions").delete().eq("id", id);
+        if (error) throw error;
+        keys.forEach((k) => queryClient.invalidateQueries({ queryKey: k }));
+      },
+      onUndo: () => {
+        snapshots.forEach(([k, snap]) => queryClient.setQueryData(k as any, snap));
+      },
+    });
+  };
+
 
   const selectPreset = (preset: FilterPreset) => {
     if (preset === "custom") {
