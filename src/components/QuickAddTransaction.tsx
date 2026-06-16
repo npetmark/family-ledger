@@ -135,6 +135,14 @@ export function QuickAddTransaction() {
             >
               <PenLine className="h-4 w-4" /> Add Record
             </Button>
+            <Button
+              onClick={() => { setShoppingOpen(true); setMenuOpen(false); }}
+              size="sm"
+              variant="secondary"
+              className="rounded-full shadow-lg px-4 gap-2"
+            >
+              <ShoppingCart className="h-4 w-4" /> Shopping Item
+            </Button>
           </div>
         )}
         <Button
@@ -147,6 +155,45 @@ export function QuickAddTransaction() {
       </div>
 
       <TransactionChatbot open={chatOpen} onOpenChange={setChatOpen} />
+
+      <Dialog open={shoppingOpen} onOpenChange={(v) => { setShoppingOpen(v); if (!v) setShoppingText(""); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add to shopping list</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (shoppingText.trim()) addShoppingMutation.mutate(shoppingText);
+            }}
+          >
+            <Input
+              autoFocus
+              value={shoppingText}
+              onChange={(e) => setShoppingText(e.target.value)}
+              placeholder="e.g. chicken 1 kg, мляко 2 л, eggs x10"
+            />
+            {shoppingPreview && shoppingPreview.name && (
+              <p className="text-xs text-muted-foreground">
+                Will add <span className="font-medium text-foreground">{shoppingPreview.name}</span>
+                {shoppingPreview.quantity !== 1 || shoppingPreview.unit
+                  ? ` · ${shoppingPreview.quantity}${shoppingPreview.unit ? ` ${shoppingPreview.unit}` : ""}`
+                  : ""}
+                {" "}to your active trip.
+              </p>
+            )}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!shoppingText.trim() || addShoppingMutation.isPending}
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Add to list
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
         <DialogContent>
