@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { detectLanguage, normalizeName, parseShoppingEntry, scheduleUndoableDelete, triggerPromoLookup } from "@/lib/shopping";
+import { computeLineTotalCents, detectLanguage, normalizeName, parseShoppingEntry, rankStoresByDeals, scheduleUndoableDelete, triggerPromoLookup } from "@/lib/shopping";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 
 type Category = {
@@ -496,28 +496,8 @@ export default function ShoppingPage() {
   const totalItems = items.length;
   const totalPrice = items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
 
-  const storeRanking = useMemo(() => {
-    const promoItems = items.filter(
-      (i) => Array.isArray(i.promo_stores) && i.promo_stores.length > 0 && i.promo_price_cents != null,
-    );
-    const lineTotal = (it: Item) =>
-      Math.round((it.promo_price_cents ?? 0) * (it.quantity && it.quantity > 0 ? it.quantity : 1));
-    const byStore = new Map<string, { store: string; count: number; total: number; itemIds: string[] }>();
-    for (const it of promoItems) {
-      for (const store of it.promo_stores!) {
-        const cur = byStore.get(store) ?? { store, count: 0, total: 0, itemIds: [] };
-        cur.count += 1;
-        cur.total += lineTotal(it);
-        cur.itemIds.push(it.id);
-        byStore.set(store, cur);
-      }
-    }
-    const ranked = Array.from(byStore.values()).sort(
-      (a, b) => b.count - a.count || a.total - b.total || a.store.localeCompare(b.store),
-    );
-    const bestPossibleTotal = promoItems.reduce((s, i) => s + lineTotal(i), 0);
-    return { ranked, promoItemCount: promoItems.length, bestPossibleTotal };
-  }, [items]);
+  const storeRanking = useMemo(() => rankStoresByDeals(items), [items]);
+
   const topStore = storeRanking.ranked[0];
 
   const refreshPromos = async () => {
@@ -711,7 +691,7 @@ export default function ShoppingPage() {
                           {it.promo_price_cents != null && (
                             <span className="text-xs font-mono-numbers font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
                               {it.quantity && it.quantity > 1
-                                ? `${formatCurrency(it.promo_price_cents)}${it.unit ? `/${it.unit}` : ""} · ${formatCurrency(Math.round(it.promo_price_cents * it.quantity))}`
+                                ? `${formatCurrency(it.promo_price_cents)}${it.unit ? `/${it.unit}` : ""} · ${formatCurrency(computeLineTotalCents(it))}`
                                 : `from ${formatCurrency(it.promo_price_cents)}`}
                             </span>
                           )}
