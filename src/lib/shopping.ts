@@ -215,6 +215,86 @@ export async function triggerPromoLookup(itemIds: string[]): Promise<void> {
 }
 
 
+/**
+ * Item fields needed to compute the total cost of a single shopping line.
+ * Pack size matters for items sold in fixed bundles: a promo "10-pack of eggs
+ * for €2.00" means qty=20 eggs costs 2 × €2.00, NOT 20 × €2.00.
+ */
+export interface PricedLine {
+  /** Promo unit price in cents (per 1 unit OR per 1 pack, depending on `pack_size`). */
+  promo_price_cents?: number | null;
+  /** Quantity the user wants, expressed in the item's `unit` (kg, l, pcs, …). */
+  quantity?: number | null;
+  /**
+   * Optional pack size. When set, the promo price is per-pack and the user's
+   * quantity is divided by this and rounded UP to the next whole pack.
+   * Example: quantity=20 eggs, pack_size=10 → 2 packs.
+   */
+  pack_size?: number | null;
+}
+
+/** How many billable units (or packs) does this line represent? Always ≥ 1. */
+export function computeBillableUnits(line: PricedLine): number {
+  const qty = line.quantity && line.quantity > 0 ? line.quantity : 1;
+  const pack = line.pack_size && line.pack_size > 0 ? line.pack_size : null;
+  if (pack) return Math.max(1, Math.ceil(qty / pack));
+  return qty;
+}
+
+/**
+ * Total cost in cents for one shopping line, taking quantity (kg/l/pcs)
+ * and optional pack_size into account. Returns 0 when no promo price is set.
+ */
+export function computeLineTotalCents(line: PricedLine): number {
+  if (line.promo_price_cents == null) return 0;
+  return Math.round(line.promo_price_cents * computeBillableUnits(line));
+}
+
+export interface RankableItem extends PricedLine {
+  id: string;
+  promo_stores?: string[] | null;
+}
+
+export interface StoreRank {
+  store: string;
+  count: number;
+  total: number;
+  itemIds: string[];
+}
+
+/**
+ * Rank stores by: (1) most promo matches, (2) lowest total promo price,
+ * (3) alphabetical for stable ties.
+ */
+export function rankStoresByDeals(items: RankableItem[]): {
+  ranked: StoreRank[];
+  promoItemCount: number;
+  bestPossibleTotal: number;
+} {
+  const promoItems = items.filter(
+    (i) => Array.isArray(i.promo_stores) && i.promo_stores.length > 0 && i.promo_price_cents != null,
+  );
+  const byStore = new Map<string, StoreRank>();
+  for (const it of promoItems) {
+    const lineTotal = computeLineTotalCents(it);
+    for (const store of it.promo_stores!) {
+      const cur = byStore.get(store) ?? { store, count: 0, total: 0, itemIds: [] };
+      cur.count += 1;
+      cur.total += lineTotal;
+      cur.itemIds.push(it.id);
+      byStore.set(store, cur);
+    }
+  }
+  const ranked = Array.from(byStore.values()).sort(
+    (a, b) => b.count - a.count || a.total - b.total || a.store.localeCompare(b.store),
+  );
+  const bestPossibleTotal = promoItems.reduce((s, i) => s + computeLineTotalCents(i), 0);
+  return { ranked, promoItemCount: promoItems.length, bestPossibleTotal };
+}
+
+
+
+
 
 
 export interface UndoableDeleteOptions {
