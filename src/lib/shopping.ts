@@ -1,13 +1,16 @@
 import { toast } from "sonner";
 
-/** Lowercase, strip diacritics, collapse whitespace. Works for Latin + Cyrillic. */
+/**
+ * Lowercase + collapse whitespace. Strips Latin diacritics ("café" → "cafe")
+ * but preserves Cyrillic precomposed letters like "й" (which would otherwise
+ * decompose into "и" + combining breve and break dictionary lookups).
+ */
 export function normalizeName(input: string): string {
-  return input
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
+  const hasCyrillic = /[\u0400-\u04FF]/.test(input);
+  const base = hasCyrillic
+    ? input.normalize("NFC")
+    : input.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  return base.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 /** Detect language: bg if any Cyrillic letter present, otherwise en. */
