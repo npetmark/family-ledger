@@ -352,12 +352,24 @@ Deno.serve(async (req) => {
       const bgName = cls?.bg ?? it.name;
       const hits = matchPromos(bgName, cls, promos);
       const stores = Array.from(new Set(hits.map((h) => h.store))).sort();
-      const lowest = hits.length > 0 ? Math.min(...hits.map((h) => h.priceCents)) : null;
+      // Pick the promo with the lowest PER-PIECE price so multi-pack deals
+      // (e.g. "10 eggs for €2 = €0.20/egg") win over a single-piece sticker price.
+      let bestHit: Promo | null = null;
+      let bestPerUnit = Infinity;
+      for (const h of hits) {
+        const pack = h.packSize && h.packSize > 0 ? h.packSize : 1;
+        const perUnit = h.priceCents / pack;
+        if (perUnit < bestPerUnit) {
+          bestPerUnit = perUnit;
+          bestHit = h;
+        }
+      }
       await admin
         .from("shopping_items")
         .update({
           promo_stores: stores.length > 0 ? stores : null,
-          promo_price_cents: lowest,
+          promo_price_cents: bestHit ? bestHit.priceCents : null,
+          promo_pack_size: bestHit?.packSize ?? null,
           promo_checked_at: new Date().toISOString(),
         })
         .eq("id", it.id);
@@ -366,7 +378,10 @@ Deno.serve(async (req) => {
         id: it.id, bgName,
         subSlugs: cls?.subSlugs ?? [],
         parentSlugs: cls?.parentSlugs ?? [],
-        stores, lowest, hits: hits.length,
+        stores,
+        lowest: bestHit?.priceCents ?? null,
+        packSize: bestHit?.packSize ?? null,
+        hits: hits.length,
       });
     }
 
