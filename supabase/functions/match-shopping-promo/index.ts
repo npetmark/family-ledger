@@ -88,6 +88,24 @@ export function parsePackSize(title: string): number | null {
   return null;
 }
 
+/**
+ * Fallback pack size for products that are virtually always sold in fixed
+ * multi-piece bundles but whose promo titles often omit the count
+ * (znamcenite.bg titles like just "Яйца" or "Pressed eggs"). Returns null
+ * when no confident default applies.
+ *
+ * Applied only when `parsePackSize` returned null AND the matched promo
+ * looks like the right product class (the matcher already restricted by
+ * subcategory, so we can trust the title keyword).
+ */
+export function defaultPackSize(promoTitle: string, itemName: string): number | null {
+  const hay = `${promoTitle} ${itemName}`.toLowerCase();
+  // Eggs — typical Bulgarian retail pack is 10.
+  if (/(^|\s)(яйц[ае]|egg|eggs)(\s|$)/u.test(hay)) return 10;
+  return null;
+}
+
+
 async function fetchAllPromos(): Promise<Promo[]> {
   const out: Promo[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
@@ -364,12 +382,15 @@ Deno.serve(async (req) => {
           bestHit = h;
         }
       }
+      const resolvedPack = bestHit
+        ? (bestHit.packSize ?? defaultPackSize(bestHit.title, it.name))
+        : null;
       await admin
         .from("shopping_items")
         .update({
           promo_stores: stores.length > 0 ? stores : null,
           promo_price_cents: bestHit ? bestHit.priceCents : null,
-          promo_pack_size: bestHit?.packSize ?? null,
+          promo_pack_size: resolvedPack,
           promo_checked_at: new Date().toISOString(),
         })
         .eq("id", it.id);
@@ -380,9 +401,10 @@ Deno.serve(async (req) => {
         parentSlugs: cls?.parentSlugs ?? [],
         stores,
         lowest: bestHit?.priceCents ?? null,
-        packSize: bestHit?.packSize ?? null,
+        packSize: resolvedPack,
         hits: hits.length,
       });
+
     }
 
     return new Response(JSON.stringify({ updated, results, promoCount: promos.length }), {
