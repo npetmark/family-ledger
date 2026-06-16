@@ -40,6 +40,12 @@ type Trip = {
   started_at: string; completed_at: string | null;
   total_cents: number | null; receipt_path: string | null; notes: string | null;
 };
+type PromoOffer = {
+  store: string;
+  price_cents: number;
+  pack_size: number | null;
+  title: string;
+};
 type Item = {
   id: string; trip_id: string; category_id: string | null; name: string;
   normalized_name: string; quantity: number; unit: string | null;
@@ -48,8 +54,10 @@ type Item = {
   promo_stores: string[] | null;
   promo_price_cents: number | null;
   promo_pack_size: number | null;
+  promo_offers: PromoOffer[] | null;
   promo_checked_at: string | null;
 };
+
 type DictEntry = {
   id: string; normalized_name: string; display_name: string;
   language: string; category_id: string | null; usage_count: number;
