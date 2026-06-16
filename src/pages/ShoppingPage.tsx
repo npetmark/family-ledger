@@ -497,7 +497,10 @@ export default function ShoppingPage() {
   const totalItems = items.length;
   const totalPrice = items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
 
-  const storeRanking = useMemo(() => rankStoresByDeals(items), [items]);
+  const storeRanking = useMemo(
+    () => rankStoresByDeals(items.map((i) => ({ ...i, pack_size: i.promo_pack_size }))),
+    [items],
+  );
 
   const topStore = storeRanking.ranked[0];
 
