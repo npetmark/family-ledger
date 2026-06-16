@@ -672,6 +672,28 @@ export default function TransactionsPage() {
           );
         });
       })()}
+
+      <AlertDialog open={!!pendingDeleteTxId} onOpenChange={(v) => !v && setPendingDeleteTxId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this transaction?</AlertDialogTitle>
+            <AlertDialogDescription>You'll have 5 seconds to undo.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const id = pendingDeleteTxId!;
+                setPendingDeleteTxId(null);
+                performDelete(id);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
