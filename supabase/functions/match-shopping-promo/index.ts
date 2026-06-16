@@ -109,6 +109,7 @@ async function fetchAllPromos(): Promise<Promo[]> {
         discountPct: it.discount != null ? Number(it.discount) : null,
         categorySlug: it.categorySlug ?? null,
         parentCategorySlug: it.parentCategorySlug ?? null,
+        packSize: parsePackSize(it.title),
       });
     }
     const totalPages = Number(data?.totalPages ?? 1);
