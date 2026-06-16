@@ -659,21 +659,43 @@ export default function ShoppingPage() {
               </div>
               <div className="divide-y divide-border">
                 {g.items.map((it) => (
-                  <div key={it.id} className="flex items-center gap-3 px-4 py-2 group">
+                  <div key={it.id} className="flex items-start gap-3 px-4 py-2 group">
                     <Checkbox
                       checked={it.checked}
                       onCheckedChange={() => toggleChecked.mutate(it)}
+                      className="mt-1"
                     />
                     <button
                       onClick={() => setEditingItem(it)}
-                      className={`flex-1 text-left text-sm truncate ${it.checked ? "line-through text-muted-foreground" : ""}`}
+                      className={`flex-1 text-left text-sm min-w-0 ${it.checked ? "line-through text-muted-foreground" : ""}`}
                     >
-                      {it.name}
-                      {(it.quantity != null && it.quantity !== 1) || it.unit ? (
-                        <span className="text-muted-foreground text-xs ml-2">
-                          {it.unit ? `${it.quantity} ${it.unit}` : `×${it.quantity}`}
-                        </span>
-                      ) : null}
+                      <div className="truncate">
+                        {it.name}
+                        {(it.quantity != null && it.quantity !== 1) || it.unit ? (
+                          <span className="text-muted-foreground text-xs ml-2">
+                            {it.unit ? `${it.quantity} ${it.unit}` : `×${it.quantity}`}
+                          </span>
+                        ) : null}
+                      </div>
+                      {it.promo_stores && it.promo_stores.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 mt-1">
+                          {it.promo_stores.map((store) => (
+                            <Badge
+                              key={store}
+                              variant="outline"
+                              className="text-[10px] py-0 px-1.5 h-4 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                            >
+                              <Tag className="h-2.5 w-2.5 mr-0.5" />
+                              {store}
+                            </Badge>
+                          ))}
+                          {it.promo_price_cents != null && (
+                            <span className="text-[11px] font-mono-numbers text-emerald-700 dark:text-emerald-400">
+                              from {formatCurrency(it.promo_price_cents)}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </button>
                     {it.price_cents != null && (
                       <span className="text-xs font-mono-numbers text-muted-foreground">
