@@ -74,6 +74,9 @@ export function parseShoppingEntry(raw: string): ParsedShoppingEntry {
     quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
     unit,
   };
+}
+
+
 
 export interface UndoableDeleteOptions {
   message: string;
