@@ -724,6 +724,7 @@ function ItemEditDialog({
             unit: unit.trim() || null,
             price_cents: price.trim() ? parseCurrencyToCents(price) : null,
             category_id: categoryId || null,
+            _prevCategoryId: item.category_id,
           })}>Save</Button>
         </DialogFooter>
       </DialogContent>
