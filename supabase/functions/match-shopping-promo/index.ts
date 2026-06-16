@@ -382,12 +382,15 @@ Deno.serve(async (req) => {
           bestHit = h;
         }
       }
+      const resolvedPack = bestHit
+        ? (bestHit.packSize ?? defaultPackSize(bestHit.title, it.name))
+        : null;
       await admin
         .from("shopping_items")
         .update({
           promo_stores: stores.length > 0 ? stores : null,
           promo_price_cents: bestHit ? bestHit.priceCents : null,
-          promo_pack_size: bestHit?.packSize ?? null,
+          promo_pack_size: resolvedPack,
           promo_checked_at: new Date().toISOString(),
         })
         .eq("id", it.id);
@@ -398,9 +401,10 @@ Deno.serve(async (req) => {
         parentSlugs: cls?.parentSlugs ?? [],
         stores,
         lowest: bestHit?.priceCents ?? null,
-        packSize: bestHit?.packSize ?? null,
+        packSize: resolvedPack,
         hits: hits.length,
       });
+
     }
 
     return new Response(JSON.stringify({ updated, results, promoCount: promos.length }), {
