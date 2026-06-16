@@ -76,6 +76,94 @@ export function parseShoppingEntry(raw: string): ParsedShoppingEntry {
   };
 }
 
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+
+/**
+ * Ensure the user has an active shopping trip, returning its id.
+ * Auto-creates one named "Shopping — <today>" when none exists.
+ */
+export async function ensureActiveTrip(userId: string): Promise<string> {
+  const { data: existing, error } = await supabase
+    .from("shopping_trips")
+    .select("id")
+    .eq("status", "active")
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (existing) return existing.id;
+
+  const name = `Shopping — ${format(new Date(), "EEE d MMM")}`;
+  const { data: created, error: cErr } = await supabase
+    .from("shopping_trips")
+    .insert({ user_id: userId, name })
+    .select("id")
+    .single();
+  if (cErr) throw cErr;
+  return created.id;
+}
+
+/**
+ * Add a single item to the active shopping trip. Accepts a free-text entry
+ * like "chicken 1 kg" and parses out the quantity/unit. Auto-categorizes
+ * via the dictionary and bumps usage counters.
+ */
+export async function addShoppingItem(opts: {
+  userId: string;
+  rawText: string;
+  fallbackCategoryId?: string | null;
+}): Promise<void> {
+  const parsed = parseShoppingEntry(opts.rawText);
+  if (!parsed.name) return;
+
+  const tripId = await ensureActiveTrip(opts.userId);
+  const norm = normalizeName(parsed.name);
+  const lang = detectLanguage(parsed.name);
+
+  // Look up dictionary entry to auto-categorize
+  const { data: dict } = await supabase
+    .from("shopping_item_dictionary")
+    .select("id, category_id, display_name, usage_count, translation_key")
+    .eq("user_id", opts.userId)
+    .eq("normalized_name", norm)
+    .maybeSingle();
+
+  const display = dict?.display_name || parsed.name;
+  const categoryId = dict?.category_id ?? opts.fallbackCategoryId ?? null;
+
+  const { error: insertErr } = await supabase.from("shopping_items").insert({
+    user_id: opts.userId,
+    trip_id: tripId,
+    category_id: categoryId,
+    name: display,
+    normalized_name: norm,
+    quantity: parsed.quantity,
+    unit: parsed.unit,
+  });
+  if (insertErr) throw insertErr;
+
+  if (dict) {
+    await supabase
+      .from("shopping_item_dictionary")
+      .update({
+        usage_count: (dict.usage_count ?? 0) + 1,
+        last_used_at: new Date().toISOString(),
+      })
+      .eq("id", dict.id);
+  } else {
+    await supabase.from("shopping_item_dictionary").insert({
+      user_id: opts.userId,
+      normalized_name: norm,
+      display_name: display,
+      language: lang,
+      category_id: categoryId,
+      usage_count: 1,
+      last_used_at: new Date().toISOString(),
+      translation_key: norm,
+    });
+  }
+}
 
 
 export interface UndoableDeleteOptions {
