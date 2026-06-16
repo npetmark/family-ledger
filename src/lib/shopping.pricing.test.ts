@@ -34,7 +34,17 @@ describe("computeBillableUnits", () => {
     // 30 eggs, box of 30 → exactly 1 pack
     expect(computeBillableUnits({ quantity: 30, pack_size: 30 })).toBe(1);
   });
+
+  it("handles fractional quantities against a pack size by rounding up to whole packs", () => {
+    // 2.5 eggs requested, pack of 10 → 1 pack (you can't buy a quarter of a box)
+    expect(computeBillableUnits({ quantity: 2.5, pack_size: 10 })).toBe(1);
+    // 10.5 eggs, pack of 10 → 2 packs
+    expect(computeBillableUnits({ quantity: 10.5, pack_size: 10 })).toBe(2);
+    // 0.1 of a pack still rounds up to 1
+    expect(computeBillableUnits({ quantity: 0.1, pack_size: 10 })).toBe(1);
+  });
 });
+
 
 describe("computeLineTotalCents", () => {
   it("returns 0 when no promo price is set", () => {
