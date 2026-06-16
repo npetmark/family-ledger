@@ -735,13 +735,13 @@ export default function ShoppingPage() {
 
       {/* Promo footnote */}
       {storeRanking.promoItemCount > 0 ? (
-        <div className="flex items-center gap-3 text-sm border rounded-md px-3 py-2 bg-muted/30">
+        <div className="flex flex-wrap items-center gap-3 text-sm border rounded-md px-3 py-2 bg-muted/30">
           <ShoppingBag className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
           <span className="text-foreground">
             Best at <span className="font-semibold">{topStore.store}</span> —{" "}
-            {topStore.count} of {storeRanking.promoItemCount} items for{" "}
-            <span className="font-mono-numbers font-semibold">{formatCurrency(topStore.total)}</span>
-            {" "} (lowest possible: <span className="font-mono-numbers font-semibold">{formatCurrency(storeRanking.bestPossibleTotal)}</span>)
+            {topStore.count} of {storeRanking.promoItemCount} items for
+            <span className="ml-1 font-mono-numbers font-semibold">{formatCurrency(topStore.total)}</span>
+            {" "}(lowest possible: <span className="font-mono-numbers font-semibold">{formatCurrency(storeRanking.bestPossibleTotal)}</span>)
           </span>
         </div>
       ) : items.length > 0 ? (
