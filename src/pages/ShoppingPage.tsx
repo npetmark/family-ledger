@@ -47,6 +47,7 @@ type Item = {
   created_at: string;
   promo_stores: string[] | null;
   promo_price_cents: number | null;
+  promo_pack_size: number | null;
   promo_checked_at: string | null;
 };
 type DictEntry = {
