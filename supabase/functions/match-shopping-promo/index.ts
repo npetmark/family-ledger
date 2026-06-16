@@ -386,6 +386,20 @@ Deno.serve(async (req) => {
       const resolvedPack = bestHit
         ? (bestHit.packSize ?? defaultPackSize(bestHit.title, it.name))
         : null;
+
+      // If the best deal comes in fixed multi-piece packs and the user's item
+      // is counted in pieces (or has no unit), round the quantity UP to a full
+      // multiple of the pack size. e.g. user asked for 10 eggs but the best
+      // per-piece price is on a 20-pack → bump quantity to 20.
+      const isPieceUnit = !it.unit || /^(piece|pieces|pcs|бр|broi|broya)$/i.test(it.unit);
+      let nextQuantity: number | null = null;
+      if (resolvedPack && resolvedPack > 1 && isPieceUnit) {
+        const currentQty = Number(it.quantity ?? 0) || 0;
+        const packs = Math.max(1, Math.ceil(currentQty / resolvedPack));
+        const adjusted = packs * resolvedPack;
+        if (adjusted !== currentQty) nextQuantity = adjusted;
+      }
+
       await admin
         .from("shopping_items")
         .update({
@@ -393,6 +407,7 @@ Deno.serve(async (req) => {
           promo_price_cents: bestHit ? bestHit.priceCents : null,
           promo_pack_size: resolvedPack,
           promo_checked_at: new Date().toISOString(),
+          ...(nextQuantity !== null ? { quantity: nextQuantity } : {}),
         })
         .eq("id", it.id);
       updated++;
@@ -403,7 +418,9 @@ Deno.serve(async (req) => {
         stores,
         lowest: bestHit?.priceCents ?? null,
         packSize: resolvedPack,
+        adjustedQuantity: nextQuantity,
         hits: hits.length,
+
       });
 
     }
