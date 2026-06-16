@@ -266,15 +266,61 @@ export default function ShoppingPage() {
   });
 
   const updateItem = useMutation({
-    mutationFn: async (patch: Partial<Item> & { id: string }) => {
-      const { id, ...fields } = patch;
+    mutationFn: async (patch: Partial<Item> & { id: string; _prevCategoryId?: string | null }) => {
+      const { id, _prevCategoryId, ...fields } = patch;
       const { error } = await supabase.from("shopping_items").update(fields).eq("id", id);
       if (error) throw error;
+
+      // Cross-language category learning: when the category changes, update
+      // the dictionary entry for this normalized name AND every entry that
+      // shares its translation_key (the EN/BG counterparts).
+      const newCategoryId = (fields.category_id ?? null) as string | null;
+      const norm = fields.normalized_name as string | undefined;
+      if (user && norm && newCategoryId && newCategoryId !== _prevCategoryId) {
+        const { data: self } = await supabase
+          .from("shopping_item_dictionary")
+          .select("id, translation_key")
+          .eq("user_id", user.id)
+          .eq("normalized_name", norm)
+          .maybeSingle();
+
+        const display = (fields.name as string | undefined)?.trim() || norm;
+        const lang = detectLanguage(display);
+        let translationKey: string | null = self?.translation_key ?? null;
+
+        if (!self) {
+          translationKey = translationKey ?? norm;
+          await supabase.from("shopping_item_dictionary").insert({
+            user_id: user.id,
+            normalized_name: norm,
+            display_name: display,
+            language: lang,
+            category_id: newCategoryId,
+            translation_key: translationKey,
+          });
+        } else {
+          await supabase
+            .from("shopping_item_dictionary")
+            .update({ category_id: newCategoryId })
+            .eq("id", self.id);
+        }
+
+        if (translationKey) {
+          await supabase
+            .from("shopping_item_dictionary")
+            .update({ category_id: newCategoryId })
+            .eq("user_id", user.id)
+            .eq("translation_key", translationKey);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip?.id] });
+      queryClient.invalidateQueries({ queryKey: ["shopping-suggestions", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["shopping-top-suggested", user?.id] });
       setEditingItem(null);
     },
+    onError: (e: any) => toast.error(e.message ?? "Failed to update item"),
   });
 
   const completeTrip = useMutation({
@@ -627,7 +673,7 @@ function ItemEditDialog({
   item: Item | null;
   categories: Category[];
   onClose: () => void;
-  onSave: (patch: Partial<Item> & { id: string }) => void;
+  onSave: (patch: Partial<Item> & { id: string; _prevCategoryId?: string | null }) => void;
 }) {
   const [name, setName] = useState("");
   const [qty, setQty] = useState("1");
@@ -678,6 +724,7 @@ function ItemEditDialog({
             unit: unit.trim() || null,
             price_cents: price.trim() ? parseCurrencyToCents(price) : null,
             category_id: categoryId || null,
+            _prevCategoryId: item.category_id,
           })}>Save</Button>
         </DialogFooter>
       </DialogContent>
