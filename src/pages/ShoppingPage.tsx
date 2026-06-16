@@ -551,6 +551,13 @@ export default function ShoppingPage() {
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
             Refresh promos
           </Button>
+          <Button
+            size="sm"
+            disabled={storeRanking.promoItemCount === 0}
+            onClick={() => setGoShoppingOpen(true)}
+            title="See which store to visit based on current promos"
+          >
+            <ShoppingBag className="h-4 w-4 mr-2" /> Go shopping
           <Button variant="outline" size="sm" onClick={() => setPastOpen(true)}>
             <History className="h-4 w-4 mr-2" /> Past trips
           </Button>
