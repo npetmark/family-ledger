@@ -558,6 +558,7 @@ export default function ShoppingPage() {
             title="See which store to visit based on current promos"
           >
             <ShoppingBag className="h-4 w-4 mr-2" /> Go shopping
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setPastOpen(true)}>
             <History className="h-4 w-4 mr-2" /> Past trips
           </Button>
