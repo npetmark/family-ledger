@@ -95,6 +95,24 @@ export function QuickAddTransaction() {
 
   const resetForm = () => setForm({ transaction_type: "expense", amount: "", date: new Date(), account_id: "", subcategory_id: "", note: "", transfer_to_account_id: "" });
 
+  const addShoppingMutation = useMutation({
+    mutationFn: async (text: string) => {
+      if (!user) throw new Error("Not signed in");
+      await addShoppingItem({ userId: user.id, rawText: text });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shopping-items"] });
+      queryClient.invalidateQueries({ queryKey: ["shopping-active-trip"] });
+      queryClient.invalidateQueries({ queryKey: ["shopping-top-suggested"] });
+      setShoppingText("");
+      setShoppingOpen(false);
+      toast.success("Added to shopping list");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to add item"),
+  });
+
+  const shoppingPreview = shoppingText.trim() ? parseShoppingEntry(shoppingText) : null;
+
   return (
     <>
       {/* FAB Menu */}
