@@ -161,16 +161,24 @@ export async function addShoppingItem(opts: {
   const display = dict?.display_name || parsed.name;
   const categoryId = dict?.category_id ?? opts.fallbackCategoryId ?? null;
 
-  const { error: insertErr } = await supabase.from("shopping_items").insert({
-    user_id: opts.userId,
-    trip_id: tripId,
-    category_id: categoryId,
-    name: display,
-    normalized_name: norm,
-    quantity: parsed.quantity,
-    unit: parsed.unit,
-  });
+  const { data: inserted, error: insertErr } = await supabase
+    .from("shopping_items")
+    .insert({
+      user_id: opts.userId,
+      trip_id: tripId,
+      category_id: categoryId,
+      name: display,
+      normalized_name: norm,
+      quantity: parsed.quantity,
+      unit: parsed.unit,
+    })
+    .select("id")
+    .single();
   if (insertErr) throw insertErr;
+
+  if (inserted?.id) {
+    triggerPromoLookup([inserted.id]).catch((e) => console.warn("promo lookup failed", e));
+  }
 
   if (dict) {
     await supabase
@@ -193,6 +201,20 @@ export async function addShoppingItem(opts: {
     });
   }
 }
+
+/**
+ * Invokes the match-shopping-promo edge function to enrich shopping items
+ * with current promotions scraped from znamcenite.bg. Fire-and-forget safe.
+ */
+export async function triggerPromoLookup(itemIds: string[]): Promise<void> {
+  if (!itemIds || itemIds.length === 0) return;
+  const { error } = await supabase.functions.invoke("match-shopping-promo", {
+    body: { item_ids: itemIds },
+  });
+  if (error) throw error;
+}
+
+
 
 
 export interface UndoableDeleteOptions {

@@ -370,6 +370,9 @@ export type Database = {
           name: string
           normalized_name: string
           price_cents: number | null
+          promo_checked_at: string | null
+          promo_price_cents: number | null
+          promo_stores: string[] | null
           quantity: number
           sort_order: number
           trip_id: string
@@ -385,6 +388,9 @@ export type Database = {
           name: string
           normalized_name: string
           price_cents?: number | null
+          promo_checked_at?: string | null
+          promo_price_cents?: number | null
+          promo_stores?: string[] | null
           quantity?: number
           sort_order?: number
           trip_id: string
@@ -400,6 +406,9 @@ export type Database = {
           name?: string
           normalized_name?: string
           price_cents?: number | null
+          promo_checked_at?: string | null
+          promo_price_cents?: number | null
+          promo_stores?: string[] | null
           quantity?: number
           sort_order?: number
           trip_id?: string
@@ -423,6 +432,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      shopping_promotions_cache: {
+        Row: {
+          id: number
+          promos: Json
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          promos?: Json
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          promos?: Json
+          updated_at?: string
+        }
+        Relationships: []
       }
       shopping_trips: {
         Row: {

@@ -25,11 +25,11 @@ import {
 } from "@/components/ui/popover";
 import {
   ChevronDown, ChevronRight, Plus, Receipt, Check, Trash2,
-  History, Paperclip, X, Pencil,
+  History, Paperclip, X, Pencil, Tag, RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { detectLanguage, normalizeName, parseShoppingEntry, scheduleUndoableDelete } from "@/lib/shopping";
+import { detectLanguage, normalizeName, parseShoppingEntry, scheduleUndoableDelete, triggerPromoLookup } from "@/lib/shopping";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 
 type Category = {
@@ -45,6 +45,9 @@ type Item = {
   normalized_name: string; quantity: number; unit: string | null;
   checked: boolean; price_cents: number | null; sort_order: number;
   created_at: string;
+  promo_stores: string[] | null;
+  promo_price_cents: number | null;
+  promo_checked_at: string | null;
 };
 type DictEntry = {
   id: string; normalized_name: string; display_name: string;
@@ -61,6 +64,7 @@ export default function ShoppingPage() {
   const [pastOpen, setPastOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
+  const [refreshingPromos, setRefreshingPromos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -206,7 +210,7 @@ export default function ShoppingPage() {
         categoryId = other?.id ?? null;
       }
 
-      const { error } = await supabase.from("shopping_items").insert({
+      const { data: inserted, error } = await supabase.from("shopping_items").insert({
         user_id: user.id,
         trip_id: activeTrip.id,
         category_id: categoryId,
@@ -215,8 +219,15 @@ export default function ShoppingPage() {
         quantity: parsed.quantity,
         unit: parsed.unit,
         sort_order: items.length,
-      });
+      }).select("id").single();
       if (error) throw error;
+
+      // Fire-and-forget promo lookup
+      if (inserted?.id) {
+        triggerPromoLookup([inserted.id])
+          .then(() => queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] }))
+          .catch((e) => console.warn("promo lookup failed", e));
+      }
 
       // Upsert dictionary entry + bump usage
       if (dictId) {
@@ -485,6 +496,20 @@ export default function ShoppingPage() {
   const totalItems = items.length;
   const totalPrice = items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
 
+  const refreshPromos = async () => {
+    if (!activeTrip || items.length === 0) return;
+    setRefreshingPromos(true);
+    try {
+      await triggerPromoLookup(items.map((i) => i.id));
+      await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
+      toast.success("Promotions refreshed");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to refresh promotions");
+    } finally {
+      setRefreshingPromos(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -492,9 +517,21 @@ export default function ShoppingPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Shopping</h1>
           <p className="text-sm text-muted-foreground">One list per trip. Items auto-categorize as you type.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setPastOpen(true)}>
-          <History className="h-4 w-4 mr-2" /> Past trips
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={refreshingPromos || items.length === 0}
+            onClick={refreshPromos}
+            title="Re-check znamcenite.bg for discounts on every item"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
+            Refresh promos
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setPastOpen(true)}>
+            <History className="h-4 w-4 mr-2" /> Past trips
+          </Button>
+        </div>
       </div>
 
       {/* Active trip card */}
@@ -622,21 +659,43 @@ export default function ShoppingPage() {
               </div>
               <div className="divide-y divide-border">
                 {g.items.map((it) => (
-                  <div key={it.id} className="flex items-center gap-3 px-4 py-2 group">
+                  <div key={it.id} className="flex items-start gap-3 px-4 py-2 group">
                     <Checkbox
                       checked={it.checked}
                       onCheckedChange={() => toggleChecked.mutate(it)}
+                      className="mt-1"
                     />
                     <button
                       onClick={() => setEditingItem(it)}
-                      className={`flex-1 text-left text-sm truncate ${it.checked ? "line-through text-muted-foreground" : ""}`}
+                      className={`flex-1 text-left text-sm min-w-0 ${it.checked ? "line-through text-muted-foreground" : ""}`}
                     >
-                      {it.name}
-                      {(it.quantity != null && it.quantity !== 1) || it.unit ? (
-                        <span className="text-muted-foreground text-xs ml-2">
-                          {it.unit ? `${it.quantity} ${it.unit}` : `×${it.quantity}`}
-                        </span>
-                      ) : null}
+                      <div className="truncate">
+                        {it.name}
+                        {(it.quantity != null && it.quantity !== 1) || it.unit ? (
+                          <span className="text-muted-foreground text-xs ml-2">
+                            {it.unit ? `${it.quantity} ${it.unit}` : `×${it.quantity}`}
+                          </span>
+                        ) : null}
+                      </div>
+                      {it.promo_stores && it.promo_stores.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 mt-1">
+                          {it.promo_stores.map((store) => (
+                            <Badge
+                              key={store}
+                              variant="outline"
+                              className="text-[10px] py-0 px-1.5 h-4 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                            >
+                              <Tag className="h-2.5 w-2.5 mr-0.5" />
+                              {store}
+                            </Badge>
+                          ))}
+                          {it.promo_price_cents != null && (
+                            <span className="text-[11px] font-mono-numbers text-emerald-700 dark:text-emerald-400">
+                              from {formatCurrency(it.promo_price_cents)}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </button>
                     {it.price_cents != null && (
                       <span className="text-xs font-mono-numbers text-muted-foreground">
