@@ -161,16 +161,24 @@ export async function addShoppingItem(opts: {
   const display = dict?.display_name || parsed.name;
   const categoryId = dict?.category_id ?? opts.fallbackCategoryId ?? null;
 
-  const { error: insertErr } = await supabase.from("shopping_items").insert({
-    user_id: opts.userId,
-    trip_id: tripId,
-    category_id: categoryId,
-    name: display,
-    normalized_name: norm,
-    quantity: parsed.quantity,
-    unit: parsed.unit,
-  });
+  const { data: inserted, error: insertErr } = await supabase
+    .from("shopping_items")
+    .insert({
+      user_id: opts.userId,
+      trip_id: tripId,
+      category_id: categoryId,
+      name: display,
+      normalized_name: norm,
+      quantity: parsed.quantity,
+      unit: parsed.unit,
+    })
+    .select("id")
+    .single();
   if (insertErr) throw insertErr;
+
+  if (inserted?.id) {
+    triggerPromoLookup([inserted.id]).catch((e) => console.warn("promo lookup failed", e));
+  }
 
   if (dict) {
     await supabase
