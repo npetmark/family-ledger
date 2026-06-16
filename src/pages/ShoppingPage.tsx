@@ -45,6 +45,9 @@ type Item = {
   normalized_name: string; quantity: number; unit: string | null;
   checked: boolean; price_cents: number | null; sort_order: number;
   created_at: string;
+  promo_stores: string[] | null;
+  promo_price_cents: number | null;
+  promo_checked_at: string | null;
 };
 type DictEntry = {
   id: string; normalized_name: string; display_name: string;
