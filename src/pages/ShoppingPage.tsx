@@ -500,12 +500,14 @@ export default function ShoppingPage() {
     const promoItems = items.filter(
       (i) => Array.isArray(i.promo_stores) && i.promo_stores.length > 0 && i.promo_price_cents != null,
     );
+    const lineTotal = (it: ShoppingItem) =>
+      Math.round((it.promo_price_cents ?? 0) * (it.quantity && it.quantity > 0 ? it.quantity : 1));
     const byStore = new Map<string, { store: string; count: number; total: number; itemIds: string[] }>();
     for (const it of promoItems) {
       for (const store of it.promo_stores!) {
         const cur = byStore.get(store) ?? { store, count: 0, total: 0, itemIds: [] };
         cur.count += 1;
-        cur.total += it.promo_price_cents!;
+        cur.total += lineTotal(it);
         cur.itemIds.push(it.id);
         byStore.set(store, cur);
       }
@@ -513,7 +515,7 @@ export default function ShoppingPage() {
     const ranked = Array.from(byStore.values()).sort(
       (a, b) => b.count - a.count || a.total - b.total || a.store.localeCompare(b.store),
     );
-    const bestPossibleTotal = promoItems.reduce((s, i) => s + (i.promo_price_cents ?? 0), 0);
+    const bestPossibleTotal = promoItems.reduce((s, i) => s + lineTotal(i), 0);
     return { ranked, promoItemCount: promoItems.length, bestPossibleTotal };
   }, [items]);
   const topStore = storeRanking.ranked[0];
