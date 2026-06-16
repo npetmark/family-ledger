@@ -64,6 +64,7 @@ export default function ShoppingPage() {
   const [pastOpen, setPastOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
+  const [refreshingPromos, setRefreshingPromos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
