@@ -1,5 +1,8 @@
 // Match shopping items against znamcenite.bg promotions via their public JSON API.
-// Caches the full feed for 6h; translates EN -> BG via Lovable AI when needed.
+// Caches the full feed for 6h; uses Lovable AI to both translate EN->BG and
+// classify each query into the znamcenite category/subcategory slugs so that
+// we only consider promos in the right subcategory (e.g. "chicken fillet"
+// matches raw chicken but not chicken meatballs).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
@@ -9,6 +12,7 @@ const corsHeaders = {
 };
 
 const API_URL = "https://api.znamcenite.bg/api/v1/promotions";
+const CATEGORIES_URL = "https://api.znamcenite.bg/api/v1/categories";
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const PAGE_SIZE = 200;
 const MAX_PAGES = 20;
@@ -20,7 +24,15 @@ type Promo = {
   priceCents: number;
   originalPriceCents: number | null;
   discountPct: number | null;
+  categorySlug: string | null;
+  parentCategorySlug: string | null;
 };
+
+type CategoryTree = Array<{
+  slug: string;
+  name: string;
+  children: Array<{ slug: string; name: string }>;
+}>;
 
 function normalize(input: string): string {
   let s = (input ?? "").toLowerCase().trim();
@@ -53,12 +65,35 @@ async function fetchAllPromos(): Promise<Promo[]> {
         priceCents: Math.round(Number(it.currentPrice) * 100),
         originalPriceCents: it.originalPrice != null ? Math.round(Number(it.originalPrice) * 100) : null,
         discountPct: it.discount != null ? Number(it.discount) : null,
+        categorySlug: it.categorySlug ?? null,
+        parentCategorySlug: it.parentCategorySlug ?? null,
       });
     }
     const totalPages = Number(data?.totalPages ?? 1);
     if (page >= totalPages) break;
   }
   return out;
+}
+
+async function fetchCategoryTree(): Promise<CategoryTree> {
+  try {
+    const res = await fetch(CATEGORIES_URL, {
+      headers: { "User-Agent": "Mozilla/5.0 LovableShopBot/1.0", "Accept": "application/json" },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    return data.map((p: any) => ({
+      slug: String(p.slug),
+      name: String(p.name),
+      children: Array.isArray(p.children)
+        ? p.children.map((c: any) => ({ slug: String(c.slug), name: String(c.name) }))
+        : [],
+    }));
+  } catch (e) {
+    console.error("fetchCategoryTree failed", e);
+    return [];
+  }
 }
 
 async function getPromos(admin: ReturnType<typeof createClient>): Promise<Promo[]> {
@@ -70,8 +105,11 @@ async function getPromos(admin: ReturnType<typeof createClient>): Promise<Promo[
   const ageMs = cache?.updated_at
     ? Date.now() - new Date(cache.updated_at as string).getTime()
     : Infinity;
-  if (cache && ageMs < CACHE_TTL_MS && Array.isArray(cache.promos) && (cache.promos as Promo[]).length > 0) {
-    return cache.promos as Promo[];
+  const cached = cache?.promos as Promo[] | undefined;
+  const hasCategoryInfo = Array.isArray(cached) && cached.length > 0 &&
+    cached.some((p) => p && (p.categorySlug || p.parentCategorySlug));
+  if (cached && ageMs < CACHE_TTL_MS && cached.length > 0 && hasCategoryInfo) {
+    return cached;
   }
   try {
     const fresh = await fetchAllPromos();
@@ -84,7 +122,7 @@ async function getPromos(admin: ReturnType<typeof createClient>): Promise<Promo[
   } catch (e) {
     console.error("fetchAllPromos failed", e);
   }
-  return (cache?.promos as Promo[]) ?? [];
+  return cached ?? [];
 }
 
 function detectLang(s: string): "bg" | "en" | "other" {
@@ -93,55 +131,118 @@ function detectLang(s: string): "bg" | "en" | "other" {
   return "other";
 }
 
-async function translateToBg(names: string[], apiKey: string): Promise<Record<string, string>> {
-  if (names.length === 0 || !apiKey) return {};
+type ItemClassification = {
+  bg: string;
+  // subcategory slugs (preferred). If empty, fall back to parents.
+  subSlugs: string[];
+  // parent slugs allowed when no usable subcategory match exists.
+  parentSlugs: string[];
+};
+
+async function classifyItems(
+  names: string[],
+  tree: CategoryTree,
+  apiKey: string,
+): Promise<Record<string, ItemClassification>> {
+  if (names.length === 0 || !apiKey || tree.length === 0) return {};
+  const taxonomy = tree.map((p) => ({
+    parent: { slug: p.slug, name: p.name },
+    subs: p.children.map((c) => ({ slug: c.slug, name: c.name })),
+  }));
   const prompt =
-    `Translate each grocery/shopping item name to Bulgarian (singular, common form, no article, no quantity). ` +
-    `Reply ONLY with a JSON object mapping each original name (verbatim key) to its Bulgarian translation. ` +
-    `Items: ${JSON.stringify(names)}`;
+    `For each grocery shopping item, do two things:\n` +
+    `1. Translate the name to Bulgarian (singular, common form, no quantity).\n` +
+    `2. Pick the NARROW subcategory slugs from the taxonomy that contain RAW/CORE products matching the item. ` +
+    `Exclude subcategories that merely contain the ingredient but are a different product class. ` +
+    `Examples: "chicken fillet" -> ONLY ["pileshko-i-pueshko-meso"] (raw poultry), NOT "kayma-i-mesni-zagotovki" (mince/meatballs) ` +
+    `or "kolbasi-i-shunki" parent. "pork" -> ["svinsko-meso"], NOT "kayma-i-mesni-zagotovki". ` +
+    `"yogurt" -> ["kiselo-mlyako"]. "cheese" -> ["sirene","kashkaval","meki-sirena","delikatesni-sirena"]. ` +
+    `Return up to 4 sub slugs. Also include up to 2 parent slugs as a broader fallback.\n` +
+    `Taxonomy: ${JSON.stringify(taxonomy)}\n` +
+    `Items: ${JSON.stringify(names)}\n` +
+    `Reply with JSON: {"items":{"<original name>":{"bg":"...","subSlugs":[...],"parentSlugs":[...]}}}`;
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
-        { role: "system", content: "You are a precise translator. Output JSON only." },
+        { role: "system", content: "You translate and classify grocery items. Output JSON only." },
         { role: "user", content: prompt },
       ],
       response_format: { type: "json_object" },
     }),
   });
   if (!res.ok) {
-    console.error("translate failed", res.status, await res.text());
+    console.error("classifyItems failed", res.status, await res.text());
     return {};
   }
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content ?? "{}";
   try {
     const parsed = JSON.parse(text);
-    const out: Record<string, string> = {};
-    for (const k of Object.keys(parsed)) out[k] = String(parsed[k]);
+    const itemsObj = parsed?.items ?? parsed ?? {};
+    const validSubs = new Set<string>();
+    const validParents = new Set<string>();
+    for (const p of tree) {
+      validParents.add(p.slug);
+      for (const c of p.children) validSubs.add(c.slug);
+    }
+    const out: Record<string, ItemClassification> = {};
+    for (const k of Object.keys(itemsObj)) {
+      const v = itemsObj[k] ?? {};
+      const subSlugs = Array.isArray(v.subSlugs)
+        ? v.subSlugs.map(String).filter((s: string) => validSubs.has(s))
+        : [];
+      const parentSlugs = Array.isArray(v.parentSlugs)
+        ? v.parentSlugs.map(String).filter((s: string) => validParents.has(s))
+        : [];
+      out[k] = {
+        bg: String(v.bg ?? k),
+        subSlugs,
+        parentSlugs,
+      };
+    }
     return out;
-  } catch {
+  } catch (e) {
+    console.error("classifyItems parse error", e);
     return {};
   }
 }
 
-function matchPromos(queryBg: string, promos: Promo[]): Promo[] {
+function matchPromos(
+  queryBg: string,
+  classification: ItemClassification | undefined,
+  promos: Promo[],
+): Promo[] {
   const qTokens = tokenize(queryBg);
   if (qTokens.length === 0) return [];
   const qNorm = normalize(queryBg);
-  // Tier 1: promo name contains the full query phrase as a word boundary.
+
+  // Restrict promo pool to allowed subcategories (preferred) or parent categories.
+  const subSet = new Set(classification?.subSlugs ?? []);
+  const parentSet = new Set(classification?.parentSlugs ?? []);
+  let pool = promos;
+  if (subSet.size > 0) {
+    pool = promos.filter((p) => p.categorySlug && subSet.has(p.categorySlug));
+  } else if (parentSet.size > 0) {
+    pool = promos.filter((p) => p.parentCategorySlug && parentSet.has(p.parentCategorySlug));
+  }
+
   const phraseRe = new RegExp(`(^|\\s)${qNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`, "u");
-  let hits = promos.filter((p) => phraseRe.test(p.normName));
+  let hits = pool.filter((p) => phraseRe.test(p.normName));
   if (hits.length === 0) {
-    // Tier 2: every query token appears as a whole-word match in the promo name.
-    hits = promos.filter((p) => {
+    hits = pool.filter((p) => {
       const pTokens = new Set(tokenize(p.title));
       return qTokens.every((t) =>
         Array.from(pTokens).some((pt) => pt === t || pt.startsWith(t) || t.startsWith(pt)),
       );
     });
+  }
+  // If we restricted to a subcategory and the phrase/token match found nothing,
+  // accept ALL promos in that subcategory — they're already the right product class.
+  if (hits.length === 0 && subSet.size > 0 && pool.length > 0) {
+    hits = pool;
   }
   return hits;
 }
@@ -191,19 +292,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    const promos = await getPromos(admin);
+    const [promos, tree] = await Promise.all([getPromos(admin), fetchCategoryTree()]);
 
-    const toTranslate: string[] = [];
-    for (const it of items) {
-      if (detectLang(it.name) !== "bg") toTranslate.push(it.name);
-    }
-    const translations = await translateToBg(toTranslate, LOVABLE_API_KEY);
+    const classification = await classifyItems(
+      items.map((it) => it.name),
+      tree,
+      LOVABLE_API_KEY,
+    );
 
     let updated = 0;
     const results: Array<Record<string, unknown>> = [];
     for (const it of items) {
-      const bgName = detectLang(it.name) === "bg" ? it.name : (translations[it.name] ?? it.name);
-      const hits = matchPromos(bgName, promos);
+      const cls = classification[it.name];
+      const bgName = cls?.bg ?? it.name;
+      const hits = matchPromos(bgName, cls, promos);
       const stores = Array.from(new Set(hits.map((h) => h.store))).sort();
       const lowest = hits.length > 0 ? Math.min(...hits.map((h) => h.priceCents)) : null;
       await admin
@@ -215,7 +317,12 @@ Deno.serve(async (req) => {
         })
         .eq("id", it.id);
       updated++;
-      results.push({ id: it.id, bgName, stores, lowest, hits: hits.length });
+      results.push({
+        id: it.id, bgName,
+        subSlugs: cls?.subSlugs ?? [],
+        parentSlugs: cls?.parentSlugs ?? [],
+        stores, lowest, hits: hits.length,
+      });
     }
 
     return new Response(JSON.stringify({ updated, results, promoCount: promos.length }), {
