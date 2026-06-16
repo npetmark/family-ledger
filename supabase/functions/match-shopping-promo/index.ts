@@ -88,6 +88,24 @@ export function parsePackSize(title: string): number | null {
   return null;
 }
 
+/**
+ * Fallback pack size for products that are virtually always sold in fixed
+ * multi-piece bundles but whose promo titles often omit the count
+ * (znamcenite.bg titles like just "Яйца" or "Pressed eggs"). Returns null
+ * when no confident default applies.
+ *
+ * Applied only when `parsePackSize` returned null AND the matched promo
+ * looks like the right product class (the matcher already restricted by
+ * subcategory, so we can trust the title keyword).
+ */
+export function defaultPackSize(promoTitle: string, itemName: string): number | null {
+  const hay = `${promoTitle} ${itemName}`.toLowerCase();
+  // Eggs — typical Bulgarian retail pack is 10.
+  if (/(^|\s)(яйц[ае]|egg|eggs)(\s|$)/u.test(hay)) return 10;
+  return null;
+}
+
+
 async function fetchAllPromos(): Promise<Promo[]> {
   const out: Promo[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
