@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/popover";
 import {
   ChevronDown, ChevronRight, Plus, Receipt, Check, Trash2,
-  History, Paperclip, X, Pencil, Tag, RefreshCw, ShoppingBag, Trophy,
+  History, Paperclip, X, Pencil, Tag, RefreshCw, ShoppingBag,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
