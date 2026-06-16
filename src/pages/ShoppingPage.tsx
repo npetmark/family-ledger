@@ -535,34 +535,11 @@ export default function ShoppingPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Shopping</h1>
-          <p className="text-sm text-muted-foreground">One list per trip. Items auto-categorize as you type.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={refreshingPromos || items.length === 0}
-            onClick={refreshPromos}
-            title="Re-check znamcenite.bg for discounts on every item"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
-            Refresh promos
-          </Button>
-          <Button
-            size="sm"
-            disabled={storeRanking.promoItemCount === 0}
-            onClick={() => setGoShoppingOpen(true)}
-            title="See which store to visit based on current promos"
-          >
-            <ShoppingBag className="h-4 w-4 mr-2" /> Go shopping
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setPastOpen(true)}>
-            <History className="h-4 w-4 mr-2" /> Past trips
-          </Button>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">Shopping</h1>
+        <Button variant="outline" size="sm" onClick={() => setPastOpen(true)}>
+          <History className="h-4 w-4 mr-2" /> Past trips
+        </Button>
       </div>
 
       {/* Active trip card */}
@@ -582,9 +559,27 @@ export default function ShoppingPage() {
                 {totalPrice > 0 && (<><span>·</span><span className="font-mono-numbers">{formatCurrency(totalPrice)}</span></>)}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadReceipt(f); e.target.value = ""; }} />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={refreshingPromos || items.length === 0}
+                onClick={refreshPromos}
+                title="Re-check znamcenite.bg for discounts on every item"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
+                Refresh promos
+              </Button>
+              <Button
+                size="sm"
+                disabled={storeRanking.promoItemCount === 0}
+                onClick={() => setGoShoppingOpen(true)}
+                title="See which store to visit based on current promos"
+              >
+                <ShoppingBag className="h-4 w-4 mr-2" /> Go shopping
+              </Button>
               <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                 <Paperclip className="h-4 w-4 mr-2" />
                 {activeTrip?.receipt_path ? "Replace receipt" : "Attach receipt"}
@@ -608,7 +603,7 @@ export default function ShoppingPage() {
             >
               <Input
                 ref={inputRef}
-                placeholder="Add an item (English or Bulgarian)…"
+                placeholder="Add an item…"
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setShowSuggest(true); }}
                 onFocus={() => setShowSuggest(true)}
