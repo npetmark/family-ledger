@@ -1,0 +1,750 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  ChevronDown, ChevronRight, Plus, Receipt, Check, Trash2,
+  History, Paperclip, X, Pencil,
+} from "lucide-react";
+import { format } from "date-fns";
+import { toast } from "sonner";
+import { detectLanguage, normalizeName, scheduleUndoableDelete } from "@/lib/shopping";
+import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
+
+type Category = {
+  id: string; name: string; emoji: string; color: string; sort_order: number;
+};
+type Trip = {
+  id: string; name: string; status: "active" | "completed" | "archived";
+  started_at: string; completed_at: string | null;
+  total_cents: number | null; receipt_path: string | null; notes: string | null;
+};
+type Item = {
+  id: string; trip_id: string; category_id: string | null; name: string;
+  normalized_name: string; quantity: number; unit: string | null;
+  checked: boolean; price_cents: number | null; sort_order: number;
+  created_at: string;
+};
+type DictEntry = {
+  id: string; normalized_name: string; display_name: string;
+  language: string; category_id: string | null; usage_count: number;
+};
+
+export default function ShoppingPage() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pastOpen, setPastOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim()), 150);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // -------- queries
+  const { data: categories = [] } = useQuery({
+    queryKey: ["shopping-categories", user?.id],
+    queryFn: async (): Promise<Category[]> => {
+      const { data, error } = await supabase
+        .from("shopping_categories")
+        .select("*")
+        .order("sort_order");
+      if (error) throw error;
+      return data as any;
+    },
+    enabled: !!user,
+  });
+
+  const { data: activeTrip } = useQuery({
+    queryKey: ["shopping-active-trip", user?.id],
+    queryFn: async (): Promise<Trip | null> => {
+      const { data, error } = await supabase
+        .from("shopping_trips")
+        .select("*")
+        .eq("status", "active")
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (data) return data as any;
+      // Auto-create
+      const name = `Shopping — ${format(new Date(), "EEE d MMM")}`;
+      const { data: created, error: cErr } = await supabase
+        .from("shopping_trips")
+        .insert({ user_id: user!.id, name })
+        .select()
+        .single();
+      if (cErr) throw cErr;
+      return created as any;
+    },
+    enabled: !!user,
+  });
+
+  const { data: items = [] } = useQuery({
+    queryKey: ["shopping-items", activeTrip?.id],
+    queryFn: async (): Promise<Item[]> => {
+      const { data, error } = await supabase
+        .from("shopping_items")
+        .select("*")
+        .eq("trip_id", activeTrip!.id)
+        .order("created_at");
+      if (error) throw error;
+      return data as any;
+    },
+    enabled: !!activeTrip?.id,
+  });
+
+  const { data: suggestions = [] } = useQuery({
+    queryKey: ["shopping-suggestions", user?.id, debounced],
+    queryFn: async (): Promise<DictEntry[]> => {
+      if (debounced.length < 1) return [];
+      const norm = normalizeName(debounced);
+      const { data, error } = await supabase
+        .from("shopping_item_dictionary")
+        .select("*")
+        .ilike("normalized_name", `${norm}%`)
+        .order("usage_count", { ascending: false })
+        .limit(8);
+      if (error) throw error;
+      return data as any;
+    },
+    enabled: !!user && debounced.length > 0,
+  });
+
+  const { data: topSuggested = [] } = useQuery({
+    queryKey: ["shopping-top-suggested", user?.id],
+    queryFn: async (): Promise<DictEntry[]> => {
+      const { data, error } = await supabase
+        .from("shopping_item_dictionary")
+        .select("*")
+        .gt("usage_count", 0)
+        .order("usage_count", { ascending: false })
+        .order("last_used_at", { ascending: false })
+        .limit(12);
+      if (error) throw error;
+      return data as any;
+    },
+    enabled: !!user,
+  });
+
+  const { data: pastTrips = [] } = useQuery({
+    queryKey: ["shopping-past-trips", user?.id],
+    queryFn: async (): Promise<Trip[]> => {
+      const { data, error } = await supabase
+        .from("shopping_trips")
+        .select("*")
+        .neq("status", "active")
+        .order("started_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      return data as any;
+    },
+    enabled: !!user && pastOpen,
+  });
+
+  // -------- mutations
+  const addItem = useMutation({
+    mutationFn: async (payload: { name: string; categoryId: string | null; dictEntry?: DictEntry }) => {
+      if (!activeTrip || !user) return;
+      const display = payload.name.trim();
+      if (!display) return;
+      const norm = normalizeName(display);
+      const lang = detectLanguage(display);
+
+      // Look up category if not provided
+      let categoryId = payload.categoryId;
+      let dictId: string | null = payload.dictEntry?.id ?? null;
+      if (!categoryId) {
+        const { data: existing } = await supabase
+          .from("shopping_item_dictionary")
+          .select("id, category_id")
+          .eq("normalized_name", norm)
+          .maybeSingle();
+        if (existing) {
+          categoryId = existing.category_id;
+          dictId = existing.id;
+        }
+      }
+      if (!categoryId) {
+        // fallback: Other
+        const other = categories.find((c) => c.name === "Other");
+        categoryId = other?.id ?? null;
+      }
+
+      const { error } = await supabase.from("shopping_items").insert({
+        user_id: user.id,
+        trip_id: activeTrip.id,
+        category_id: categoryId,
+        name: display,
+        normalized_name: norm,
+        quantity: 1,
+        sort_order: items.length,
+      });
+      if (error) throw error;
+
+      // Upsert dictionary entry + bump usage
+      if (dictId) {
+        await supabase
+          .from("shopping_item_dictionary")
+          .update({ usage_count: (payload.dictEntry?.usage_count ?? 0) + 1, last_used_at: new Date().toISOString(), category_id: categoryId })
+          .eq("id", dictId);
+      } else {
+        await supabase
+          .from("shopping_item_dictionary")
+          .insert({
+            user_id: user.id,
+            normalized_name: norm,
+            display_name: display,
+            language: lang,
+            category_id: categoryId,
+            usage_count: 1,
+            last_used_at: new Date().toISOString(),
+          })
+          .select()
+          .maybeSingle();
+      }
+    },
+    onSuccess: () => {
+      setQuery("");
+      setShowSuggest(false);
+      queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip?.id] });
+      queryClient.invalidateQueries({ queryKey: ["shopping-top-suggested", user?.id] });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Failed to add item"),
+  });
+
+  const toggleChecked = useMutation({
+    mutationFn: async (it: Item) => {
+      const { error } = await supabase
+        .from("shopping_items")
+        .update({ checked: !it.checked })
+        .eq("id", it.id);
+      if (error) throw error;
+    },
+    onMutate: async (it) => {
+      await queryClient.cancelQueries({ queryKey: ["shopping-items", activeTrip?.id] });
+      const prev = queryClient.getQueryData<Item[]>(["shopping-items", activeTrip?.id]);
+      queryClient.setQueryData<Item[]>(["shopping-items", activeTrip?.id], (old) =>
+        (old ?? []).map((x) => (x.id === it.id ? { ...x, checked: !x.checked } : x))
+      );
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["shopping-items", activeTrip?.id], ctx.prev);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip?.id] });
+    },
+  });
+
+  const updateItem = useMutation({
+    mutationFn: async (patch: Partial<Item> & { id: string }) => {
+      const { id, ...fields } = patch;
+      const { error } = await supabase.from("shopping_items").update(fields).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip?.id] });
+      setEditingItem(null);
+    },
+  });
+
+  const completeTrip = useMutation({
+    mutationFn: async () => {
+      if (!activeTrip) return;
+      const total = items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
+      const { error } = await supabase
+        .from("shopping_trips")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          total_cents: total || null,
+        })
+        .eq("id", activeTrip.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["shopping-past-trips", user?.id] });
+      setConfirmCompleteOpen(false);
+      toast.success("Trip completed");
+    },
+  });
+
+  const renameTrip = useMutation({
+    mutationFn: async (name: string) => {
+      if (!activeTrip) return;
+      const { error } = await supabase.from("shopping_trips").update({ name }).eq("id", activeTrip.id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] }),
+  });
+
+  // -------- delete with confirmation + undo
+  const requestDelete = (id: string) => setPendingDeleteId(id);
+  const confirmDelete = () => {
+    if (!pendingDeleteId || !activeTrip) return;
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
+
+    // Optimistically hide
+    const key = ["shopping-items", activeTrip.id];
+    const prev = queryClient.getQueryData<Item[]>(key);
+    queryClient.setQueryData<Item[]>(key, (old) => (old ?? []).filter((x) => x.id !== id));
+
+    scheduleUndoableDelete({
+      message: "Item deleted",
+      onConfirm: async () => {
+        const { error } = await supabase.from("shopping_items").delete().eq("id", id);
+        if (error) throw error;
+      },
+      onUndo: () => {
+        if (prev) queryClient.setQueryData(key, prev);
+        else queryClient.invalidateQueries({ queryKey: key });
+      },
+    });
+  };
+
+  // -------- receipt upload
+  const uploadReceipt = async (file: File) => {
+    if (!activeTrip || !user) return;
+    const ext = file.name.split(".").pop() || "bin";
+    const path = `${user.id}/${activeTrip.id}/receipt-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("shopping-receipts").upload(path, file, { upsert: true });
+    if (error) { toast.error(error.message); return; }
+    await supabase.from("shopping_trips").update({ receipt_path: path }).eq("id", activeTrip.id);
+    queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] });
+    toast.success("Receipt attached");
+  };
+
+  // -------- grouped items
+  const grouped = useMemo(() => {
+    const byCat = new Map<string, Item[]>();
+    for (const it of items) {
+      const key = it.category_id ?? "uncat";
+      if (!byCat.has(key)) byCat.set(key, []);
+      byCat.get(key)!.push(it);
+    }
+    return categories
+      .map((c) => ({ category: c, items: (byCat.get(c.id) ?? []).slice().sort((a, b) =>
+        Number(a.checked) - Number(b.checked) || a.name.localeCompare(b.name)
+      ) }))
+      .filter((g) => g.items.length > 0);
+  }, [items, categories]);
+
+  const existingNorms = useMemo(() => new Set(items.map((i) => i.normalized_name)), [items]);
+  const chipSuggestions = topSuggested.filter((s) => !existingNorms.has(s.normalized_name)).slice(0, 10);
+
+  const totalChecked = items.filter((i) => i.checked).length;
+  const totalItems = items.length;
+  const totalPrice = items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
+
+  return (
+    <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Shopping</h1>
+          <p className="text-sm text-muted-foreground">One list per trip. Items auto-categorize as you type.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setPastOpen(true)}>
+          <History className="h-4 w-4 mr-2" /> Past trips
+        </Button>
+      </div>
+
+      {/* Active trip card */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <TripNameEditor
+                key={activeTrip?.id}
+                value={activeTrip?.name ?? "Loading…"}
+                onSave={(name) => renameTrip.mutate(name)}
+              />
+              <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+                <span>{activeTrip ? format(new Date(activeTrip.started_at), "PPP") : ""}</span>
+                <span>·</span>
+                <span>{totalChecked} / {totalItems} checked</span>
+                {totalPrice > 0 && (<><span>·</span><span className="font-mono-numbers">{formatCurrency(totalPrice)}</span></>)}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadReceipt(f); e.target.value = ""; }} />
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <Paperclip className="h-4 w-4 mr-2" />
+                {activeTrip?.receipt_path ? "Replace receipt" : "Attach receipt"}
+              </Button>
+              <Button size="sm" onClick={() => setConfirmCompleteOpen(true)} disabled={!totalItems}>
+                <Check className="h-4 w-4 mr-2" /> Complete trip
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Add bar with autocomplete */}
+          <div className="relative">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!query.trim()) return;
+                addItem.mutate({ name: query, categoryId: null });
+              }}
+              className="flex gap-2"
+            >
+              <Input
+                ref={inputRef}
+                placeholder="Add an item (English or Bulgarian)…"
+                value={query}
+                onChange={(e) => { setQuery(e.target.value); setShowSuggest(true); }}
+                onFocus={() => setShowSuggest(true)}
+                onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
+                autoComplete="off"
+              />
+              <Button type="submit" disabled={!query.trim() || addItem.isPending}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </form>
+            {showSuggest && suggestions.length > 0 && (
+              <div className="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md shadow-md overflow-hidden">
+                {suggestions.map((s) => {
+                  const cat = categories.find((c) => c.id === s.category_id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => addItem.mutate({ name: s.display_name, categoryId: s.category_id, dictEntry: s })}
+                      className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-muted text-left"
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span>{cat?.emoji ?? "🛒"}</span>
+                        <span className="truncate">{s.display_name}</span>
+                      </span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">{cat?.name ?? "Other"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Suggested chips */}
+          {chipSuggestions.length > 0 && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-2">Suggested</div>
+              <div className="flex flex-wrap gap-2">
+                {chipSuggestions.map((s) => {
+                  const cat = categories.find((c) => c.id === s.category_id);
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => addItem.mutate({ name: s.display_name, categoryId: s.category_id, dictEntry: s })}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted hover:bg-muted/70 text-xs"
+                    >
+                      <span>{cat?.emoji ?? "🛒"}</span>
+                      <span>{s.display_name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Grouped list */}
+      {grouped.length === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            Your list is empty. Add something above.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {grouped.map((g) => (
+            <Card key={g.category.id} className="overflow-hidden">
+              <div
+                className="px-4 py-2 flex items-center justify-between border-l-4"
+                style={{ borderLeftColor: `hsl(${g.category.color})` }}
+              >
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <span className="text-lg leading-none">{g.category.emoji}</span>
+                  <span>{g.category.name}</span>
+                  <Badge variant="secondary" className="ml-1 text-xs">{g.items.length}</Badge>
+                </div>
+              </div>
+              <div className="divide-y divide-border">
+                {g.items.map((it) => (
+                  <div key={it.id} className="flex items-center gap-3 px-4 py-2 group">
+                    <Checkbox
+                      checked={it.checked}
+                      onCheckedChange={() => toggleChecked.mutate(it)}
+                    />
+                    <button
+                      onClick={() => setEditingItem(it)}
+                      className={`flex-1 text-left text-sm truncate ${it.checked ? "line-through text-muted-foreground" : ""}`}
+                    >
+                      {it.name}
+                      {it.quantity && it.quantity !== 1 ? (
+                        <span className="text-muted-foreground text-xs ml-2">×{it.quantity}{it.unit ? ` ${it.unit}` : ""}</span>
+                      ) : it.unit ? (
+                        <span className="text-muted-foreground text-xs ml-2">{it.unit}</span>
+                      ) : null}
+                    </button>
+                    {it.price_cents != null && (
+                      <span className="text-xs font-mono-numbers text-muted-foreground">
+                        {formatCurrency(it.price_cents)}
+                      </span>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground" onClick={() => setEditingItem(it)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => requestDelete(it.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!pendingDeleteId} onOpenChange={(v) => !v && setPendingDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this item?</AlertDialogTitle>
+            <AlertDialogDescription>You'll have 5 seconds to undo.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Complete confirm */}
+      <AlertDialog open={confirmCompleteOpen} onOpenChange={setConfirmCompleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Complete this trip?</AlertDialogTitle>
+            <AlertDialogDescription>The list will be archived and a new active trip will start.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => completeTrip.mutate()}>Complete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Item edit */}
+      <ItemEditDialog
+        item={editingItem}
+        categories={categories}
+        onClose={() => setEditingItem(null)}
+        onSave={(patch) => updateItem.mutate(patch)}
+      />
+
+      {/* Past trips drawer */}
+      <Dialog open={pastOpen} onOpenChange={setPastOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Past trips</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto space-y-2">
+            {pastTrips.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">No completed trips yet.</p>
+            ) : pastTrips.map((t) => (
+              <PastTripRow key={t.id} trip={t} />
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// -------- subcomponents
+
+function TripNameEditor({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value);
+  useEffect(() => setVal(value), [value]);
+  if (!editing) {
+    return (
+      <button onClick={() => setEditing(true)} className="text-lg font-semibold hover:underline text-left">
+        {value}
+      </button>
+    );
+  }
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); if (val.trim() && val !== value) onSave(val.trim()); setEditing(false); }}
+      className="flex items-center gap-2"
+    >
+      <Input value={val} onChange={(e) => setVal(e.target.value)} autoFocus className="h-8" />
+      <Button type="submit" size="sm" variant="secondary">Save</Button>
+      <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setVal(value); setEditing(false); }}>
+        <X className="h-4 w-4" />
+      </Button>
+    </form>
+  );
+}
+
+function ItemEditDialog({
+  item, categories, onClose, onSave,
+}: {
+  item: Item | null;
+  categories: Category[];
+  onClose: () => void;
+  onSave: (patch: Partial<Item> & { id: string }) => void;
+}) {
+  const [name, setName] = useState("");
+  const [qty, setQty] = useState("1");
+  const [unit, setUnit] = useState("");
+  const [price, setPrice] = useState("");
+  const [categoryId, setCategoryId] = useState<string>("");
+
+  useEffect(() => {
+    if (item) {
+      setName(item.name);
+      setQty(String(item.quantity ?? 1));
+      setUnit(item.unit ?? "");
+      setPrice(item.price_cents != null ? (item.price_cents / 100).toFixed(2) : "");
+      setCategoryId(item.category_id ?? "");
+    }
+  }, [item]);
+
+  if (!item) return null;
+  return (
+    <Dialog open={!!item} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit item</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
+          <div className="grid grid-cols-2 gap-2">
+            <Input value={qty} onChange={(e) => setQty(e.target.value)} placeholder="Quantity" type="number" step="0.01" />
+            <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Unit (kg, l…)" />
+          </div>
+          <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (optional)" type="number" step="0.01" />
+          <Select value={categoryId} onValueChange={setCategoryId}>
+            <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
+            <SelectContent>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.emoji} {c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => onSave({
+            id: item.id,
+            name: name.trim() || item.name,
+            normalized_name: normalizeName(name),
+            quantity: parseFloat(qty) || 1,
+            unit: unit.trim() || null,
+            price_cents: price.trim() ? parseCurrencyToCents(price) : null,
+            category_id: categoryId || null,
+          })}>Save</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PastTripRow({ trip }: { trip: Trip }) {
+  const [open, setOpen] = useState(false);
+  const { data: items = [] } = useQuery({
+    queryKey: ["shopping-items", trip.id],
+    queryFn: async (): Promise<Item[]> => {
+      const { data, error } = await supabase
+        .from("shopping_items")
+        .select("*")
+        .eq("trip_id", trip.id)
+        .order("created_at");
+      if (error) throw error;
+      return data as any;
+    },
+    enabled: open,
+  });
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (open && trip.receipt_path && !receiptUrl) {
+      supabase.storage.from("shopping-receipts").createSignedUrl(trip.receipt_path, 300).then(({ data }) => {
+        if (data?.signedUrl) setReceiptUrl(data.signedUrl);
+      });
+    }
+  }, [open, trip.receipt_path, receiptUrl]);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <Card>
+        <CollapsibleTrigger className="w-full">
+          <div className="flex items-center justify-between p-3 hover:bg-muted/30">
+            <div className="text-left">
+              <p className="text-sm font-medium">{trip.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {format(new Date(trip.started_at), "PPP")}
+                {trip.total_cents ? ` · ${formatCurrency(trip.total_cents)}` : ""}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              {trip.receipt_path && <Receipt className="h-4 w-4" />}
+              {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </div>
+          </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="px-4 pb-3 space-y-1">
+            {items.map((it) => (
+              <div key={it.id} className="text-sm flex items-center justify-between">
+                <span className={it.checked ? "line-through text-muted-foreground" : ""}>{it.name}</span>
+                {it.price_cents != null && (
+                  <span className="text-xs font-mono-numbers text-muted-foreground">{formatCurrency(it.price_cents)}</span>
+                )}
+              </div>
+            ))}
+            {receiptUrl && (
+              <a href={receiptUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs text-primary hover:underline mt-2">
+                <Receipt className="h-3.5 w-3.5" /> View receipt
+              </a>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}

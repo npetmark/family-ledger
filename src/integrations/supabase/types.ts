@@ -275,6 +275,194 @@ export type Database = {
           },
         ]
       }
+      shopping_categories: {
+        Row: {
+          color: string
+          created_at: string
+          emoji: string
+          id: string
+          is_default: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          emoji?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          emoji?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      shopping_item_dictionary: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          display_name: string
+          id: string
+          language: string
+          last_used_at: string | null
+          normalized_name: string
+          updated_at: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          display_name: string
+          id?: string
+          language?: string
+          last_used_at?: string | null
+          normalized_name: string
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          language?: string
+          last_used_at?: string | null
+          normalized_name?: string
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_item_dictionary_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopping_items: {
+        Row: {
+          category_id: string | null
+          checked: boolean
+          created_at: string
+          id: string
+          name: string
+          normalized_name: string
+          price_cents: number | null
+          quantity: number
+          sort_order: number
+          trip_id: string
+          unit: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          checked?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          normalized_name: string
+          price_cents?: number | null
+          quantity?: number
+          sort_order?: number
+          trip_id: string
+          unit?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string | null
+          checked?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          normalized_name?: string
+          price_cents?: number | null
+          quantity?: number
+          sort_order?: number
+          trip_id?: string
+          unit?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_items_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopping_trips: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          receipt_path: string | null
+          started_at: string
+          status: string
+          total_cents: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          receipt_path?: string | null
+          started_at?: string
+          status?: string
+          total_cents?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          receipt_path?: string | null
+          started_at?: string
+          status?: string
+          total_cents?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       subcategories: {
         Row: {
           color: string
@@ -448,7 +636,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      seed_shopping_defaults: { Args: { _user_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

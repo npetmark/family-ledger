@@ -1,41 +1,52 @@
+# Shopping list + safer transaction delete
 
+## Part 1 — Shopping list
 
-## Plan: Fix Chatbot Scrolling, Category Picker, and Dashboard Pie Chart
+### Data model (new tables, RLS by `auth.uid()`, BIGINT cents)
 
-### Issues to Fix
+- **shopping_categories** — `id, user_id, name, emoji, color, sort_order`. User-editable.
+- **shopping_trips** — `id, user_id, name, status ('active'|'completed'|'archived'), started_at, completed_at, total_cents, receipt_path, notes`. One trip = one shopping run.
+- **shopping_items** — `id, user_id, trip_id, name, category_id, quantity numeric(10,2) default 1, unit, checked bool, price_cents bigint null, sort_order`.
+- **shopping_item_dictionary** — `id, user_id, normalized_name (citext), display_name, language ('en'|'bg'|'other'), category_id, usage_count int default 0, last_used_at`. Drives both autocomplete and auto-categorization, learns from every item you add.
 
-1. **Chatbot category picker not scrollable** — The `PopoverContent` in the chatbot's `TransactionCard` has `max-h-60 overflow-y-auto` but lacks the scroll event isolation (`onWheel`/`onTouchMove` stopPropagation) used in the manual flow.
+Seed triggers on new user:
+- ~12 default categories with emojis: Produce 🥦, Meat & Fish 🥩, Dairy & Eggs 🥚, Bakery 🍞, Pantry 🥫, Frozen 🧊, Drinks 🥤, Snacks 🍫, Household 🧻, Personal Care 🧼, Baby 🍼, Other 🛒.
+- Bilingual dictionary (~120 common items, EN + BG) pre-mapped to those categories (eggs/яйца → Dairy & Eggs, chicken/пиле → Meat & Fish, etc.). Existing users get backfilled in the same migration.
 
-2. **Chatbot dialog not scrollable** — The `ScrollArea` component forwards `ref` to the Radix `Root` element, but scrolling actually happens on the inner `Viewport`. The `scrollRef` used for auto-scroll likely targets the wrong element. The dialog also needs proper flex layout to allow the scroll area to shrink.
+Storage bucket `shopping-receipts` (private, RLS by user folder) for receipt photos/PDFs attached to a trip.
 
-3. **Manual flow category picker missing colored dots** — The manual `QuickAddTransaction` category picker doesn't show colored dots next to main category names like the chatbot does.
+### Page (`/shopping`, new sidebar entry between Recurring and Analytics)
 
-4. **Dashboard pie chart percentage denominator wrong** — Currently `totalExpenses` excludes Investments, so the pie chart percentages are calculated against Needs+Wants only. The pie chart should include all three (Needs, Wants, Investments) as 100%.
+Layout matches existing app (DM Sans, sage/teal tokens, card surfaces, responsive grid):
 
-### Changes
+- **Active trip card** — name (editable, defaults to `Shopping — Mon 16 Jun`), date, item count, completion progress. Buttons: Complete trip, Archive, Attach receipt.
+- **Add bar** — single text input with debounced autocomplete dropdown that searches the bilingual dictionary (BG + EN) ordered by `usage_count`. Enter or pick a suggestion adds the item. Optional qty/unit chips.
+- **Auto-categorization** — on add we look up `normalized_name` in the dictionary; if found, the item lands in that category. If unknown, it goes to the last-used category for that word (per-user learning) or Other, with an inline category picker so a one-click correction teaches the dictionary (insert into `shopping_item_dictionary` with the chosen category).
+- **List** — grouped by category (emoji + name headers, color stripe), items sorted unchecked-first then alphabetically. Tap to check; long-press / kebab to edit name, qty, category, price. Swipe / trash button to remove with the same 5-second undo toast pattern below.
+- **Suggested items** — horizontal chip row above the list with the top 10 items from the dictionary by `usage_count` that are not already in the active trip. Tap to add instantly.
+- **Past trips drawer** — list of completed trips with date, item count, total, receipt thumbnail. Tap to reopen read-only or duplicate as a new trip.
 
-#### File: `src/components/TransactionChatbot.tsx`
+### Files
 
-- **Fix chatbot scrollability**: Replace `ScrollArea` with a plain `div` using `overflow-y-auto` and proper flex sizing, or fix the ref to target the viewport. Simpler approach: use a regular `div` with `className="flex-1 min-h-0 overflow-y-auto"` and attach `scrollRef` directly.
-- **Fix category picker scrollability**: Add `onWheel={(e) => e.stopPropagation()}` and `onTouchMove={(e) => e.stopPropagation()}` to the `PopoverContent` inner div, matching the manual flow pattern. Also add `overscroll-contain touch-pan-y`.
-- **Add colored dots**: Already present in the chatbot (line 364). Keep as-is.
+- migration: tables, grants, RLS, seed triggers, bilingual dictionary backfill, storage bucket + policies.
+- `src/pages/ShoppingPage.tsx` — page shell, trip selector, receipt upload.
+- `src/components/shopping/AddItemBar.tsx` — input + autocomplete.
+- `src/components/shopping/ShoppingList.tsx` — grouped list, check/edit/delete.
+- `src/components/shopping/SuggestedItems.tsx` — chip row.
+- `src/components/shopping/PastTrips.tsx` — drawer.
+- `src/lib/shopping.ts` — normalize (lowercase, strip diacritics, trim), category lookup, mutations.
+- Route + sidebar entry in `App.tsx` / `AppSidebar.tsx`.
 
-#### File: `src/components/QuickAddTransaction.tsx`
+## Part 2 — Safer transaction delete
 
-- **Add colored dots to manual flow category picker**: Fetch `main_categories` data (need a new query or join). Update the `CollapsibleTrigger` to include a colored dot `<div className="w-2 h-2 rounded-full" style={{ backgroundColor: \`hsl(\${color})\` }} />` next to each main category name, matching the chatbot style.
+Both in `src/pages/TransactionsPage.tsx` and `src/components/dashboard/RecentTransactions.tsx`:
 
-#### File: `src/pages/DashboardPage.tsx`
+1. Trash button opens an `AlertDialog` "Delete this transaction?" with Cancel / Delete.
+2. On confirm: optimistically remove from cache, show a Sonner toast `Transaction deleted` with an **Undo** action and 5 s duration. The actual `supabase.delete` runs only after 5 s if undo wasn't clicked; undo restores the cache and cancels the delete. Pattern reused for shopping item delete.
 
-- **Fix pie chart denominator**: The pie chart's `categoryBreakdown` already includes all categories (Needs, Wants, Investments). The percentage label calculation on line 255 uses `totalExpenses` which excludes Investments. Change the denominator to `allExpenseLikeTotal` (sum of all `expenseLike` transactions including Investments) so the pie shows all three categories as 100%.
-- Add a separate total for pie chart: `const allExpensesForChart = expenseLike.reduce((sum, t) => sum + t.amount, 0)` and use that in the label calculation.
-- The summary cards remain unchanged (Expenses = Needs+Wants, Savings = Investments).
+## Technical notes
 
-### Summary of Scope
-
-| Area | What Changes |
-|------|-------------|
-| Chatbot scroll | Replace ScrollArea with plain overflow div |
-| Chatbot category picker | Add scroll event isolation to PopoverContent |
-| Manual flow category picker | Add colored dots next to main category names |
-| Dashboard pie chart | Use all-inclusive expense total as denominator for % labels |
-
+- Autocomplete query: server-side `ilike` on `normalized_name` with `limit 8`, debounced 150 ms, also matches the start of any word (split on space).
+- Normalization handles Cyrillic and Latin (lowercase, NFKD strip combining marks, collapse whitespace).
+- Receipts upload to `shopping-receipts/{user_id}/{trip_id}/...`; signed URLs for display.
+- No money math in floats: prices stored as cents; totals summed in SQL.

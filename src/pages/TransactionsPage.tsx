@@ -19,6 +19,11 @@ import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronD
 import { toast } from "sonner";
 import { format, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths } from "date-fns";
 import { getFundSubcategoryId } from "@/lib/fund-accounts";
+import { scheduleUndoableDelete } from "@/lib/shopping";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type FilterPreset = "day" | "week" | "month" | "year" | "custom";
 
@@ -174,17 +179,31 @@ export default function TransactionsPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("transactions").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
-      toast.success("Transaction deleted");
-    },
-  });
+  const [pendingDeleteTxId, setPendingDeleteTxId] = useState<string | null>(null);
+
+  const performDelete = (id: string) => {
+    const keys = [["transactions"], ["all-transactions-for-balance"]];
+    const snapshots = keys.map((k) => [k, queryClient.getQueryData(k)] as const);
+    // Optimistically remove from caches
+    keys.forEach((k) => {
+      queryClient.setQueriesData({ queryKey: k }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.filter((t: any) => t.id !== id);
+      });
+    });
+    scheduleUndoableDelete({
+      message: "Transaction deleted",
+      onConfirm: async () => {
+        const { error } = await supabase.from("transactions").delete().eq("id", id);
+        if (error) throw error;
+        keys.forEach((k) => queryClient.invalidateQueries({ queryKey: k }));
+      },
+      onUndo: () => {
+        snapshots.forEach(([k, snap]) => queryClient.setQueryData(k as any, snap));
+      },
+    });
+  };
+
 
   const selectPreset = (preset: FilterPreset) => {
     if (preset === "custom") {
@@ -569,7 +588,7 @@ export default function TransactionsPage() {
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
-                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(t.id); }}
+                onClick={(e) => { e.stopPropagation(); setPendingDeleteTxId(t.id); }}
               >
                 <span className="text-xs">✕</span>
               </Button>
@@ -653,6 +672,28 @@ export default function TransactionsPage() {
           );
         });
       })()}
+
+      <AlertDialog open={!!pendingDeleteTxId} onOpenChange={(v) => !v && setPendingDeleteTxId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this transaction?</AlertDialogTitle>
+            <AlertDialogDescription>You'll have 5 seconds to undo.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const id = pendingDeleteTxId!;
+                setPendingDeleteTxId(null);
+                performDelete(id);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
