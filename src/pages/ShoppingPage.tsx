@@ -819,6 +819,7 @@ export default function ShoppingPage() {
             </div>
           </Card>
         </div>
+      )}
 
       {/* Promo footnote */}
       {storeRanking.promoItemCount > 0 ? (
