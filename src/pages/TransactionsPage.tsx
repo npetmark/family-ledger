@@ -482,6 +482,22 @@ export default function TransactionsPage() {
             "Save Changes",
             updateMutation.isPending
           )}
+          {editingTransaction && (
+            <DialogFooter className="sm:justify-start">
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => {
+                  const id = editingTransaction.id;
+                  setEditOpen(false);
+                  setEditingTransaction(null);
+                  setPendingDeleteTxId(id);
+                }}
+              >
+                Delete transaction
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -583,15 +599,6 @@ export default function TransactionsPage() {
                 {t.transaction_type === "income" ? "+" : t.transaction_type === "expense" ? "-" : ""}
                 {formatCurrency(t.amount)}
               </span>
-              <Pencil className="h-3.5 w-3.5 opacity-0 group-hover:opacity-50 transition-opacity" />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
-                onClick={(e) => { e.stopPropagation(); setPendingDeleteTxId(t.id); }}
-              >
-                <span className="text-xs">✕</span>
-              </Button>
             </div>
           </div>
         );

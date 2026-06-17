@@ -243,6 +243,21 @@ export default function ShoppingPage() {
         categoryId = other?.id ?? null;
       }
 
+      // Look up last known price for this item (across all this user's trips)
+      let defaultPriceCents: number | null = null;
+      {
+        const { data: lastPriced } = await supabase
+          .from("shopping_items")
+          .select("price_cents")
+          .eq("user_id", user.id)
+          .eq("normalized_name", norm)
+          .not("price_cents", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lastPriced?.price_cents != null) defaultPriceCents = lastPriced.price_cents;
+      }
+
       const { data: inserted, error } = await supabase.from("shopping_items").insert({
         user_id: user.id,
         trip_id: activeTrip.id,
@@ -251,6 +266,7 @@ export default function ShoppingPage() {
         normalized_name: norm,
         quantity: parsed.quantity,
         unit: parsed.unit,
+        price_cents: defaultPriceCents,
         sort_order: items.length,
       }).select("id").single();
       if (error) throw error;
@@ -531,11 +547,21 @@ export default function ShoppingPage() {
       if (!byCat.has(key)) byCat.set(key, []);
       byCat.get(key)!.push(it);
     }
-    return categories
+    const visible = categories
       .map((c) => ({ category: c, items: (byCat.get(c.id) ?? []).slice().sort((a, b) =>
         Number(a.checked) - Number(b.checked) || a.name.localeCompare(b.name)
       ) }))
       .filter((g) => g.items.length > 0);
+    const uncat = (byCat.get("uncat") ?? []).slice().sort((a, b) =>
+      Number(a.checked) - Number(b.checked) || a.name.localeCompare(b.name)
+    );
+    if (uncat.length > 0) {
+      visible.push({
+        category: { id: "uncat", name: "Uncategorized", emoji: "🛒", color: "0 0% 60%", sort_order: 999 } as Category,
+        items: uncat,
+      });
+    }
+    return visible;
   }, [items, categories]);
 
   const existingNorms = useMemo(() => new Set(items.map((i) => i.normalized_name)), [items]);
@@ -786,6 +812,12 @@ export default function ShoppingPage() {
               </div>
             </Card>
           ))}
+          <Card>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm font-medium">Total paid</span>
+              <span className="text-base font-mono-numbers font-semibold">{formatCurrency(totalPrice)}</span>
+            </div>
+          </Card>
         </div>
       )}
 
