@@ -547,11 +547,21 @@ export default function ShoppingPage() {
       if (!byCat.has(key)) byCat.set(key, []);
       byCat.get(key)!.push(it);
     }
-    return categories
+    const visible = categories
       .map((c) => ({ category: c, items: (byCat.get(c.id) ?? []).slice().sort((a, b) =>
         Number(a.checked) - Number(b.checked) || a.name.localeCompare(b.name)
       ) }))
       .filter((g) => g.items.length > 0);
+    const uncat = (byCat.get("uncat") ?? []).slice().sort((a, b) =>
+      Number(a.checked) - Number(b.checked) || a.name.localeCompare(b.name)
+    );
+    if (uncat.length > 0) {
+      visible.push({
+        category: { id: "uncat", name: "Uncategorized", emoji: "🛒", color: "0 0% 60%", sort_order: 999 } as Category,
+        items: uncat,
+      });
+    }
+    return visible;
   }, [items, categories]);
 
   const existingNorms = useMemo(() => new Set(items.map((i) => i.normalized_name)), [items]);
