@@ -812,8 +812,13 @@ export default function ShoppingPage() {
               </div>
             </Card>
           ))}
+          <Card>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm font-medium">Total paid</span>
+              <span className="text-base font-mono-numbers font-semibold">{formatCurrency(totalPrice)}</span>
+            </div>
+          </Card>
         </div>
-      )}
 
       {/* Promo footnote */}
       {storeRanking.promoItemCount > 0 ? (
