@@ -482,6 +482,22 @@ export default function TransactionsPage() {
             "Save Changes",
             updateMutation.isPending
           )}
+          {editingTransaction && (
+            <DialogFooter className="sm:justify-start">
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => {
+                  const id = editingTransaction.id;
+                  setEditOpen(false);
+                  setEditingTransaction(null);
+                  setPendingDeleteTxId(id);
+                }}
+              >
+                Delete transaction
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 
