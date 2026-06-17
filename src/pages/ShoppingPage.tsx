@@ -243,6 +243,21 @@ export default function ShoppingPage() {
         categoryId = other?.id ?? null;
       }
 
+      // Look up last known price for this item (across all this user's trips)
+      let defaultPriceCents: number | null = null;
+      {
+        const { data: lastPriced } = await supabase
+          .from("shopping_items")
+          .select("price_cents")
+          .eq("user_id", user.id)
+          .eq("normalized_name", norm)
+          .not("price_cents", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lastPriced?.price_cents != null) defaultPriceCents = lastPriced.price_cents;
+      }
+
       const { data: inserted, error } = await supabase.from("shopping_items").insert({
         user_id: user.id,
         trip_id: activeTrip.id,
@@ -251,6 +266,7 @@ export default function ShoppingPage() {
         normalized_name: norm,
         quantity: parsed.quantity,
         unit: parsed.unit,
+        price_cents: defaultPriceCents,
         sort_order: items.length,
       }).select("id").single();
       if (error) throw error;
