@@ -592,7 +592,7 @@ export default function TransactionsPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`font-mono-numbers text-sm font-medium ${
+              <span className={`font-mono-numbers text-sm font-medium whitespace-nowrap flex-shrink-0 ${
                 t.transaction_type === "income" ? "text-income" :
                 t.transaction_type === "transfer" ? "text-transfer" : "text-expense"
               }`}>

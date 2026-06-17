@@ -232,7 +232,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                       </div>
                     </div>
                     <span
-                      className={`font-mono-numbers text-sm font-medium flex-shrink-0 ml-2 ${
+                      className={`font-mono-numbers text-sm font-medium whitespace-nowrap flex-shrink-0 ml-2 ${
                         t.transaction_type === "income"
                           ? "text-income"
                           : t.transaction_type === "transfer"
