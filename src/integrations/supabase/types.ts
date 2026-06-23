@@ -363,10 +363,12 @@ export type Database = {
       }
       shopping_items: {
         Row: {
+          actual_price_cents: number | null
           category_id: string | null
           checked: boolean
           created_at: string
           id: string
+          is_excess: boolean
           name: string
           normalized_name: string
           price_cents: number | null
@@ -383,10 +385,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          actual_price_cents?: number | null
           category_id?: string | null
           checked?: boolean
           created_at?: string
           id?: string
+          is_excess?: boolean
           name: string
           normalized_name: string
           price_cents?: number | null
@@ -403,10 +407,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          actual_price_cents?: number | null
           category_id?: string | null
           checked?: boolean
           created_at?: string
           id?: string
+          is_excess?: boolean
           name?: string
           normalized_name?: string
           price_cents?: number | null
