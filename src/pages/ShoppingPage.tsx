@@ -550,10 +550,87 @@ export default function ShoppingPage() {
     toast.success("Receipt attached");
   };
 
-  // -------- grouped items
+  // -------- AI receipt parse
+  const parseReceipt = async (file: File) => {
+    if (!activeTrip) return;
+    setParsingReceipt(true);
+    try {
+      // Read file as base64 data URL
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+
+      // Also store the receipt on the trip
+      uploadReceipt(file).catch(() => {});
+
+      const { data, error } = await supabase.functions.invoke("parse-receipt", {
+        body: { image: dataUrl, trip_id: activeTrip.id },
+      });
+      if (error) throw error;
+      const result = data as ReceiptResult;
+      setReceiptResult(result);
+      // Pre-select all unmatched items for adding as excess
+      const sel: Record<number, boolean> = {};
+      result.unmatched.forEach((_, idx) => { sel[idx] = true; });
+      setReceiptExcessSelection(sel);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to parse receipt");
+    } finally {
+      setParsingReceipt(false);
+    }
+  };
+
+  const confirmReceiptResult = async () => {
+    if (!receiptResult || !activeTrip || !user) return;
+    try {
+      // Update matched items with actual prices, mark as checked
+      for (const m of receiptResult.matched) {
+        await supabase
+          .from("shopping_items")
+          .update({ actual_price_cents: m.actual_price_cents, checked: true })
+          .eq("id", m.item_id);
+      }
+      // Insert selected unmatched as excess
+      const toInsert = receiptResult.unmatched
+        .map((u, idx) => ({ u, idx }))
+        .filter(({ idx }) => receiptExcessSelection[idx])
+        .map(({ u }) => {
+          const norm = normalizeName(u.name);
+          return {
+            user_id: user.id,
+            trip_id: activeTrip.id,
+            category_id: null,
+            name: u.name,
+            normalized_name: norm,
+            quantity: u.quantity || 1,
+            unit: u.unit,
+            actual_price_cents: u.actual_price_cents,
+            is_excess: true,
+            checked: true,
+            sort_order: items.length + 1000,
+          };
+        });
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from("shopping_items").insert(toInsert);
+        if (error) throw error;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
+      toast.success(`Receipt applied · ${receiptResult.matched.length} matched, ${toInsert.length} excess`);
+      setReceiptResult(null);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to apply receipt");
+    }
+  };
+
+  // -------- grouped items (excess goes to its own group)
   const grouped = useMemo(() => {
     const byCat = new Map<string, Item[]>();
+    const excess: Item[] = [];
     for (const it of items) {
+      if (it.is_excess) { excess.push(it); continue; }
       const key = it.category_id ?? "uncat";
       if (!byCat.has(key)) byCat.set(key, []);
       byCat.get(key)!.push(it);
@@ -572,18 +649,44 @@ export default function ShoppingPage() {
         items: uncat,
       });
     }
+    if (excess.length > 0) {
+      visible.push({
+        category: { id: "excess", name: "Excess (not on list)", emoji: "➕", color: "30 80% 55%", sort_order: 1000 } as Category,
+        items: excess.slice().sort((a, b) => a.name.localeCompare(b.name)),
+      });
+    }
     return visible;
   }, [items, categories]);
 
   const existingNorms = useMemo(() => new Set(items.map((i) => i.normalized_name)), [items]);
   const chipSuggestions = topSuggested.filter((s) => !existingNorms.has(s.normalized_name)).slice(0, 10);
 
-  const totalChecked = items.filter((i) => i.checked).length;
-  const totalItems = items.length;
-  const totalPrice = items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
+  const totalChecked = items.filter((i) => !i.is_excess && i.checked).length;
+  const totalItems = items.filter((i) => !i.is_excess).length;
+
+  // Expected = promo-aware computed cost; falls back to entered price_cents.
+  const expectedTotal = items.reduce((s, i) => {
+    if (i.is_excess) return s;
+    if (i.promo_price_cents != null) {
+      return s + computeLineTotalCents({
+        promo_price_cents: i.promo_price_cents,
+        quantity: i.quantity,
+        pack_size: i.promo_pack_size,
+      });
+    }
+    return s + (i.price_cents ?? 0);
+  }, 0);
+  const actualTotal = items.reduce(
+    (s, i) => s + (i.actual_price_cents ?? 0),
+    0,
+  );
+  const hasAnyActual = items.some((i) => i.actual_price_cents != null);
+  const delta = actualTotal - expectedTotal;
+  // Legacy total (used in header)
+  const totalPrice = actualTotal > 0 ? actualTotal : items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
 
   const storeRanking = useMemo(
-    () => rankStoresByDeals(items.map((i) => ({ ...i, pack_size: i.promo_pack_size }))),
+    () => rankStoresByDeals(items.filter((i) => !i.is_excess).map((i) => ({ ...i, pack_size: i.promo_pack_size }))),
     [items],
   );
 
@@ -593,7 +696,7 @@ export default function ShoppingPage() {
     if (!activeTrip || items.length === 0) return;
     setRefreshingPromos(true);
     try {
-      await triggerPromoLookup(items.map((i) => i.id));
+      await triggerPromoLookup(items.filter((i) => !i.is_excess).map((i) => i.id));
       await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
       toast.success("Promotions refreshed");
     } catch (e: any) {
