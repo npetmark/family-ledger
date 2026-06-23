@@ -1027,6 +1027,93 @@ export default function ShoppingPage() {
         onSave={(patch) => updateItem.mutate(patch)}
       />
 
+      {/* Receipt result preview */}
+      <Dialog open={!!receiptResult} onOpenChange={(v) => !v && setReceiptResult(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Receipt parsed</DialogTitle>
+          </DialogHeader>
+          {receiptResult && (
+            <div className="max-h-[60vh] overflow-auto space-y-4">
+              <section>
+                <h3 className="text-sm font-medium mb-2">
+                  Matched items ({receiptResult.matched.length})
+                </h3>
+                {receiptResult.matched.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No items from your list were matched.</p>
+                ) : (
+                  <ul className="space-y-1 text-sm">
+                    {receiptResult.matched.map((m) => {
+                      const it = items.find((i) => i.id === m.item_id);
+                      const expected = it?.price_cents ?? (it?.promo_price_cents != null ? computeLineTotalCents({
+                        promo_price_cents: it.promo_price_cents, quantity: it.quantity, pack_size: it.promo_pack_size,
+                      }) : null);
+                      const diff = expected != null ? m.actual_price_cents - expected : null;
+                      return (
+                        <li key={m.item_id} className="flex items-center justify-between gap-2 border-b pb-1">
+                          <span className="truncate">
+                            <span className="font-medium">{it?.name ?? m.receipt_name}</span>
+                            {m.receipt_name && it?.name && m.receipt_name !== it.name && (
+                              <span className="text-xs text-muted-foreground"> · "{m.receipt_name}"</span>
+                            )}
+                          </span>
+                          <span className="font-mono-numbers text-sm whitespace-nowrap">
+                            {formatCurrency(m.actual_price_cents)}
+                            {diff != null && diff !== 0 && (
+                              <span className={`ml-1 text-xs ${diff > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                ({diff > 0 ? "+" : ""}{formatCurrency(diff)})
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+
+              <section>
+                <h3 className="text-sm font-medium mb-2">
+                  Excess items ({receiptResult.unmatched.length})
+                </h3>
+                {receiptResult.unmatched.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nothing extra on the receipt.</p>
+                ) : (
+                  <ul className="space-y-1 text-sm">
+                    {receiptResult.unmatched.map((u, idx) => (
+                      <li key={idx} className="flex items-center gap-2 border-b pb-1">
+                        <Checkbox
+                          checked={!!receiptExcessSelection[idx]}
+                          onCheckedChange={(v) =>
+                            setReceiptExcessSelection((s) => ({ ...s, [idx]: !!v }))
+                          }
+                        />
+                        <span className="flex-1 truncate">
+                          {u.name}
+                          {u.quantity !== 1 || u.unit ? (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              {u.unit ? `${u.quantity} ${u.unit}` : `×${u.quantity}`}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="font-mono-numbers text-sm whitespace-nowrap">
+                          {formatCurrency(u.actual_price_cents)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReceiptResult(null)}>Cancel</Button>
+            <Button onClick={confirmReceiptResult}>Apply receipt</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       {/* Past trips drawer */}
       <Dialog open={pastOpen} onOpenChange={setPastOpen}>
         <DialogContent className="max-w-2xl">
