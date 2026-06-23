@@ -1172,6 +1172,7 @@ function ItemEditDialog({
   const [qty, setQty] = useState("1");
   const [unit, setUnit] = useState("");
   const [price, setPrice] = useState("");
+  const [actualPrice, setActualPrice] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [translation, setTranslation] = useState("");
 
