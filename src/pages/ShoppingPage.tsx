@@ -735,6 +735,8 @@ export default function ShoppingPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadReceipt(f); e.target.value = ""; }} />
+              <input ref={receiptInputRef} type="file" accept="image/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) parseReceipt(f); e.target.value = ""; }} />
               <Button
                 variant="outline"
                 size="sm"
@@ -744,6 +746,16 @@ export default function ShoppingPage() {
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
                 Refresh promos
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={parsingReceipt || !activeTrip}
+                onClick={() => receiptInputRef.current?.click()}
+                title="Upload a photo of the receipt and auto-fill actual prices"
+              >
+                {parsingReceipt ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ScanLine className="h-4 w-4 mr-2" />}
+                Parse receipt
               </Button>
               <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                 <Paperclip className="h-4 w-4 mr-2" />
