@@ -82,25 +82,27 @@ Rules:
 - Skip totals, taxes, discounts, change, and other non-product lines.
 - Do not invent items not visible on the receipt.`;
 
+    const aiBody = {
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Parse this receipt and match items to my list." },
+            { type: "image_url", image_url: { url: image } },
+          ],
+        },
+      ],
+    };
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Lovable-API-Key": LOVABLE_API_KEY,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: systemPrompt },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Parse this receipt and match items to my list." },
-              { type: "image_url", image_url: { url: image } },
-            ],
-          },
-        ],
-      }),
+      body: JSON.stringify(aiBody),
     });
 
     if (!response.ok) {
@@ -116,7 +118,8 @@ Rules:
       }
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "Receipt parsing failed" }), {
+      console.error("itemsList length:", itemsList.length);
+      return new Response(JSON.stringify({ error: "Receipt parsing failed", upstream: t }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
