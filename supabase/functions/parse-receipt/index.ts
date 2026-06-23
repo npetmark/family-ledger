@@ -95,14 +95,16 @@ Rules:
         },
       ],
     };
-    console.log("AI request size bytes:", JSON.stringify(aiBody).length, "key len:", LOVABLE_API_KEY.length);
+    const bodyString = JSON.stringify(aiBody);
+    console.log("AI request size bytes:", bodyString.length, "key len:", LOVABLE_API_KEY.length, "byteLen:", new TextEncoder().encode(bodyString).length);
+    console.log("system prompt:", systemPrompt.slice(0, 400));
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(aiBody),
+      body: bodyString,
     });
 
     if (!response.ok) {
