@@ -922,11 +922,23 @@ export default function ShoppingPage() {
                         </div>
                       )}
                     </button>
-                    {it.price_cents != null && (
-                      <span className="text-sm font-mono-numbers font-medium text-foreground">
-                        {formatCurrency(it.price_cents)}
-                      </span>
-                    )}
+                    <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                      {it.actual_price_cents != null && (
+                        <span className="text-sm font-mono-numbers font-semibold text-foreground whitespace-nowrap">
+                          {formatCurrency(it.actual_price_cents)}
+                        </span>
+                      )}
+                      {it.price_cents != null && it.actual_price_cents == null && (
+                        <span className="text-sm font-mono-numbers font-medium text-foreground whitespace-nowrap">
+                          {formatCurrency(it.price_cents)}
+                        </span>
+                      )}
+                      {it.actual_price_cents != null && it.price_cents != null && it.actual_price_cents !== it.price_cents && (
+                        <span className={`text-[10px] font-mono-numbers whitespace-nowrap ${it.actual_price_cents > it.price_cents ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                          exp {formatCurrency(it.price_cents)}
+                        </span>
+                      )}
+                    </div>
                     <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground" onClick={() => setEditingItem(it)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -939,9 +951,23 @@ export default function ShoppingPage() {
             </Card>
           ))}
           <Card>
-            <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-sm font-medium">Total paid</span>
-              <span className="text-base font-mono-numbers font-semibold">{formatCurrency(totalPrice)}</span>
+            <div className="px-4 py-3 space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Expected</span>
+                <span className="font-mono-numbers">{formatCurrency(expectedTotal)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Actual paid</span>
+                <span className="font-mono-numbers font-semibold">{formatCurrency(actualTotal)}</span>
+              </div>
+              {hasAnyActual && (
+                <div className={`flex items-center justify-between text-sm pt-1.5 border-t ${delta > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                  <span className="font-medium">Delta</span>
+                  <span className="font-mono-numbers font-semibold">
+                    {delta > 0 ? "+" : ""}{formatCurrency(delta)}
+                  </span>
+                </div>
+              )}
             </div>
           </Card>
         </div>
