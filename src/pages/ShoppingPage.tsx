@@ -26,6 +26,7 @@ import {
 import {
   ChevronDown, ChevronRight, Plus, Receipt, Check, Trash2,
   History, Paperclip, X, Pencil, Tag, RefreshCw, ShoppingBag,
+  ScanLine, Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -58,7 +59,13 @@ type Item = {
   promo_pack_size: number | null;
   promo_offers: PromoOffer[] | null;
   promo_checked_at: string | null;
+  actual_price_cents: number | null;
+  is_excess: boolean;
 };
+
+type ReceiptMatch = { item_id: string; actual_price_cents: number; receipt_name: string };
+type ReceiptUnmatched = { name: string; quantity: number; unit: string | null; actual_price_cents: number };
+type ReceiptResult = { matched: ReceiptMatch[]; unmatched: ReceiptUnmatched[]; currency_hint: string | null };
 
 type DictEntry = {
   id: string; normalized_name: string; display_name: string;
@@ -77,8 +84,12 @@ export default function ShoppingPage() {
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const [refreshingPromos, setRefreshingPromos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const autoPackRefreshed = useRef<Set<string>>(new Set());
+  const [parsingReceipt, setParsingReceipt] = useState(false);
+  const [receiptResult, setReceiptResult] = useState<ReceiptResult | null>(null);
+  const [receiptExcessSelection, setReceiptExcessSelection] = useState<Record<number, boolean>>({});
 
 
   useEffect(() => {
@@ -539,10 +550,87 @@ export default function ShoppingPage() {
     toast.success("Receipt attached");
   };
 
-  // -------- grouped items
+  // -------- AI receipt parse
+  const parseReceipt = async (file: File) => {
+    if (!activeTrip) return;
+    setParsingReceipt(true);
+    try {
+      // Read file as base64 data URL
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+
+      // Also store the receipt on the trip
+      uploadReceipt(file).catch(() => {});
+
+      const { data, error } = await supabase.functions.invoke("parse-receipt", {
+        body: { image: dataUrl, trip_id: activeTrip.id },
+      });
+      if (error) throw error;
+      const result = data as ReceiptResult;
+      setReceiptResult(result);
+      // Pre-select all unmatched items for adding as excess
+      const sel: Record<number, boolean> = {};
+      result.unmatched.forEach((_, idx) => { sel[idx] = true; });
+      setReceiptExcessSelection(sel);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to parse receipt");
+    } finally {
+      setParsingReceipt(false);
+    }
+  };
+
+  const confirmReceiptResult = async () => {
+    if (!receiptResult || !activeTrip || !user) return;
+    try {
+      // Update matched items with actual prices, mark as checked
+      for (const m of receiptResult.matched) {
+        await supabase
+          .from("shopping_items")
+          .update({ actual_price_cents: m.actual_price_cents, checked: true })
+          .eq("id", m.item_id);
+      }
+      // Insert selected unmatched as excess
+      const toInsert = receiptResult.unmatched
+        .map((u, idx) => ({ u, idx }))
+        .filter(({ idx }) => receiptExcessSelection[idx])
+        .map(({ u }) => {
+          const norm = normalizeName(u.name);
+          return {
+            user_id: user.id,
+            trip_id: activeTrip.id,
+            category_id: null,
+            name: u.name,
+            normalized_name: norm,
+            quantity: u.quantity || 1,
+            unit: u.unit,
+            actual_price_cents: u.actual_price_cents,
+            is_excess: true,
+            checked: true,
+            sort_order: items.length + 1000,
+          };
+        });
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from("shopping_items").insert(toInsert);
+        if (error) throw error;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
+      toast.success(`Receipt applied · ${receiptResult.matched.length} matched, ${toInsert.length} excess`);
+      setReceiptResult(null);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to apply receipt");
+    }
+  };
+
+  // -------- grouped items (excess goes to its own group)
   const grouped = useMemo(() => {
     const byCat = new Map<string, Item[]>();
+    const excess: Item[] = [];
     for (const it of items) {
+      if (it.is_excess) { excess.push(it); continue; }
       const key = it.category_id ?? "uncat";
       if (!byCat.has(key)) byCat.set(key, []);
       byCat.get(key)!.push(it);
@@ -561,18 +649,44 @@ export default function ShoppingPage() {
         items: uncat,
       });
     }
+    if (excess.length > 0) {
+      visible.push({
+        category: { id: "excess", name: "Excess (not on list)", emoji: "➕", color: "30 80% 55%", sort_order: 1000 } as Category,
+        items: excess.slice().sort((a, b) => a.name.localeCompare(b.name)),
+      });
+    }
     return visible;
   }, [items, categories]);
 
   const existingNorms = useMemo(() => new Set(items.map((i) => i.normalized_name)), [items]);
   const chipSuggestions = topSuggested.filter((s) => !existingNorms.has(s.normalized_name)).slice(0, 10);
 
-  const totalChecked = items.filter((i) => i.checked).length;
-  const totalItems = items.length;
-  const totalPrice = items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
+  const totalChecked = items.filter((i) => !i.is_excess && i.checked).length;
+  const totalItems = items.filter((i) => !i.is_excess).length;
+
+  // Expected = promo-aware computed cost; falls back to entered price_cents.
+  const expectedTotal = items.reduce((s, i) => {
+    if (i.is_excess) return s;
+    if (i.promo_price_cents != null) {
+      return s + computeLineTotalCents({
+        promo_price_cents: i.promo_price_cents,
+        quantity: i.quantity,
+        pack_size: i.promo_pack_size,
+      });
+    }
+    return s + (i.price_cents ?? 0);
+  }, 0);
+  const actualTotal = items.reduce(
+    (s, i) => s + (i.actual_price_cents ?? 0),
+    0,
+  );
+  const hasAnyActual = items.some((i) => i.actual_price_cents != null);
+  const delta = actualTotal - expectedTotal;
+  // Legacy total (used in header)
+  const totalPrice = actualTotal > 0 ? actualTotal : items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
 
   const storeRanking = useMemo(
-    () => rankStoresByDeals(items.map((i) => ({ ...i, pack_size: i.promo_pack_size }))),
+    () => rankStoresByDeals(items.filter((i) => !i.is_excess).map((i) => ({ ...i, pack_size: i.promo_pack_size }))),
     [items],
   );
 
@@ -582,7 +696,7 @@ export default function ShoppingPage() {
     if (!activeTrip || items.length === 0) return;
     setRefreshingPromos(true);
     try {
-      await triggerPromoLookup(items.map((i) => i.id));
+      await triggerPromoLookup(items.filter((i) => !i.is_excess).map((i) => i.id));
       await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
       toast.success("Promotions refreshed");
     } catch (e: any) {
@@ -621,6 +735,8 @@ export default function ShoppingPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadReceipt(f); e.target.value = ""; }} />
+              <input ref={receiptInputRef} type="file" accept="image/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) parseReceipt(f); e.target.value = ""; }} />
               <Button
                 variant="outline"
                 size="sm"
@@ -630,6 +746,16 @@ export default function ShoppingPage() {
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
                 Refresh promos
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={parsingReceipt || !activeTrip}
+                onClick={() => receiptInputRef.current?.click()}
+                title="Upload a photo of the receipt and auto-fill actual prices"
+              >
+                {parsingReceipt ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ScanLine className="h-4 w-4 mr-2" />}
+                Parse receipt
               </Button>
               <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                 <Paperclip className="h-4 w-4 mr-2" />
@@ -796,11 +922,23 @@ export default function ShoppingPage() {
                         </div>
                       )}
                     </button>
-                    {it.price_cents != null && (
-                      <span className="text-sm font-mono-numbers font-medium text-foreground">
-                        {formatCurrency(it.price_cents)}
-                      </span>
-                    )}
+                    <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                      {it.actual_price_cents != null && (
+                        <span className="text-sm font-mono-numbers font-semibold text-foreground whitespace-nowrap">
+                          {formatCurrency(it.actual_price_cents)}
+                        </span>
+                      )}
+                      {it.price_cents != null && it.actual_price_cents == null && (
+                        <span className="text-sm font-mono-numbers font-medium text-foreground whitespace-nowrap">
+                          {formatCurrency(it.price_cents)}
+                        </span>
+                      )}
+                      {it.actual_price_cents != null && it.price_cents != null && it.actual_price_cents !== it.price_cents && (
+                        <span className={`text-[10px] font-mono-numbers whitespace-nowrap ${it.actual_price_cents > it.price_cents ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                          exp {formatCurrency(it.price_cents)}
+                        </span>
+                      )}
+                    </div>
                     <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground" onClick={() => setEditingItem(it)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -813,9 +951,23 @@ export default function ShoppingPage() {
             </Card>
           ))}
           <Card>
-            <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-sm font-medium">Total paid</span>
-              <span className="text-base font-mono-numbers font-semibold">{formatCurrency(totalPrice)}</span>
+            <div className="px-4 py-3 space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Expected</span>
+                <span className="font-mono-numbers">{formatCurrency(expectedTotal)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Actual paid</span>
+                <span className="font-mono-numbers font-semibold">{formatCurrency(actualTotal)}</span>
+              </div>
+              {hasAnyActual && (
+                <div className={`flex items-center justify-between text-sm pt-1.5 border-t ${delta > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                  <span className="font-medium">Delta</span>
+                  <span className="font-mono-numbers font-semibold">
+                    {delta > 0 ? "+" : ""}{formatCurrency(delta)}
+                  </span>
+                </div>
+              )}
             </div>
           </Card>
         </div>
@@ -874,6 +1026,93 @@ export default function ShoppingPage() {
         onClose={() => setEditingItem(null)}
         onSave={(patch) => updateItem.mutate(patch)}
       />
+
+      {/* Receipt result preview */}
+      <Dialog open={!!receiptResult} onOpenChange={(v) => !v && setReceiptResult(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Receipt parsed</DialogTitle>
+          </DialogHeader>
+          {receiptResult && (
+            <div className="max-h-[60vh] overflow-auto space-y-4">
+              <section>
+                <h3 className="text-sm font-medium mb-2">
+                  Matched items ({receiptResult.matched.length})
+                </h3>
+                {receiptResult.matched.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No items from your list were matched.</p>
+                ) : (
+                  <ul className="space-y-1 text-sm">
+                    {receiptResult.matched.map((m) => {
+                      const it = items.find((i) => i.id === m.item_id);
+                      const expected = it?.price_cents ?? (it?.promo_price_cents != null ? computeLineTotalCents({
+                        promo_price_cents: it.promo_price_cents, quantity: it.quantity, pack_size: it.promo_pack_size,
+                      }) : null);
+                      const diff = expected != null ? m.actual_price_cents - expected : null;
+                      return (
+                        <li key={m.item_id} className="flex items-center justify-between gap-2 border-b pb-1">
+                          <span className="truncate">
+                            <span className="font-medium">{it?.name ?? m.receipt_name}</span>
+                            {m.receipt_name && it?.name && m.receipt_name !== it.name && (
+                              <span className="text-xs text-muted-foreground"> · "{m.receipt_name}"</span>
+                            )}
+                          </span>
+                          <span className="font-mono-numbers text-sm whitespace-nowrap">
+                            {formatCurrency(m.actual_price_cents)}
+                            {diff != null && diff !== 0 && (
+                              <span className={`ml-1 text-xs ${diff > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                ({diff > 0 ? "+" : ""}{formatCurrency(diff)})
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+
+              <section>
+                <h3 className="text-sm font-medium mb-2">
+                  Excess items ({receiptResult.unmatched.length})
+                </h3>
+                {receiptResult.unmatched.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nothing extra on the receipt.</p>
+                ) : (
+                  <ul className="space-y-1 text-sm">
+                    {receiptResult.unmatched.map((u, idx) => (
+                      <li key={idx} className="flex items-center gap-2 border-b pb-1">
+                        <Checkbox
+                          checked={!!receiptExcessSelection[idx]}
+                          onCheckedChange={(v) =>
+                            setReceiptExcessSelection((s) => ({ ...s, [idx]: !!v }))
+                          }
+                        />
+                        <span className="flex-1 truncate">
+                          {u.name}
+                          {u.quantity !== 1 || u.unit ? (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              {u.unit ? `${u.quantity} ${u.unit}` : `×${u.quantity}`}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="font-mono-numbers text-sm whitespace-nowrap">
+                          {formatCurrency(u.actual_price_cents)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReceiptResult(null)}>Cancel</Button>
+            <Button onClick={confirmReceiptResult}>Apply receipt</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Past trips drawer */}
       <Dialog open={pastOpen} onOpenChange={setPastOpen}>
