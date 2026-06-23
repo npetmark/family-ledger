@@ -1182,6 +1182,7 @@ function ItemEditDialog({
       setQty(String(item.quantity ?? 1));
       setUnit(item.unit ?? "");
       setPrice(item.price_cents != null ? (item.price_cents / 100).toFixed(2) : "");
+      setActualPrice(item.actual_price_cents != null ? (item.actual_price_cents / 100).toFixed(2) : "");
       setCategoryId(item.category_id ?? "");
       setTranslation("");
     }
