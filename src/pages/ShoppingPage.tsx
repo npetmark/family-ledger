@@ -59,7 +59,13 @@ type Item = {
   promo_pack_size: number | null;
   promo_offers: PromoOffer[] | null;
   promo_checked_at: string | null;
+  actual_price_cents: number | null;
+  is_excess: boolean;
 };
+
+type ReceiptMatch = { item_id: string; actual_price_cents: number; receipt_name: string };
+type ReceiptUnmatched = { name: string; quantity: number; unit: string | null; actual_price_cents: number };
+type ReceiptResult = { matched: ReceiptMatch[]; unmatched: ReceiptUnmatched[]; currency_hint: string | null };
 
 type DictEntry = {
   id: string; normalized_name: string; display_name: string;
