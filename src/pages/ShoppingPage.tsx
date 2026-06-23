@@ -1181,7 +1181,18 @@ function ItemEditDialog({
       setName(item.name);
       setQty(String(item.quantity ?? 1));
       setUnit(item.unit ?? "");
-      setPrice(item.price_cents != null ? (item.price_cents / 100).toFixed(2) : "");
+      // Auto-populate expected price from the cheapest matched deal if no manual price set
+      let expectedCents = item.price_cents;
+      if (expectedCents == null && item.promo_offers && item.promo_offers.length > 0) {
+        const cheapest = item.promo_offers[0];
+        const isMeasure = cheapest.unit === "kg" || cheapest.unit === "l" || cheapest.unit === "g" || cheapest.unit === "ml";
+        expectedCents = computeLineTotalCents({
+          promo_price_cents: cheapest.price_cents,
+          quantity: item.quantity ?? 1,
+          pack_size: isMeasure ? null : cheapest.pack_size,
+        });
+      }
+      setPrice(expectedCents != null ? (expectedCents / 100).toFixed(2) : "");
       setActualPrice(item.actual_price_cents != null ? (item.actual_price_cents / 100).toFixed(2) : "");
       setCategoryId(item.category_id ?? "");
       setTranslation("");
