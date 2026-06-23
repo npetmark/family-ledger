@@ -1289,6 +1289,7 @@ function ItemEditDialog({
             quantity: parseFloat(qty) || 1,
             unit: unit.trim() || null,
             price_cents: price.trim() ? parseCurrencyToCents(price) : null,
+            actual_price_cents: actualPrice.trim() ? parseCurrencyToCents(actualPrice) : null,
             category_id: categoryId || null,
             _prevCategoryId: item.category_id,
             _translation: translation.trim() || null,
