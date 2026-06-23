@@ -84,8 +84,12 @@ export default function ShoppingPage() {
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const [refreshingPromos, setRefreshingPromos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const autoPackRefreshed = useRef<Set<string>>(new Set());
+  const [parsingReceipt, setParsingReceipt] = useState(false);
+  const [receiptResult, setReceiptResult] = useState<ReceiptResult | null>(null);
+  const [receiptExcessSelection, setReceiptExcessSelection] = useState<Record<number, boolean>>({});
 
 
   useEffect(() => {
