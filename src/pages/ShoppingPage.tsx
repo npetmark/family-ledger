@@ -1207,7 +1207,16 @@ function ItemEditDialog({
             <Input value={qty} onChange={(e) => setQty(e.target.value)} placeholder="Quantity" type="number" step="0.01" />
             <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Unit (kg, l…)" />
           </div>
-          <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (optional)" type="number" step="0.01" />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Expected price</label>
+              <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Optional" type="number" step="0.01" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Actual paid</label>
+              <Input value={actualPrice} onChange={(e) => setActualPrice(e.target.value)} placeholder="Optional" type="number" step="0.01" />
+            </div>
+          </div>
           <Select value={categoryId} onValueChange={setCategoryId}>
             <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
             <SelectContent>
