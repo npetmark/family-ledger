@@ -1172,6 +1172,7 @@ function ItemEditDialog({
   const [qty, setQty] = useState("1");
   const [unit, setUnit] = useState("");
   const [price, setPrice] = useState("");
+  const [actualPrice, setActualPrice] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [translation, setTranslation] = useState("");
 
@@ -1181,6 +1182,7 @@ function ItemEditDialog({
       setQty(String(item.quantity ?? 1));
       setUnit(item.unit ?? "");
       setPrice(item.price_cents != null ? (item.price_cents / 100).toFixed(2) : "");
+      setActualPrice(item.actual_price_cents != null ? (item.actual_price_cents / 100).toFixed(2) : "");
       setCategoryId(item.category_id ?? "");
       setTranslation("");
     }
@@ -1205,7 +1207,16 @@ function ItemEditDialog({
             <Input value={qty} onChange={(e) => setQty(e.target.value)} placeholder="Quantity" type="number" step="0.01" />
             <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Unit (kg, l…)" />
           </div>
-          <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price (optional)" type="number" step="0.01" />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Expected price</label>
+              <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Optional" type="number" step="0.01" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Actual paid</label>
+              <Input value={actualPrice} onChange={(e) => setActualPrice(e.target.value)} placeholder="Optional" type="number" step="0.01" />
+            </div>
+          </div>
           <Select value={categoryId} onValueChange={setCategoryId}>
             <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
             <SelectContent>
@@ -1278,6 +1289,7 @@ function ItemEditDialog({
             quantity: parseFloat(qty) || 1,
             unit: unit.trim() || null,
             price_cents: price.trim() ? parseCurrencyToCents(price) : null,
+            actual_price_cents: actualPrice.trim() ? parseCurrencyToCents(actualPrice) : null,
             category_id: categoryId || null,
             _prevCategoryId: item.category_id,
             _translation: translation.trim() || null,
