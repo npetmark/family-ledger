@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.data-export]
 verify_jwt = false
+
+[functions.parse-receipt]
+verify_jwt = true
