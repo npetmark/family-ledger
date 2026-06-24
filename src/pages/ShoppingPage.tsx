@@ -1288,7 +1288,9 @@ export default function ShoppingPage() {
           )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setReceiptResult(null)}>Cancel</Button>
-            <Button onClick={confirmReceiptResult}>Apply receipt</Button>
+            <Button onClick={confirmReceiptResult} disabled={applyingReceipt}>
+              {applyingReceipt ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying…</>) : "Apply receipt"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
