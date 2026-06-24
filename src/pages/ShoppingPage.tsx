@@ -754,7 +754,7 @@ export default function ShoppingPage() {
                 <span>{activeTrip ? format(new Date(activeTrip.started_at), "PPP") : ""}</span>
                 <span>·</span>
                 <span>{totalChecked} / {totalItems} checked</span>
-                {totalPrice > 0 && (<><span>·</span><span className="font-mono-numbers">{formatCurrency(totalPrice)}</span></>)}
+                {headerTotal > 0 && (<><span>·</span><span className="font-mono-numbers" title={hasAnyActual ? "Actual paid so far" : "Expected total"}>{formatCurrency(headerTotal)}{!hasAnyActual && <span className="text-muted-foreground ml-1">expected</span>}</span></>)}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
