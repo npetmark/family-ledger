@@ -96,6 +96,11 @@ export default function ShoppingPage() {
   // Snapshots of recent excess→item links so the user can undo even after the toast is gone.
   // Keyed by the target item id; cleared when the trip changes or after an undo.
   const [recentLinks, setRecentLinks] = useState<Record<string, { excess: Item; prevTarget: { actual_price_cents: number | null; checked: boolean } }>>({});
+  // Receipt viewer
+  const [viewReceiptOpen, setViewReceiptOpen] = useState(false);
+  const [activeReceiptUrl, setActiveReceiptUrl] = useState<string | null>(null);
+  // Complete-trip dialog form
+  const [completeForm, setCompleteForm] = useState({ store: "", account_id: "", amount: "" });
 
 
   useEffect(() => {
