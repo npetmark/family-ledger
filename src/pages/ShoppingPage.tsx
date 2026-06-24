@@ -108,6 +108,8 @@ export default function ShoppingPage() {
     return () => clearTimeout(t);
   }, [query]);
 
+  // Fetch a fresh signed URL for the active trip's receipt whenever it changes.
+
   // -------- queries
   const { data: categories = [] } = useQuery({
     queryKey: ["shopping-categories", user?.id],
