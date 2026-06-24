@@ -1125,10 +1125,10 @@ export default function ShoppingPage() {
                         onClick={() => { setMatchExcessFor(it); setMatchQuery(""); }}
                         title="Link to an existing item on the list"
                       >
-                        <Check className="h-3.5 w-3.5" />
+                        <Link2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground" onClick={() => setEditingItem(it)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setEditingItem(it)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => requestDelete(it.id)}>
