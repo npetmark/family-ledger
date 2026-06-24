@@ -616,15 +616,36 @@ export default function ShoppingPage() {
   });
 
   const completeTrip = useMutation({
-    mutationFn: async () => {
-      if (!activeTrip) return;
-      const total = items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
+    mutationFn: async (opts: { store: string; accountId: string; amountCents: number }) => {
+      if (!activeTrip || !user) return;
+      const totalForTrip = opts.amountCents > 0
+        ? opts.amountCents
+        : items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
+
+      // 1. Create the "Пазар" expense transaction for this shop
+      if (opts.amountCents > 0 && opts.accountId) {
+        const note = opts.store.trim()
+          ? `${opts.store.trim()} · ${activeTrip.name}`
+          : activeTrip.name;
+        const { error: txErr } = await supabase.from("transactions").insert({
+          user_id: user.id,
+          account_id: opts.accountId,
+          subcategory_id: groceriesSubcategoryId ?? null,
+          transaction_type: "expense",
+          amount: opts.amountCents,
+          date: format(new Date(), "yyyy-MM-dd"),
+          note,
+        });
+        if (txErr) throw txErr;
+      }
+
+      // 2. Complete the trip
       const { error } = await supabase
         .from("shopping_trips")
         .update({
           status: "completed",
           completed_at: new Date().toISOString(),
-          total_cents: total || null,
+          total_cents: totalForTrip || null,
         })
         .eq("id", activeTrip.id);
       if (error) throw error;
@@ -632,9 +653,13 @@ export default function ShoppingPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["shopping-past-trips", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
       setConfirmCompleteOpen(false);
+      setCompleteForm({ store: "", account_id: "", amount: "" });
       toast.success("Trip completed");
     },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to complete trip"),
   });
 
   const renameTrip = useMutation({
