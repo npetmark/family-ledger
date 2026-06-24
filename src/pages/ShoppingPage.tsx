@@ -1346,19 +1346,111 @@ export default function ShoppingPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Complete confirm */}
-      <AlertDialog open={confirmCompleteOpen} onOpenChange={setConfirmCompleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Complete this trip?</AlertDialogTitle>
-            <AlertDialogDescription>The list will be archived and a new active trip will start.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => completeTrip.mutate()}>Complete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Complete confirm — also records a "Пазар" expense transaction */}
+      <Dialog open={confirmCompleteOpen} onOpenChange={setConfirmCompleteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete this trip?</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const cents = parseCurrencyToCents(completeForm.amount);
+              if (!completeForm.account_id) {
+                toast.error("Pick an account");
+                return;
+              }
+              completeTrip.mutate({
+                store: completeForm.store,
+                accountId: completeForm.account_id,
+                amountCents: cents,
+              });
+            }}
+          >
+            <p className="text-xs text-muted-foreground">
+              The list will be archived and a new active trip will start. A "Пазар" expense will be recorded with the details below.
+            </p>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Store</label>
+              <Input
+                autoFocus
+                value={completeForm.store}
+                onChange={(e) => setCompleteForm((f) => ({ ...f, store: e.target.value }))}
+                placeholder="e.g. Kaufland, Lidl…"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Account</label>
+              <Select
+                value={completeForm.account_id}
+                onValueChange={(v) => setCompleteForm((f) => ({ ...f, account_id: v }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Amount</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={completeForm.amount}
+                onChange={(e) => setCompleteForm((f) => ({ ...f, amount: e.target.value }))}
+                placeholder="0.00"
+              />
+              {actualTotal > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Prefilled from Actual paid ({formatCurrency(actualTotal)})
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setConfirmCompleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={completeTrip.isPending}>
+                {completeTrip.isPending ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Completing…</>) : "Complete trip"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receipt viewer */}
+      <Dialog open={viewReceiptOpen} onOpenChange={setViewReceiptOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Receipt</DialogTitle>
+          </DialogHeader>
+          {activeReceiptUrl ? (
+            <div className="max-h-[70vh] overflow-auto flex items-center justify-center">
+              {/* Best-effort: render images inline, link out for PDFs/other types */}
+              {/\.pdf(\?|$)/i.test(activeReceiptUrl) ? (
+                <a href={activeReceiptUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                  Open receipt in a new tab
+                </a>
+              ) : (
+                <img src={activeReceiptUrl} alt="Receipt" className="max-w-full h-auto rounded-md" />
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
+          )}
+          {activeReceiptUrl && (
+            <DialogFooter>
+              <a href={activeReceiptUrl} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">
+                Open in new tab
+              </a>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Item edit */}
       <ItemEditDialog
