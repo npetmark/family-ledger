@@ -672,11 +672,11 @@ export default function ShoppingPage() {
   const totalChecked = items.filter((i) => !i.is_excess && i.checked).length;
   const totalItems = items.filter((i) => !i.is_excess).length;
 
-  // Expected cost for a single line: prefers manually entered price, otherwise
-  // falls back to the cheapest matched promo computed for this quantity.
-  // Per-weight/volume offers (kg/L/g/ml) don't use pack rounding.
+  // Expected cost for a single line.
+  // Priority: live promo computation (so quantity changes are reflected) →
+  // manually entered price_cents → null. Per-weight/volume offers (kg/L/g/ml)
+  // multiply qty directly without pack rounding.
   const expectedFor = (i: Item): number | null => {
-    if (i.price_cents != null) return i.price_cents;
     const cheapest = i.promo_offers && i.promo_offers.length > 0 ? i.promo_offers[0] : null;
     if (cheapest) {
       const isMeasure = cheapest.unit === "kg" || cheapest.unit === "l" || cheapest.unit === "g" || cheapest.unit === "ml";
@@ -694,6 +694,7 @@ export default function ShoppingPage() {
         pack_size: isMeasure ? null : i.promo_pack_size,
       });
     }
+    if (i.price_cents != null) return i.price_cents;
     return null;
   };
 
