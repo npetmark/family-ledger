@@ -104,6 +104,8 @@ export default function ShoppingPage() {
   const [activeReceiptUrl, setActiveReceiptUrl] = useState<string | null>(null);
   // Complete-trip dialog form
   const [completeForm, setCompleteForm] = useState({ store: "", account_id: "", amount: "" });
+  // Collapsed category ids on the list. Default is expanded; user can toggle.
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
 
 
   useEffect(() => {
@@ -1175,18 +1177,36 @@ export default function ShoppingPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {grouped.map((g) => (
+          {grouped.map((g) => {
+            const collapsed = collapsedCats.has(g.category.id);
+            return (
             <Card key={g.category.id} className="overflow-hidden">
-              <div
-                className="px-4 py-2 flex items-center justify-between border-l-4"
+              <button
+                type="button"
+                onClick={() =>
+                  setCollapsedCats((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(g.category.id)) next.delete(g.category.id);
+                    else next.add(g.category.id);
+                    return next;
+                  })
+                }
+                className="w-full px-4 py-2 flex items-center justify-between border-l-4 hover:bg-muted/40 transition-colors"
                 style={{ borderLeftColor: `hsl(${g.category.color})` }}
+                aria-expanded={!collapsed}
               >
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <span className="text-lg leading-none">{g.category.emoji}</span>
                   <span>{g.category.name}</span>
                   <Badge variant="secondary" className="ml-1 text-xs">{g.items.length}</Badge>
                 </div>
-              </div>
+                {collapsed ? (
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+              {!collapsed && (
               <div className="divide-y divide-border">
                 {g.items.map((it) => (
                   <div key={it.id} className="flex items-start gap-3 px-4 py-2 group">
@@ -1295,8 +1315,10 @@ export default function ShoppingPage() {
                   </div>
                 ))}
               </div>
+              )}
             </Card>
-          ))}
+            );
+          })}
           <Card>
             <div className="px-4 py-3 space-y-1.5">
               <div className="flex items-center justify-between text-sm">
