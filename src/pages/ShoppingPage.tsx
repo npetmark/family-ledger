@@ -947,23 +947,33 @@ export default function ShoppingPage() {
                         </div>
                       )}
                     </button>
-                    <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                      {it.actual_price_cents != null && (
-                        <span className="text-sm font-mono-numbers font-semibold text-foreground whitespace-nowrap">
-                          {formatCurrency(it.actual_price_cents)}
-                        </span>
-                      )}
-                      {it.price_cents != null && it.actual_price_cents == null && (
-                        <span className="text-sm font-mono-numbers font-medium text-foreground whitespace-nowrap">
-                          {formatCurrency(it.price_cents)}
-                        </span>
-                      )}
-                      {it.actual_price_cents != null && it.price_cents != null && it.actual_price_cents !== it.price_cents && (
-                        <span className={`text-[10px] font-mono-numbers whitespace-nowrap ${it.actual_price_cents > it.price_cents ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-                          exp {formatCurrency(it.price_cents)}
-                        </span>
-                      )}
-                    </div>
+                    {(() => {
+                      const exp = expectedFor(it);
+                      const actual = it.actual_price_cents;
+                      const isEstimate = it.price_cents == null && exp != null;
+                      return (
+                        <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                          {actual != null && (
+                            <span className="text-sm font-mono-numbers font-semibold text-foreground whitespace-nowrap">
+                              {formatCurrency(actual)}
+                            </span>
+                          )}
+                          {actual == null && exp != null && (
+                            <span
+                              className={`text-sm font-mono-numbers whitespace-nowrap ${isEstimate ? "text-muted-foreground italic" : "font-medium text-foreground"}`}
+                              title={isEstimate ? "Estimated from cheapest deal" : "Expected price"}
+                            >
+                              {isEstimate ? "~" : ""}{formatCurrency(exp)}
+                            </span>
+                          )}
+                          {actual != null && exp != null && actual !== exp && (
+                            <span className={`text-[10px] font-mono-numbers whitespace-nowrap ${actual > exp ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                              exp {formatCurrency(exp)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground" onClick={() => setEditingItem(it)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
