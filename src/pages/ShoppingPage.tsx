@@ -122,6 +122,30 @@ export default function ShoppingPage() {
     enabled: !!user,
   });
 
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["accounts", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("accounts").select("id, name").order("sort_order");
+      if (error) throw error;
+      return data as { id: string; name: string }[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: groceriesSubcategoryId } = useQuery({
+    queryKey: ["groceries-subcategory", user?.id],
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from("subcategories")
+        .select("id, name")
+        .in("name", ["Пазар", "Groceries"]);
+      if (error) throw error;
+      const pick = data?.find((s) => s.name === "Пазар") ?? data?.[0];
+      return pick?.id ?? null;
+    },
+    enabled: !!user,
+  });
+
   const { data: activeTrip } = useQuery({
     queryKey: ["shopping-active-trip", user?.id],
     queryFn: async (): Promise<Trip | null> => {
