@@ -759,6 +759,9 @@ export default function ShoppingPage() {
   // then removes the excess line so the trip totals stay correct.
   const linkExcessToItem = async (excess: Item, targetId: string) => {
     if (!activeTrip) return;
+    const target = items.find((i) => i.id === targetId);
+    if (!target) return;
+    const prevTarget = { actual_price_cents: target.actual_price_cents, checked: target.checked };
     try {
       const { error: upErr } = await supabase
         .from("shopping_items")
@@ -770,7 +773,41 @@ export default function ShoppingPage() {
       await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
       setMatchExcessFor(null);
       setMatchQuery("");
-      toast.success("Linked to existing item");
+      toast.success(`Linked to ${target.name}`, {
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            try {
+              // Restore target to its prior state
+              const { error: revertErr } = await supabase
+                .from("shopping_items")
+                .update(prevTarget)
+                .eq("id", targetId);
+              if (revertErr) throw revertErr;
+              // Re-insert the excess row with its original fields
+              const { error: insErr } = await supabase.from("shopping_items").insert({
+                id: excess.id,
+                trip_id: excess.trip_id,
+                category_id: excess.category_id,
+                name: excess.name,
+                normalized_name: excess.normalized_name,
+                quantity: excess.quantity,
+                unit: excess.unit,
+                checked: excess.checked,
+                price_cents: excess.price_cents,
+                sort_order: excess.sort_order,
+                actual_price_cents: excess.actual_price_cents,
+                is_excess: true,
+              });
+              if (insErr) throw insErr;
+              await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
+              toast.success("Link undone");
+            } catch (e: any) {
+              toast.error(e?.message ?? "Failed to undo link");
+            }
+          },
+        },
+      });
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to link item");
     }
