@@ -684,18 +684,27 @@ export default function ShoppingPage() {
 
   const confirmReceiptResult = async () => {
     if (!receiptResult || !activeTrip || !user) return;
+    if (applyingReceipt) return; // guard against double-clicks
+    setApplyingReceipt(true);
+    // Snapshot + close immediately so a second click can't fire again
+    const snapshot = receiptResult;
+    const selection = receiptExcessSelection;
+    setReceiptResult(null);
     try {
       // Update matched items with actual prices, mark as checked
-      for (const m of receiptResult.matched) {
+      for (const m of snapshot.matched) {
         await supabase
           .from("shopping_items")
           .update({ actual_price_cents: m.actual_price_cents, checked: true })
           .eq("id", m.item_id);
       }
-      // Insert selected unmatched as excess
-      const toInsert = receiptResult.unmatched
+      // Insert selected unmatched as excess — dedupe within this batch by
+      // (normalized_name, actual_price_cents) so the same line can't land
+      // multiple times even if the AI returned it twice.
+      const seen = new Set<string>();
+      const toInsert = snapshot.unmatched
         .map((u, idx) => ({ u, idx }))
-        .filter(({ idx }) => receiptExcessSelection[idx])
+        .filter(({ idx }) => selection[idx])
         .map(({ u }) => {
           const norm = normalizeName(u.name);
           return {
@@ -711,18 +720,62 @@ export default function ShoppingPage() {
             checked: true,
             sort_order: items.length + 1000,
           };
+        })
+        .filter((row) => {
+          const key = `${row.normalized_name}::${row.actual_price_cents}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
         });
       if (toInsert.length > 0) {
-        const { error } = await supabase.from("shopping_items").insert(toInsert);
-        if (error) throw error;
+        // Skip any (name, price) combo that already exists on this trip as excess.
+        const { data: existingExcess } = await supabase
+          .from("shopping_items")
+          .select("name, actual_price_cents")
+          .eq("trip_id", activeTrip.id)
+          .eq("is_excess", true);
+        const existingKeys = new Set(
+          (existingExcess ?? []).map((r: any) => `${normalizeName(r.name)}::${r.actual_price_cents}`),
+        );
+        const filtered = toInsert.filter(
+          (r) => !existingKeys.has(`${r.normalized_name}::${r.actual_price_cents}`),
+        );
+        if (filtered.length > 0) {
+          const { error } = await supabase.from("shopping_items").insert(filtered);
+          if (error) throw error;
+        }
       }
       await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
-      toast.success(`Receipt applied · ${receiptResult.matched.length} matched, ${toInsert.length} excess`);
-      setReceiptResult(null);
+      toast.success(`Receipt applied · ${snapshot.matched.length} matched, ${toInsert.length} excess`);
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to apply receipt");
+    } finally {
+      setApplyingReceipt(false);
     }
   };
+
+  // -------- manual match: link an excess line to an existing list item.
+  // Copies the excess's paid price onto the target item, marks it checked,
+  // then removes the excess line so the trip totals stay correct.
+  const linkExcessToItem = async (excess: Item, targetId: string) => {
+    if (!activeTrip) return;
+    try {
+      const { error: upErr } = await supabase
+        .from("shopping_items")
+        .update({ actual_price_cents: excess.actual_price_cents, checked: true })
+        .eq("id", targetId);
+      if (upErr) throw upErr;
+      const { error: delErr } = await supabase.from("shopping_items").delete().eq("id", excess.id);
+      if (delErr) throw delErr;
+      await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
+      setMatchExcessFor(null);
+      setMatchQuery("");
+      toast.success("Linked to existing item");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to link item");
+    }
+  };
+
 
   // -------- grouped items (excess goes to its own group)
   const grouped = useMemo(() => {
