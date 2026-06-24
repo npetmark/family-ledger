@@ -788,6 +788,7 @@ export default function ShoppingPage() {
               const { error: insErr } = await supabase.from("shopping_items").insert({
                 id: excess.id,
                 trip_id: excess.trip_id,
+                user_id: user!.id,
                 category_id: excess.category_id,
                 name: excess.name,
                 normalized_name: excess.normalized_name,
