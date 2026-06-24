@@ -1162,6 +1162,17 @@ export default function ShoppingPage() {
                         </div>
                       );
                     })()}
+                    {!it.is_excess && recentLinks[it.id] && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary"
+                        onClick={() => undoLink(it.id)}
+                        title="Undo link from excess"
+                      >
+                        <Undo2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     {it.is_excess && (
                       <Button
                         variant="ghost"
