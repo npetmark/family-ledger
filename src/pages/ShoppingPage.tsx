@@ -239,11 +239,19 @@ export default function ShoppingPage() {
       let categoryId = payload.categoryId;
       let dictId: string | null = payload.dictEntry?.id ?? null;
       if (!categoryId) {
-        const { data: existing } = await supabase
+        // Prefer the user's own learned mapping; fall back to any shared entry.
+        const { data: own } = await supabase
+          .from("shopping_item_dictionary")
+          .select("id, category_id")
+          .eq("user_id", user.id)
+          .eq("normalized_name", norm)
+          .maybeSingle();
+        const existing = own ?? (await supabase
           .from("shopping_item_dictionary")
           .select("id, category_id")
           .eq("normalized_name", norm)
-          .maybeSingle();
+          .limit(1)
+          .maybeSingle()).data;
         if (existing) {
           categoryId = existing.category_id;
           dictId = existing.id;
