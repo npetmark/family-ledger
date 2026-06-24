@@ -1307,6 +1307,65 @@ export default function ShoppingPage() {
       </Dialog>
 
 
+      {/* Manually link an excess line to an existing list item */}
+      <Dialog open={!!matchExcessFor} onOpenChange={(v) => { if (!v) { setMatchExcessFor(null); setMatchQuery(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link to an existing item</DialogTitle>
+          </DialogHeader>
+          {matchExcessFor && (
+            <div className="space-y-3">
+              <div className="text-sm border rounded-md px-3 py-2 bg-muted/30">
+                <div className="font-medium truncate">{matchExcessFor.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  Paid {formatCurrency(matchExcessFor.actual_price_cents ?? 0)} — pick the planned item it belongs to.
+                </div>
+              </div>
+              <Input
+                autoFocus
+                placeholder="Search your list…"
+                value={matchQuery}
+                onChange={(e) => setMatchQuery(e.target.value)}
+              />
+              <div className="max-h-80 overflow-auto divide-y border rounded-md">
+                {(() => {
+                  const q = normalizeName(matchQuery);
+                  const candidates = items
+                    .filter((i) => !i.is_excess && i.id !== matchExcessFor.id)
+                    .filter((i) => !q || i.normalized_name.includes(q) || i.name.toLowerCase().includes(q))
+                    .sort((a, b) => Number(a.checked) - Number(b.checked) || a.name.localeCompare(b.name))
+                    .slice(0, 50);
+                  if (candidates.length === 0) {
+                    return <div className="px-3 py-4 text-center text-sm text-muted-foreground">No items match.</div>;
+                  }
+                  return candidates.map((c) => {
+                    const cat = categories.find((x) => x.id === c.category_id);
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => linkExcessToItem(matchExcessFor, c.id)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
+                      >
+                        <span>{cat?.emoji ?? "🛒"}</span>
+                        <span className="flex-1 truncate">{c.name}</span>
+                        {c.actual_price_cents != null && (
+                          <span className="text-xs text-muted-foreground font-mono-numbers">
+                            paid {formatCurrency(c.actual_price_cents)}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setMatchExcessFor(null); setMatchQuery(""); }}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Past trips drawer */}
       <Dialog open={pastOpen} onOpenChange={setPastOpen}>
         <DialogContent className="max-w-2xl">
