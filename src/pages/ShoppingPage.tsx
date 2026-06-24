@@ -1212,23 +1212,27 @@ function ItemEditDialog({
   const [categoryId, setCategoryId] = useState<string>("");
   const [translation, setTranslation] = useState("");
 
+  // Live estimate from the cheapest matched deal (recomputed as qty changes).
+  const estimatedExpectedCents = useMemo(() => {
+    if (!item || !item.promo_offers || item.promo_offers.length === 0) return null;
+    const cheapest = item.promo_offers[0];
+    const isMeasure = cheapest.unit === "kg" || cheapest.unit === "l" || cheapest.unit === "g" || cheapest.unit === "ml";
+    return computeLineTotalCents({
+      promo_price_cents: cheapest.price_cents,
+      quantity: parseFloat(qty) || item.quantity || 1,
+      pack_size: isMeasure ? null : cheapest.pack_size,
+    });
+  }, [item, qty]);
+
   useEffect(() => {
     if (item) {
       setName(item.name);
       setQty(String(item.quantity ?? 1));
       setUnit(item.unit ?? "");
-      // Auto-populate expected price from the cheapest matched deal if no manual price set
-      let expectedCents = item.price_cents;
-      if (expectedCents == null && item.promo_offers && item.promo_offers.length > 0) {
-        const cheapest = item.promo_offers[0];
-        const isMeasure = cheapest.unit === "kg" || cheapest.unit === "l" || cheapest.unit === "g" || cheapest.unit === "ml";
-        expectedCents = computeLineTotalCents({
-          promo_price_cents: cheapest.price_cents,
-          quantity: item.quantity ?? 1,
-          pack_size: isMeasure ? null : cheapest.pack_size,
-        });
-      }
-      setPrice(expectedCents != null ? (expectedCents / 100).toFixed(2) : "");
+      // Only pre-fill with the user's own manual override. The cheapest-deal
+      // estimate is shown as a placeholder so we never silently persist a
+      // stale value when quantity or deals change.
+      setPrice(item.price_cents != null ? (item.price_cents / 100).toFixed(2) : "");
       setActualPrice(item.actual_price_cents != null ? (item.actual_price_cents / 100).toFixed(2) : "");
       setCategoryId(item.category_id ?? "");
       setTranslation("");
