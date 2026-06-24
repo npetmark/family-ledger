@@ -24,6 +24,9 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ChevronDown, ChevronRight, Plus, Receipt, Check, Trash2,
   History, Paperclip, X, Pencil, Tag, RefreshCw, ShoppingBag,
   ScanLine, Loader2, Link2, Undo2,
