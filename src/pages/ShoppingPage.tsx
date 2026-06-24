@@ -672,11 +672,11 @@ export default function ShoppingPage() {
   const totalChecked = items.filter((i) => !i.is_excess && i.checked).length;
   const totalItems = items.filter((i) => !i.is_excess).length;
 
-  // Expected cost for a single line: prefers manually entered price, otherwise
-  // falls back to the cheapest matched promo computed for this quantity.
-  // Per-weight/volume offers (kg/L/g/ml) don't use pack rounding.
+  // Expected cost for a single line.
+  // Priority: live promo computation (so quantity changes are reflected) →
+  // manually entered price_cents → null. Per-weight/volume offers (kg/L/g/ml)
+  // multiply qty directly without pack rounding.
   const expectedFor = (i: Item): number | null => {
-    if (i.price_cents != null) return i.price_cents;
     const cheapest = i.promo_offers && i.promo_offers.length > 0 ? i.promo_offers[0] : null;
     if (cheapest) {
       const isMeasure = cheapest.unit === "kg" || cheapest.unit === "l" || cheapest.unit === "g" || cheapest.unit === "ml";
@@ -694,6 +694,7 @@ export default function ShoppingPage() {
         pack_size: isMeasure ? null : i.promo_pack_size,
       });
     }
+    if (i.price_cents != null) return i.price_cents;
     return null;
   };
 
@@ -950,22 +951,20 @@ export default function ShoppingPage() {
                     {(() => {
                       const exp = expectedFor(it);
                       const actual = it.actual_price_cents;
-                      const isEstimate = it.price_cents == null && exp != null;
                       return (
                         <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                          {actual != null && (
+                          {actual != null ? (
                             <span className="text-sm font-mono-numbers font-semibold text-foreground whitespace-nowrap">
                               {formatCurrency(actual)}
                             </span>
-                          )}
-                          {actual == null && exp != null && (
+                          ) : exp != null ? (
                             <span
-                              className={`text-sm font-mono-numbers whitespace-nowrap ${isEstimate ? "text-muted-foreground italic" : "font-medium text-foreground"}`}
-                              title={isEstimate ? "Estimated from cheapest deal" : "Expected price"}
+                              className="text-sm font-mono-numbers text-muted-foreground whitespace-nowrap"
+                              title="Expected price"
                             >
-                              {isEstimate ? "~" : ""}{formatCurrency(exp)}
+                              {formatCurrency(exp)}
                             </span>
-                          )}
+                          ) : null}
                           {actual != null && exp != null && actual !== exp && (
                             <span className={`text-[10px] font-mono-numbers whitespace-nowrap ${actual > exp ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
                               exp {formatCurrency(exp)}
@@ -1213,23 +1212,27 @@ function ItemEditDialog({
   const [categoryId, setCategoryId] = useState<string>("");
   const [translation, setTranslation] = useState("");
 
+  // Live estimate from the cheapest matched deal (recomputed as qty changes).
+  const estimatedExpectedCents = useMemo(() => {
+    if (!item || !item.promo_offers || item.promo_offers.length === 0) return null;
+    const cheapest = item.promo_offers[0];
+    const isMeasure = cheapest.unit === "kg" || cheapest.unit === "l" || cheapest.unit === "g" || cheapest.unit === "ml";
+    return computeLineTotalCents({
+      promo_price_cents: cheapest.price_cents,
+      quantity: parseFloat(qty) || item.quantity || 1,
+      pack_size: isMeasure ? null : cheapest.pack_size,
+    });
+  }, [item, qty]);
+
   useEffect(() => {
     if (item) {
       setName(item.name);
       setQty(String(item.quantity ?? 1));
       setUnit(item.unit ?? "");
-      // Auto-populate expected price from the cheapest matched deal if no manual price set
-      let expectedCents = item.price_cents;
-      if (expectedCents == null && item.promo_offers && item.promo_offers.length > 0) {
-        const cheapest = item.promo_offers[0];
-        const isMeasure = cheapest.unit === "kg" || cheapest.unit === "l" || cheapest.unit === "g" || cheapest.unit === "ml";
-        expectedCents = computeLineTotalCents({
-          promo_price_cents: cheapest.price_cents,
-          quantity: item.quantity ?? 1,
-          pack_size: isMeasure ? null : cheapest.pack_size,
-        });
-      }
-      setPrice(expectedCents != null ? (expectedCents / 100).toFixed(2) : "");
+      // Only pre-fill with the user's own manual override. The cheapest-deal
+      // estimate is shown as a placeholder so we never silently persist a
+      // stale value when quantity or deals change.
+      setPrice(item.price_cents != null ? (item.price_cents / 100).toFixed(2) : "");
       setActualPrice(item.actual_price_cents != null ? (item.actual_price_cents / 100).toFixed(2) : "");
       setCategoryId(item.category_id ?? "");
       setTranslation("");
@@ -1257,8 +1260,14 @@ function ItemEditDialog({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Expected price</label>
-              <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Optional" type="number" step="0.01" />
+              <label className="text-xs text-muted-foreground">Expected price (override)</label>
+              <Input
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder={estimatedExpectedCents != null ? `~${(estimatedExpectedCents / 100).toFixed(2)} from deal` : "Optional"}
+                type="number"
+                step="0.01"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Actual paid</label>
