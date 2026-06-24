@@ -90,6 +90,9 @@ export default function ShoppingPage() {
   const [parsingReceipt, setParsingReceipt] = useState(false);
   const [receiptResult, setReceiptResult] = useState<ReceiptResult | null>(null);
   const [receiptExcessSelection, setReceiptExcessSelection] = useState<Record<number, boolean>>({});
+  const [applyingReceipt, setApplyingReceipt] = useState(false);
+  const [matchExcessFor, setMatchExcessFor] = useState<Item | null>(null);
+  const [matchQuery, setMatchQuery] = useState("");
 
 
   useEffect(() => {
@@ -681,18 +684,27 @@ export default function ShoppingPage() {
 
   const confirmReceiptResult = async () => {
     if (!receiptResult || !activeTrip || !user) return;
+    if (applyingReceipt) return; // guard against double-clicks
+    setApplyingReceipt(true);
+    // Snapshot + close immediately so a second click can't fire again
+    const snapshot = receiptResult;
+    const selection = receiptExcessSelection;
+    setReceiptResult(null);
     try {
       // Update matched items with actual prices, mark as checked
-      for (const m of receiptResult.matched) {
+      for (const m of snapshot.matched) {
         await supabase
           .from("shopping_items")
           .update({ actual_price_cents: m.actual_price_cents, checked: true })
           .eq("id", m.item_id);
       }
-      // Insert selected unmatched as excess
-      const toInsert = receiptResult.unmatched
+      // Insert selected unmatched as excess — dedupe within this batch by
+      // (normalized_name, actual_price_cents) so the same line can't land
+      // multiple times even if the AI returned it twice.
+      const seen = new Set<string>();
+      const toInsert = snapshot.unmatched
         .map((u, idx) => ({ u, idx }))
-        .filter(({ idx }) => receiptExcessSelection[idx])
+        .filter(({ idx }) => selection[idx])
         .map(({ u }) => {
           const norm = normalizeName(u.name);
           return {
@@ -708,18 +720,62 @@ export default function ShoppingPage() {
             checked: true,
             sort_order: items.length + 1000,
           };
+        })
+        .filter((row) => {
+          const key = `${row.normalized_name}::${row.actual_price_cents}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
         });
       if (toInsert.length > 0) {
-        const { error } = await supabase.from("shopping_items").insert(toInsert);
-        if (error) throw error;
+        // Skip any (name, price) combo that already exists on this trip as excess.
+        const { data: existingExcess } = await supabase
+          .from("shopping_items")
+          .select("name, actual_price_cents")
+          .eq("trip_id", activeTrip.id)
+          .eq("is_excess", true);
+        const existingKeys = new Set(
+          (existingExcess ?? []).map((r: any) => `${normalizeName(r.name)}::${r.actual_price_cents}`),
+        );
+        const filtered = toInsert.filter(
+          (r) => !existingKeys.has(`${r.normalized_name}::${r.actual_price_cents}`),
+        );
+        if (filtered.length > 0) {
+          const { error } = await supabase.from("shopping_items").insert(filtered);
+          if (error) throw error;
+        }
       }
       await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
-      toast.success(`Receipt applied · ${receiptResult.matched.length} matched, ${toInsert.length} excess`);
-      setReceiptResult(null);
+      toast.success(`Receipt applied · ${snapshot.matched.length} matched, ${toInsert.length} excess`);
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to apply receipt");
+    } finally {
+      setApplyingReceipt(false);
     }
   };
+
+  // -------- manual match: link an excess line to an existing list item.
+  // Copies the excess's paid price onto the target item, marks it checked,
+  // then removes the excess line so the trip totals stay correct.
+  const linkExcessToItem = async (excess: Item, targetId: string) => {
+    if (!activeTrip) return;
+    try {
+      const { error: upErr } = await supabase
+        .from("shopping_items")
+        .update({ actual_price_cents: excess.actual_price_cents, checked: true })
+        .eq("id", targetId);
+      if (upErr) throw upErr;
+      const { error: delErr } = await supabase.from("shopping_items").delete().eq("id", excess.id);
+      if (delErr) throw delErr;
+      await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
+      setMatchExcessFor(null);
+      setMatchQuery("");
+      toast.success("Linked to existing item");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to link item");
+    }
+  };
+
 
   // -------- grouped items (excess goes to its own group)
   const grouped = useMemo(() => {
@@ -1061,6 +1117,17 @@ export default function ShoppingPage() {
                         </div>
                       );
                     })()}
+                    {it.is_excess && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary"
+                        onClick={() => { setMatchExcessFor(it); setMatchQuery(""); }}
+                        title="Link to an existing item on the list"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground" onClick={() => setEditingItem(it)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -1232,11 +1299,72 @@ export default function ShoppingPage() {
           )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setReceiptResult(null)}>Cancel</Button>
-            <Button onClick={confirmReceiptResult}>Apply receipt</Button>
+            <Button onClick={confirmReceiptResult} disabled={applyingReceipt}>
+              {applyingReceipt ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying…</>) : "Apply receipt"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+
+      {/* Manually link an excess line to an existing list item */}
+      <Dialog open={!!matchExcessFor} onOpenChange={(v) => { if (!v) { setMatchExcessFor(null); setMatchQuery(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link to an existing item</DialogTitle>
+          </DialogHeader>
+          {matchExcessFor && (
+            <div className="space-y-3">
+              <div className="text-sm border rounded-md px-3 py-2 bg-muted/30">
+                <div className="font-medium truncate">{matchExcessFor.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  Paid {formatCurrency(matchExcessFor.actual_price_cents ?? 0)} — pick the planned item it belongs to.
+                </div>
+              </div>
+              <Input
+                autoFocus
+                placeholder="Search your list…"
+                value={matchQuery}
+                onChange={(e) => setMatchQuery(e.target.value)}
+              />
+              <div className="max-h-80 overflow-auto divide-y border rounded-md">
+                {(() => {
+                  const q = normalizeName(matchQuery);
+                  const candidates = items
+                    .filter((i) => !i.is_excess && i.id !== matchExcessFor.id)
+                    .filter((i) => !q || i.normalized_name.includes(q) || i.name.toLowerCase().includes(q))
+                    .sort((a, b) => Number(a.checked) - Number(b.checked) || a.name.localeCompare(b.name))
+                    .slice(0, 50);
+                  if (candidates.length === 0) {
+                    return <div className="px-3 py-4 text-center text-sm text-muted-foreground">No items match.</div>;
+                  }
+                  return candidates.map((c) => {
+                    const cat = categories.find((x) => x.id === c.category_id);
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => linkExcessToItem(matchExcessFor, c.id)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
+                      >
+                        <span>{cat?.emoji ?? "🛒"}</span>
+                        <span className="flex-1 truncate">{c.name}</span>
+                        {c.actual_price_cents != null && (
+                          <span className="text-xs text-muted-foreground font-mono-numbers">
+                            paid {formatCurrency(c.actual_price_cents)}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setMatchExcessFor(null); setMatchQuery(""); }}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Past trips drawer */}
       <Dialog open={pastOpen} onOpenChange={setPastOpen}>
