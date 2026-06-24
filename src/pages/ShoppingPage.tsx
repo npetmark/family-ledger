@@ -239,11 +239,19 @@ export default function ShoppingPage() {
       let categoryId = payload.categoryId;
       let dictId: string | null = payload.dictEntry?.id ?? null;
       if (!categoryId) {
-        const { data: existing } = await supabase
+        // Prefer the user's own learned mapping; fall back to any shared entry.
+        const { data: own } = await supabase
+          .from("shopping_item_dictionary")
+          .select("id, category_id")
+          .eq("user_id", user.id)
+          .eq("normalized_name", norm)
+          .maybeSingle();
+        const existing = own ?? (await supabase
           .from("shopping_item_dictionary")
           .select("id, category_id")
           .eq("normalized_name", norm)
-          .maybeSingle();
+          .limit(1)
+          .maybeSingle()).data;
         if (existing) {
           categoryId = existing.category_id;
           dictId = existing.id;
@@ -664,17 +672,34 @@ export default function ShoppingPage() {
   const totalChecked = items.filter((i) => !i.is_excess && i.checked).length;
   const totalItems = items.filter((i) => !i.is_excess).length;
 
-  // Expected = promo-aware computed cost; falls back to entered price_cents.
-  const expectedTotal = items.reduce((s, i) => {
-    if (i.is_excess) return s;
-    if (i.promo_price_cents != null) {
-      return s + computeLineTotalCents({
-        promo_price_cents: i.promo_price_cents,
-        quantity: i.quantity,
-        pack_size: i.promo_pack_size,
+  // Expected cost for a single line: prefers manually entered price, otherwise
+  // falls back to the cheapest matched promo computed for this quantity.
+  // Per-weight/volume offers (kg/L/g/ml) don't use pack rounding.
+  const expectedFor = (i: Item): number | null => {
+    if (i.price_cents != null) return i.price_cents;
+    const cheapest = i.promo_offers && i.promo_offers.length > 0 ? i.promo_offers[0] : null;
+    if (cheapest) {
+      const isMeasure = cheapest.unit === "kg" || cheapest.unit === "l" || cheapest.unit === "g" || cheapest.unit === "ml";
+      return computeLineTotalCents({
+        promo_price_cents: cheapest.price_cents,
+        quantity: i.quantity ?? 1,
+        pack_size: isMeasure ? null : cheapest.pack_size,
       });
     }
-    return s + (i.price_cents ?? 0);
+    if (i.promo_price_cents != null) {
+      const isMeasure = i.unit === "kg" || i.unit === "l" || i.unit === "g" || i.unit === "ml";
+      return computeLineTotalCents({
+        promo_price_cents: i.promo_price_cents,
+        quantity: i.quantity ?? 1,
+        pack_size: isMeasure ? null : i.promo_pack_size,
+      });
+    }
+    return null;
+  };
+
+  const expectedTotal = items.reduce((s, i) => {
+    if (i.is_excess) return s;
+    return s + (expectedFor(i) ?? 0);
   }, 0);
   const actualTotal = items.reduce(
     (s, i) => s + (i.actual_price_cents ?? 0),
@@ -682,8 +707,8 @@ export default function ShoppingPage() {
   );
   const hasAnyActual = items.some((i) => i.actual_price_cents != null);
   const delta = actualTotal - expectedTotal;
-  // Legacy total (used in header)
-  const totalPrice = actualTotal > 0 ? actualTotal : items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
+  // Header total: actual once any actual is recorded, otherwise expected.
+  const headerTotal = hasAnyActual ? actualTotal : expectedTotal;
 
   const storeRanking = useMemo(
     () => rankStoresByDeals(items.filter((i) => !i.is_excess).map((i) => ({ ...i, pack_size: i.promo_pack_size }))),
@@ -729,7 +754,7 @@ export default function ShoppingPage() {
                 <span>{activeTrip ? format(new Date(activeTrip.started_at), "PPP") : ""}</span>
                 <span>·</span>
                 <span>{totalChecked} / {totalItems} checked</span>
-                {totalPrice > 0 && (<><span>·</span><span className="font-mono-numbers">{formatCurrency(totalPrice)}</span></>)}
+                {headerTotal > 0 && (<><span>·</span><span className="font-mono-numbers" title={hasAnyActual ? "Actual paid so far" : "Expected total"}>{formatCurrency(headerTotal)}{!hasAnyActual && <span className="text-muted-foreground ml-1">expected</span>}</span></>)}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -922,23 +947,33 @@ export default function ShoppingPage() {
                         </div>
                       )}
                     </button>
-                    <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                      {it.actual_price_cents != null && (
-                        <span className="text-sm font-mono-numbers font-semibold text-foreground whitespace-nowrap">
-                          {formatCurrency(it.actual_price_cents)}
-                        </span>
-                      )}
-                      {it.price_cents != null && it.actual_price_cents == null && (
-                        <span className="text-sm font-mono-numbers font-medium text-foreground whitespace-nowrap">
-                          {formatCurrency(it.price_cents)}
-                        </span>
-                      )}
-                      {it.actual_price_cents != null && it.price_cents != null && it.actual_price_cents !== it.price_cents && (
-                        <span className={`text-[10px] font-mono-numbers whitespace-nowrap ${it.actual_price_cents > it.price_cents ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-                          exp {formatCurrency(it.price_cents)}
-                        </span>
-                      )}
-                    </div>
+                    {(() => {
+                      const exp = expectedFor(it);
+                      const actual = it.actual_price_cents;
+                      const isEstimate = it.price_cents == null && exp != null;
+                      return (
+                        <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                          {actual != null && (
+                            <span className="text-sm font-mono-numbers font-semibold text-foreground whitespace-nowrap">
+                              {formatCurrency(actual)}
+                            </span>
+                          )}
+                          {actual == null && exp != null && (
+                            <span
+                              className={`text-sm font-mono-numbers whitespace-nowrap ${isEstimate ? "text-muted-foreground italic" : "font-medium text-foreground"}`}
+                              title={isEstimate ? "Estimated from cheapest deal" : "Expected price"}
+                            >
+                              {isEstimate ? "~" : ""}{formatCurrency(exp)}
+                            </span>
+                          )}
+                          {actual != null && exp != null && actual !== exp && (
+                            <span className={`text-[10px] font-mono-numbers whitespace-nowrap ${actual > exp ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                              exp {formatCurrency(exp)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground" onClick={() => setEditingItem(it)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -975,13 +1010,15 @@ export default function ShoppingPage() {
 
       {/* Promo footnote */}
       {storeRanking.promoItemCount > 0 ? (
-        <div className="flex flex-wrap items-center gap-3 text-sm border rounded-md px-3 py-2 bg-muted/30">
+        <div className="flex flex-wrap items-center gap-2 text-sm border rounded-md px-3 py-2 bg-muted/30">
           <ShoppingBag className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
           <span className="text-foreground">
-            Best at <span className="font-semibold">{topStore.store}</span> —{" "}
-            {topStore.count} of {storeRanking.promoItemCount} items for
-            <span className="ml-1 font-mono-numbers font-semibold">{formatCurrency(topStore.total)}</span>
-            {" "}(lowest possible: <span className="font-mono-numbers font-semibold">{formatCurrency(storeRanking.bestPossibleTotal)}</span>)
+            Single-store best: <span className="font-semibold">{topStore.store}</span> covers{" "}
+            {topStore.count} of {storeRanking.promoItemCount} promo items for{" "}
+            <span className="font-mono-numbers font-semibold">{formatCurrency(topStore.total)}</span>.
+            <span className="ml-1 text-muted-foreground">
+              Split across all stores' best deals: <span className="font-mono-numbers font-semibold">{formatCurrency(storeRanking.bestPossibleTotal)}</span>.
+            </span>
           </span>
         </div>
       ) : items.length > 0 ? (
