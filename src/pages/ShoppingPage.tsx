@@ -93,6 +93,9 @@ export default function ShoppingPage() {
   const [applyingReceipt, setApplyingReceipt] = useState(false);
   const [matchExcessFor, setMatchExcessFor] = useState<Item | null>(null);
   const [matchQuery, setMatchQuery] = useState("");
+  // Snapshots of recent excess→item links so the user can undo even after the toast is gone.
+  // Keyed by the target item id; cleared when the trip changes or after an undo.
+  const [recentLinks, setRecentLinks] = useState<Record<string, { excess: Item; prevTarget: { actual_price_cents: number | null; checked: boolean } }>>({});
 
 
   useEffect(() => {
