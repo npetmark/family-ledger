@@ -1027,6 +1027,7 @@ export default function ShoppingPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="w-40 justify-center"
                 disabled={refreshingPromos || items.length === 0}
                 onClick={refreshPromos}
                 title="Re-check znamcenite.bg for discounts on every item"
@@ -1037,6 +1038,7 @@ export default function ShoppingPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="w-40 justify-center"
                 disabled={parsingReceipt || !activeTrip}
                 onClick={() => receiptInputRef.current?.click()}
                 title="Upload a photo of the receipt and auto-fill actual prices"
@@ -1044,7 +1046,7 @@ export default function ShoppingPage() {
                 {parsingReceipt ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ScanLine className="h-4 w-4 mr-2" />}
                 Parse receipt
               </Button>
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <Button variant="outline" size="sm" className="w-40 justify-center" onClick={() => fileInputRef.current?.click()}>
                 <Paperclip className="h-4 w-4 mr-2" />
                 {activeTrip?.receipt_path ? "Replace receipt" : "Attach receipt"}
               </Button>
@@ -1052,6 +1054,7 @@ export default function ShoppingPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="w-40 justify-center"
                   onClick={() => setViewReceiptOpen(true)}
                   title="View the attached receipt"
                 >
@@ -1061,6 +1064,7 @@ export default function ShoppingPage() {
               )}
               <Button
                 size="sm"
+                className="w-40 justify-center"
                 onClick={() => {
                   setCompleteForm({
                     store: "",
