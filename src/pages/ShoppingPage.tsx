@@ -1035,33 +1035,34 @@ export default function ShoppingPage() {
                 <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
                 Refresh promos
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-40 justify-center"
-                disabled={parsingReceipt || !activeTrip}
-                onClick={() => receiptInputRef.current?.click()}
-                title="Upload a photo of the receipt and auto-fill actual prices"
-              >
-                {parsingReceipt ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ScanLine className="h-4 w-4 mr-2" />}
-                Parse receipt
-              </Button>
-              <Button variant="outline" size="sm" className="w-40 justify-center" onClick={() => fileInputRef.current?.click()}>
-                <Paperclip className="h-4 w-4 mr-2" />
-                {activeTrip?.receipt_path ? "Replace receipt" : "Attach receipt"}
-              </Button>
-              {activeTrip?.receipt_path && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-40 justify-center"
-                  onClick={() => setViewReceiptOpen(true)}
-                  title="View the attached receipt"
-                >
-                  <Receipt className="h-4 w-4 mr-2" />
-                  View receipt
-                </Button>
-              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-40 justify-center" disabled={!activeTrip}>
+                    <Receipt className="h-4 w-4 mr-2" />
+                    Receipt
+                    <ChevronDown className="h-4 w-4 ml-2 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem
+                    disabled={parsingReceipt || !activeTrip}
+                    onSelect={() => receiptInputRef.current?.click()}
+                  >
+                    {parsingReceipt ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ScanLine className="h-4 w-4 mr-2" />}
+                    Parse receipt
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
+                    <Paperclip className="h-4 w-4 mr-2" />
+                    {activeTrip?.receipt_path ? "Replace receipt" : "Attach receipt"}
+                  </DropdownMenuItem>
+                  {activeTrip?.receipt_path && (
+                    <DropdownMenuItem onSelect={() => setViewReceiptOpen(true)}>
+                      <Receipt className="h-4 w-4 mr-2" />
+                      View receipt
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 size="sm"
                 className="w-40 justify-center"
