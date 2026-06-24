@@ -26,7 +26,7 @@ import {
 import {
   ChevronDown, ChevronRight, Plus, Receipt, Check, Trash2,
   History, Paperclip, X, Pencil, Tag, RefreshCw, ShoppingBag,
-  ScanLine, Loader2, Link2,
+  ScanLine, Loader2, Link2, Undo2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -93,6 +93,9 @@ export default function ShoppingPage() {
   const [applyingReceipt, setApplyingReceipt] = useState(false);
   const [matchExcessFor, setMatchExcessFor] = useState<Item | null>(null);
   const [matchQuery, setMatchQuery] = useState("");
+  // Snapshots of recent excess→item links so the user can undo even after the toast is gone.
+  // Keyed by the target item id; cleared when the trip changes or after an undo.
+  const [recentLinks, setRecentLinks] = useState<Record<string, { excess: Item; prevTarget: { actual_price_cents: number | null; checked: boolean } }>>({});
 
 
   useEffect(() => {
@@ -757,6 +760,40 @@ export default function ShoppingPage() {
   // -------- manual match: link an excess line to an existing list item.
   // Copies the excess's paid price onto the target item, marks it checked,
   // then removes the excess line so the trip totals stay correct.
+  const undoLink = async (targetId: string) => {
+    const snap = recentLinks[targetId];
+    if (!snap || !activeTrip) return;
+    const { excess, prevTarget } = snap;
+    try {
+      const { error: revertErr } = await supabase
+        .from("shopping_items")
+        .update(prevTarget)
+        .eq("id", targetId);
+      if (revertErr) throw revertErr;
+      const { error: insErr } = await supabase.from("shopping_items").insert({
+        id: excess.id,
+        trip_id: excess.trip_id,
+        user_id: user!.id,
+        category_id: excess.category_id,
+        name: excess.name,
+        normalized_name: excess.normalized_name,
+        quantity: excess.quantity,
+        unit: excess.unit,
+        checked: excess.checked,
+        price_cents: excess.price_cents,
+        sort_order: excess.sort_order,
+        actual_price_cents: excess.actual_price_cents,
+        is_excess: true,
+      });
+      if (insErr) throw insErr;
+      setRecentLinks((m) => { const n = { ...m }; delete n[targetId]; return n; });
+      await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
+      toast.success("Link undone");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to undo link");
+    }
+  };
+
   const linkExcessToItem = async (excess: Item, targetId: string) => {
     if (!activeTrip) return;
     const target = items.find((i) => i.id === targetId);
@@ -770,44 +807,12 @@ export default function ShoppingPage() {
       if (upErr) throw upErr;
       const { error: delErr } = await supabase.from("shopping_items").delete().eq("id", excess.id);
       if (delErr) throw delErr;
+      setRecentLinks((m) => ({ ...m, [targetId]: { excess, prevTarget } }));
       await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
       setMatchExcessFor(null);
       setMatchQuery("");
       toast.success(`Linked to ${target.name}`, {
-        action: {
-          label: "Undo",
-          onClick: async () => {
-            try {
-              // Restore target to its prior state
-              const { error: revertErr } = await supabase
-                .from("shopping_items")
-                .update(prevTarget)
-                .eq("id", targetId);
-              if (revertErr) throw revertErr;
-              // Re-insert the excess row with its original fields
-              const { error: insErr } = await supabase.from("shopping_items").insert({
-                id: excess.id,
-                trip_id: excess.trip_id,
-                user_id: user!.id,
-                category_id: excess.category_id,
-                name: excess.name,
-                normalized_name: excess.normalized_name,
-                quantity: excess.quantity,
-                unit: excess.unit,
-                checked: excess.checked,
-                price_cents: excess.price_cents,
-                sort_order: excess.sort_order,
-                actual_price_cents: excess.actual_price_cents,
-                is_excess: true,
-              });
-              if (insErr) throw insErr;
-              await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
-              toast.success("Link undone");
-            } catch (e: any) {
-              toast.error(e?.message ?? "Failed to undo link");
-            }
-          },
-        },
+        action: { label: "Undo", onClick: () => undoLink(targetId) },
       });
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to link item");
@@ -1157,6 +1162,17 @@ export default function ShoppingPage() {
                         </div>
                       );
                     })()}
+                    {!it.is_excess && recentLinks[it.id] && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary"
+                        onClick={() => undoLink(it.id)}
+                        title="Undo link from excess"
+                      >
+                        <Undo2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                     {it.is_excess && (
                       <Button
                         variant="ghost"
