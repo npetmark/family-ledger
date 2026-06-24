@@ -173,6 +173,22 @@ export default function ShoppingPage() {
     enabled: !!user,
   });
 
+  // Fetch a fresh signed URL whenever the active trip's receipt changes.
+  useEffect(() => {
+    setActiveReceiptUrl(null);
+    if (!activeTrip?.receipt_path) return;
+    let cancelled = false;
+    supabase.storage
+      .from("shopping-receipts")
+      .createSignedUrl(activeTrip.receipt_path, 600)
+      .then(({ data }) => {
+        if (!cancelled && data?.signedUrl) setActiveReceiptUrl(data.signedUrl);
+      });
+    return () => { cancelled = true; };
+  }, [activeTrip?.receipt_path]);
+
+
+
   const { data: items = [] } = useQuery({
     queryKey: ["shopping-items", activeTrip?.id],
     queryFn: async (): Promise<Item[]> => {
