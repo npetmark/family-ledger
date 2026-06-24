@@ -779,11 +779,13 @@ export default function ShoppingPage() {
 
   // -------- grouped items (excess goes to its own group)
   const grouped = useMemo(() => {
+    const otherCat = categories.find((c) => c.name === "Other");
     const byCat = new Map<string, Item[]>();
     const excess: Item[] = [];
     for (const it of items) {
       if (it.is_excess) { excess.push(it); continue; }
-      const key = it.category_id ?? "uncat";
+      // Items with no category fall into "Other" when it exists.
+      const key = it.category_id ?? otherCat?.id ?? "uncat";
       if (!byCat.has(key)) byCat.set(key, []);
       byCat.get(key)!.push(it);
     }
@@ -797,7 +799,7 @@ export default function ShoppingPage() {
     );
     if (uncat.length > 0) {
       visible.push({
-        category: { id: "uncat", name: "Uncategorized", emoji: "🛒", color: "0 0% 60%", sort_order: 999 } as Category,
+        category: { id: "uncat", name: "Other", emoji: "🛒", color: "0 0% 60%", sort_order: 999 } as Category,
         items: uncat,
       });
     }
