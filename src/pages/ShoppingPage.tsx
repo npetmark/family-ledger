@@ -951,22 +951,20 @@ export default function ShoppingPage() {
                     {(() => {
                       const exp = expectedFor(it);
                       const actual = it.actual_price_cents;
-                      const isEstimate = it.price_cents == null && exp != null;
                       return (
                         <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                          {actual != null && (
+                          {actual != null ? (
                             <span className="text-sm font-mono-numbers font-semibold text-foreground whitespace-nowrap">
                               {formatCurrency(actual)}
                             </span>
-                          )}
-                          {actual == null && exp != null && (
+                          ) : exp != null ? (
                             <span
-                              className={`text-sm font-mono-numbers whitespace-nowrap ${isEstimate ? "text-muted-foreground italic" : "font-medium text-foreground"}`}
-                              title={isEstimate ? "Estimated from cheapest deal" : "Expected price"}
+                              className="text-sm font-mono-numbers text-muted-foreground whitespace-nowrap"
+                              title="Expected price"
                             >
-                              {isEstimate ? "~" : ""}{formatCurrency(exp)}
+                              {formatCurrency(exp)}
                             </span>
-                          )}
+                          ) : null}
                           {actual != null && exp != null && actual !== exp && (
                             <span className={`text-[10px] font-mono-numbers whitespace-nowrap ${actual > exp ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
                               exp {formatCurrency(exp)}
