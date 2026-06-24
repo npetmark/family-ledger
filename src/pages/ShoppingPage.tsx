@@ -90,6 +90,9 @@ export default function ShoppingPage() {
   const [parsingReceipt, setParsingReceipt] = useState(false);
   const [receiptResult, setReceiptResult] = useState<ReceiptResult | null>(null);
   const [receiptExcessSelection, setReceiptExcessSelection] = useState<Record<number, boolean>>({});
+  const [applyingReceipt, setApplyingReceipt] = useState(false);
+  const [matchExcessFor, setMatchExcessFor] = useState<Item | null>(null);
+  const [matchQuery, setMatchQuery] = useState("");
 
 
   useEffect(() => {
