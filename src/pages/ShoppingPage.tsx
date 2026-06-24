@@ -1260,8 +1260,14 @@ function ItemEditDialog({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Expected price</label>
-              <Input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Optional" type="number" step="0.01" />
+              <label className="text-xs text-muted-foreground">Expected price (override)</label>
+              <Input
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder={estimatedExpectedCents != null ? `~${(estimatedExpectedCents / 100).toFixed(2)} from deal` : "Optional"}
+                type="number"
+                step="0.01"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Actual paid</label>
