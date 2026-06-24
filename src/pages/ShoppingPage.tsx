@@ -1048,7 +1048,29 @@ export default function ShoppingPage() {
                 <Paperclip className="h-4 w-4 mr-2" />
                 {activeTrip?.receipt_path ? "Replace receipt" : "Attach receipt"}
               </Button>
-              <Button size="sm" onClick={() => setConfirmCompleteOpen(true)} disabled={!totalItems}>
+              {activeTrip?.receipt_path && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setViewReceiptOpen(true)}
+                  title="View the attached receipt"
+                >
+                  <Receipt className="h-4 w-4 mr-2" />
+                  View receipt
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={() => {
+                  setCompleteForm({
+                    store: "",
+                    account_id: accounts[0]?.id ?? "",
+                    amount: actualTotal > 0 ? (actualTotal / 100).toFixed(2) : "",
+                  });
+                  setConfirmCompleteOpen(true);
+                }}
+                disabled={!totalItems}
+              >
                 <Check className="h-4 w-4 mr-2" /> Complete trip
               </Button>
             </div>
