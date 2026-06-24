@@ -96,12 +96,19 @@ export default function ShoppingPage() {
   // Snapshots of recent excess→item links so the user can undo even after the toast is gone.
   // Keyed by the target item id; cleared when the trip changes or after an undo.
   const [recentLinks, setRecentLinks] = useState<Record<string, { excess: Item; prevTarget: { actual_price_cents: number | null; checked: boolean } }>>({});
+  // Receipt viewer
+  const [viewReceiptOpen, setViewReceiptOpen] = useState(false);
+  const [activeReceiptUrl, setActiveReceiptUrl] = useState<string | null>(null);
+  // Complete-trip dialog form
+  const [completeForm, setCompleteForm] = useState({ store: "", account_id: "", amount: "" });
 
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 150);
     return () => clearTimeout(t);
   }, [query]);
+
+  // Fetch a fresh signed URL for the active trip's receipt whenever it changes.
 
   // -------- queries
   const { data: categories = [] } = useQuery({
@@ -113,6 +120,30 @@ export default function ShoppingPage() {
         .order("sort_order");
       if (error) throw error;
       return data as any;
+    },
+    enabled: !!user,
+  });
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["accounts", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("accounts").select("id, name").order("sort_order");
+      if (error) throw error;
+      return data as { id: string; name: string }[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: groceriesSubcategoryId } = useQuery({
+    queryKey: ["groceries-subcategory", user?.id],
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from("subcategories")
+        .select("id, name")
+        .in("name", ["Пазар", "Groceries"]);
+      if (error) throw error;
+      const pick = data?.find((s) => s.name === "Пазар") ?? data?.[0];
+      return pick?.id ?? null;
     },
     enabled: !!user,
   });
@@ -141,6 +172,22 @@ export default function ShoppingPage() {
     },
     enabled: !!user,
   });
+
+  // Fetch a fresh signed URL whenever the active trip's receipt changes.
+  useEffect(() => {
+    setActiveReceiptUrl(null);
+    if (!activeTrip?.receipt_path) return;
+    let cancelled = false;
+    supabase.storage
+      .from("shopping-receipts")
+      .createSignedUrl(activeTrip.receipt_path, 600)
+      .then(({ data }) => {
+        if (!cancelled && data?.signedUrl) setActiveReceiptUrl(data.signedUrl);
+      });
+    return () => { cancelled = true; };
+  }, [activeTrip?.receipt_path]);
+
+
 
   const { data: items = [] } = useQuery({
     queryKey: ["shopping-items", activeTrip?.id],
@@ -569,15 +616,36 @@ export default function ShoppingPage() {
   });
 
   const completeTrip = useMutation({
-    mutationFn: async () => {
-      if (!activeTrip) return;
-      const total = items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
+    mutationFn: async (opts: { store: string; accountId: string; amountCents: number }) => {
+      if (!activeTrip || !user) return;
+      const totalForTrip = opts.amountCents > 0
+        ? opts.amountCents
+        : items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
+
+      // 1. Create the "Пазар" expense transaction for this shop
+      if (opts.amountCents > 0 && opts.accountId) {
+        const note = opts.store.trim()
+          ? `${opts.store.trim()} · ${activeTrip.name}`
+          : activeTrip.name;
+        const { error: txErr } = await supabase.from("transactions").insert({
+          user_id: user.id,
+          account_id: opts.accountId,
+          subcategory_id: groceriesSubcategoryId ?? null,
+          transaction_type: "expense",
+          amount: opts.amountCents,
+          date: format(new Date(), "yyyy-MM-dd"),
+          note,
+        });
+        if (txErr) throw txErr;
+      }
+
+      // 2. Complete the trip
       const { error } = await supabase
         .from("shopping_trips")
         .update({
           status: "completed",
           completed_at: new Date().toISOString(),
-          total_cents: total || null,
+          total_cents: totalForTrip || null,
         })
         .eq("id", activeTrip.id);
       if (error) throw error;
@@ -585,9 +653,13 @@ export default function ShoppingPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["shopping-past-trips", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
       setConfirmCompleteOpen(false);
+      setCompleteForm({ store: "", account_id: "", amount: "" });
       toast.success("Trip completed");
     },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to complete trip"),
   });
 
   const renameTrip = useMutation({
@@ -976,7 +1048,29 @@ export default function ShoppingPage() {
                 <Paperclip className="h-4 w-4 mr-2" />
                 {activeTrip?.receipt_path ? "Replace receipt" : "Attach receipt"}
               </Button>
-              <Button size="sm" onClick={() => setConfirmCompleteOpen(true)} disabled={!totalItems}>
+              {activeTrip?.receipt_path && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setViewReceiptOpen(true)}
+                  title="View the attached receipt"
+                >
+                  <Receipt className="h-4 w-4 mr-2" />
+                  View receipt
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={() => {
+                  setCompleteForm({
+                    store: "",
+                    account_id: accounts[0]?.id ?? "",
+                    amount: actualTotal > 0 ? (actualTotal / 100).toFixed(2) : "",
+                  });
+                  setConfirmCompleteOpen(true);
+                }}
+                disabled={!totalItems}
+              >
                 <Check className="h-4 w-4 mr-2" /> Complete trip
               </Button>
             </div>
@@ -1252,19 +1346,111 @@ export default function ShoppingPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Complete confirm */}
-      <AlertDialog open={confirmCompleteOpen} onOpenChange={setConfirmCompleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Complete this trip?</AlertDialogTitle>
-            <AlertDialogDescription>The list will be archived and a new active trip will start.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => completeTrip.mutate()}>Complete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Complete confirm — also records a "Пазар" expense transaction */}
+      <Dialog open={confirmCompleteOpen} onOpenChange={setConfirmCompleteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete this trip?</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const cents = parseCurrencyToCents(completeForm.amount);
+              if (!completeForm.account_id) {
+                toast.error("Pick an account");
+                return;
+              }
+              completeTrip.mutate({
+                store: completeForm.store,
+                accountId: completeForm.account_id,
+                amountCents: cents,
+              });
+            }}
+          >
+            <p className="text-xs text-muted-foreground">
+              The list will be archived and a new active trip will start. A "Пазар" expense will be recorded with the details below.
+            </p>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Store</label>
+              <Input
+                autoFocus
+                value={completeForm.store}
+                onChange={(e) => setCompleteForm((f) => ({ ...f, store: e.target.value }))}
+                placeholder="e.g. Kaufland, Lidl…"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Account</label>
+              <Select
+                value={completeForm.account_id}
+                onValueChange={(v) => setCompleteForm((f) => ({ ...f, account_id: v }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Amount</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={completeForm.amount}
+                onChange={(e) => setCompleteForm((f) => ({ ...f, amount: e.target.value }))}
+                placeholder="0.00"
+              />
+              {actualTotal > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Prefilled from Actual paid ({formatCurrency(actualTotal)})
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setConfirmCompleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={completeTrip.isPending}>
+                {completeTrip.isPending ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Completing…</>) : "Complete trip"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receipt viewer */}
+      <Dialog open={viewReceiptOpen} onOpenChange={setViewReceiptOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Receipt</DialogTitle>
+          </DialogHeader>
+          {activeReceiptUrl ? (
+            <div className="max-h-[70vh] overflow-auto flex items-center justify-center">
+              {/* Best-effort: render images inline, link out for PDFs/other types */}
+              {/\.pdf(\?|$)/i.test(activeReceiptUrl) ? (
+                <a href={activeReceiptUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                  Open receipt in a new tab
+                </a>
+              ) : (
+                <img src={activeReceiptUrl} alt="Receipt" className="max-w-full h-auto rounded-md" />
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
+          )}
+          {activeReceiptUrl && (
+            <DialogFooter>
+              <a href={activeReceiptUrl} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">
+                Open in new tab
+              </a>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Item edit */}
       <ItemEditDialog
