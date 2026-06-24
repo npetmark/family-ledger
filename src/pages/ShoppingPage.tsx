@@ -1299,11 +1299,11 @@ export default function ShoppingPage() {
                 <span className="font-medium">Actual paid</span>
                 <span className="font-mono-numbers font-semibold">{formatCurrency(actualTotal)}</span>
               </div>
-              {hasAnyActual && (
+              {hasAnyActual && delta !== 0 && (
                 <div className={`flex items-center justify-between text-sm pt-1.5 border-t ${delta > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-                  <span className="font-medium">Delta</span>
+                  <span className="font-medium">{delta > 0 ? "Overspent" : "Saved"}</span>
                   <span className="font-mono-numbers font-semibold">
-                    {delta > 0 ? "+" : ""}{formatCurrency(delta)}
+                    {formatCurrency(Math.abs(delta))}
                   </span>
                 </div>
               )}
