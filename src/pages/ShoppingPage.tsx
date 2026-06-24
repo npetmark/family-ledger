@@ -672,17 +672,34 @@ export default function ShoppingPage() {
   const totalChecked = items.filter((i) => !i.is_excess && i.checked).length;
   const totalItems = items.filter((i) => !i.is_excess).length;
 
-  // Expected = promo-aware computed cost; falls back to entered price_cents.
-  const expectedTotal = items.reduce((s, i) => {
-    if (i.is_excess) return s;
-    if (i.promo_price_cents != null) {
-      return s + computeLineTotalCents({
-        promo_price_cents: i.promo_price_cents,
-        quantity: i.quantity,
-        pack_size: i.promo_pack_size,
+  // Expected cost for a single line: prefers manually entered price, otherwise
+  // falls back to the cheapest matched promo computed for this quantity.
+  // Per-weight/volume offers (kg/L/g/ml) don't use pack rounding.
+  const expectedFor = (i: Item): number | null => {
+    if (i.price_cents != null) return i.price_cents;
+    const cheapest = i.promo_offers && i.promo_offers.length > 0 ? i.promo_offers[0] : null;
+    if (cheapest) {
+      const isMeasure = cheapest.unit === "kg" || cheapest.unit === "l" || cheapest.unit === "g" || cheapest.unit === "ml";
+      return computeLineTotalCents({
+        promo_price_cents: cheapest.price_cents,
+        quantity: i.quantity ?? 1,
+        pack_size: isMeasure ? null : cheapest.pack_size,
       });
     }
-    return s + (i.price_cents ?? 0);
+    if (i.promo_price_cents != null) {
+      const isMeasure = i.unit === "kg" || i.unit === "l" || i.unit === "g" || i.unit === "ml";
+      return computeLineTotalCents({
+        promo_price_cents: i.promo_price_cents,
+        quantity: i.quantity ?? 1,
+        pack_size: isMeasure ? null : i.promo_pack_size,
+      });
+    }
+    return null;
+  };
+
+  const expectedTotal = items.reduce((s, i) => {
+    if (i.is_excess) return s;
+    return s + (expectedFor(i) ?? 0);
   }, 0);
   const actualTotal = items.reduce(
     (s, i) => s + (i.actual_price_cents ?? 0),
@@ -690,8 +707,8 @@ export default function ShoppingPage() {
   );
   const hasAnyActual = items.some((i) => i.actual_price_cents != null);
   const delta = actualTotal - expectedTotal;
-  // Legacy total (used in header)
-  const totalPrice = actualTotal > 0 ? actualTotal : items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
+  // Header total: actual once any actual is recorded, otherwise expected.
+  const headerTotal = hasAnyActual ? actualTotal : expectedTotal;
 
   const storeRanking = useMemo(
     () => rankStoresByDeals(items.filter((i) => !i.is_excess).map((i) => ({ ...i, pack_size: i.promo_pack_size }))),
