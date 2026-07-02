@@ -61,9 +61,19 @@ export default function DashboardPage() {
   const { data: allTransactions = [] } = useQuery({
     queryKey: ["all-transactions-for-balance", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("transactions").select("account_id, transaction_type, amount, transfer_to_account_id");
-      if (error) throw error;
-      return data;
+      const pageSize = 1000;
+      const all: any[] = [];
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("transactions")
+          .select("account_id, transaction_type, amount, transfer_to_account_id")
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        all.push(...data);
+        if (data.length < pageSize) break;
+      }
+      return all;
     },
     enabled: !!user,
   });
