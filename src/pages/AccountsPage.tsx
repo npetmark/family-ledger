@@ -33,40 +33,22 @@ export default function AccountsPage() {
     enabled: !!user,
   });
 
-  const { data: allTransactions = [] } = useQuery({
-    queryKey: ["all-transactions-for-balance", user?.id],
+  const { data: balanceRows = [] } = useQuery({
+    queryKey: ["account-balances", user?.id],
     queryFn: async () => {
-      const pageSize = 1000;
-      const all: any[] = [];
-      for (let from = 0; ; from += pageSize) {
-        const { data, error } = await supabase
-          .from("transactions")
-          .select("account_id, transaction_type, amount, transfer_to_account_id")
-          .range(from, from + pageSize - 1);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        all.push(...data);
-        if (data.length < pageSize) break;
-      }
-      return all;
+      const { data, error } = await supabase.rpc("get_account_balances");
+      if (error) throw error;
+      return data ?? [];
     },
     enabled: !!user,
   });
 
-  const computeBalance = (acc: any) => {
-    let balance = acc.starting_balance;
-    allTransactions.forEach((t) => {
-      if (t.account_id === acc.id) {
-        if (t.transaction_type === "income") balance += t.amount;
-        else if (t.transaction_type === "expense") balance -= t.amount;
-        else if (t.transaction_type === "transfer") balance -= t.amount;
-      }
-      if (t.transfer_to_account_id === acc.id && t.transaction_type === "transfer") {
-        balance += t.amount;
-      }
-    });
-    return balance;
-  };
+  const balanceMap = new Map<string, number>(
+    balanceRows.map((r: any) => [r.account_id, Number(r.balance)])
+  );
+
+  const computeBalance = (acc: any) => balanceMap.get(acc.id) ?? acc.starting_balance;
+
 
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
