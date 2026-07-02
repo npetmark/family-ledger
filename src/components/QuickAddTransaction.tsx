@@ -85,7 +85,7 @@ export function QuickAddTransaction() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["account-balances"] });
       setOpen(false);
       resetForm();
       toast.success("Transaction added");

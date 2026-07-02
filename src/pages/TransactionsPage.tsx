@@ -140,7 +140,7 @@ export default function TransactionsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["account-balances"] });
       setOpen(false);
       setForm(emptyForm);
       toast.success("Transaction added");
@@ -171,7 +171,7 @@ export default function TransactionsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["account-balances"] });
       setEditOpen(false);
       setEditingTransaction(null);
       toast.success("Transaction updated");
@@ -182,7 +182,7 @@ export default function TransactionsPage() {
   const [pendingDeleteTxId, setPendingDeleteTxId] = useState<string | null>(null);
 
   const performDelete = (id: string) => {
-    const keys = [["transactions"], ["all-transactions-for-balance"]];
+    const keys = [["transactions"], ["account-balances"]];
     const snapshots = keys.map((k) => [k, queryClient.getQueryData(k)] as const);
     // Optimistically remove from caches
     keys.forEach((k) => {
