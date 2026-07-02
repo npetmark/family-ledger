@@ -57,45 +57,31 @@ export default function DashboardPage() {
     enabled: !!user,
   });
 
-  // Compute account balances
-  const { data: allTransactions = [] } = useQuery({
-    queryKey: ["all-transactions-for-balance", user?.id],
+  // Compute account balances via server-side aggregation
+  const { data: accountBalances = [] } = useQuery({
+    queryKey: ["account-balances", user?.id],
     queryFn: async () => {
-      const pageSize = 1000;
-      const all: any[] = [];
-      for (let from = 0; ; from += pageSize) {
-        const { data, error } = await supabase
-          .from("transactions")
-          .select("account_id, transaction_type, amount, transfer_to_account_id")
-          .range(from, from + pageSize - 1);
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        all.push(...data);
-        if (data.length < pageSize) break;
-      }
-      return all;
+      const { data, error } = await supabase.rpc("get_account_balances");
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        id: r.account_id,
+        name: r.name,
+        currency: r.currency,
+        account_type: r.account_type,
+        icon: r.icon,
+        is_visible: r.is_visible,
+        sort_order: r.sort_order,
+        starting_balance: r.starting_balance,
+        computed_balance: r.balance,
+      }));
     },
     enabled: !!user,
-  });
-
-  const accountBalances = accounts.map((acc) => {
-    let balance = acc.starting_balance;
-    allTransactions.forEach((t) => {
-      if (t.account_id === acc.id) {
-        if (t.transaction_type === "income") balance += t.amount;
-        else if (t.transaction_type === "expense") balance -= t.amount;
-        else if (t.transaction_type === "transfer") balance -= t.amount;
-      }
-      if (t.transfer_to_account_id === acc.id && t.transaction_type === "transfer") {
-        balance += t.amount;
-      }
-    });
-    return { ...acc, computed_balance: balance };
   });
 
   const totalAssets = accountBalances
     .filter((a) => a.is_visible)
     .reduce((sum, a) => sum + a.computed_balance, 0);
+
 
   // Filter transactions by visible accounts (matching Analytics behavior)
   const visibleAccountIds = new Set(accounts.filter((a) => a.is_visible).map((a) => a.id));
