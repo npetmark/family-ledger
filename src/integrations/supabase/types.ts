@@ -678,6 +678,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_account_balances: {
+        Args: never
+        Returns: {
+          account_id: string
+          account_type: string
+          balance: number
+          currency: string
+          icon: string
+          is_visible: boolean
+          name: string
+          sort_order: number
+          starting_balance: number
+        }[]
+      }
       seed_shopping_defaults: { Args: { _user_id: string }; Returns: undefined }
     }
     Enums: {
