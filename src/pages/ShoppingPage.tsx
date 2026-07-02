@@ -659,7 +659,7 @@ export default function ShoppingPage() {
       queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["shopping-past-trips", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["account-balances"] });
       setConfirmCompleteOpen(false);
       setCompleteForm({ store: "", account_id: "", amount: "" });
       toast.success("Trip completed");

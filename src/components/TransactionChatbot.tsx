@@ -141,7 +141,7 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["account-balances"] });
       toast.success("Transactions saved!");
     },
     onError: (e) => toast.error(e.message),

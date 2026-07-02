@@ -122,7 +122,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["all-transactions-for-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["account-balances"] });
       toast.success("Transaction updated");
       setEditOpen(false);
       setEditingTx(null);
@@ -135,7 +135,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
     const id = editingTx.id;
     setDeleteOpen(false);
     setEditingTx(null);
-    const keys = [["transactions"], ["all-transactions-for-balance"]];
+    const keys = [["transactions"], ["account-balances"]];
     const snapshots = keys.map((k) => [k, queryClient.getQueryData(k)] as const);
     keys.forEach((k) => {
       queryClient.setQueriesData({ queryKey: k }, (old: any) => {
