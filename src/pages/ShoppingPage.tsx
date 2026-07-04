@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -103,7 +104,7 @@ export default function ShoppingPage() {
   const [viewReceiptOpen, setViewReceiptOpen] = useState(false);
   const [activeReceiptUrl, setActiveReceiptUrl] = useState<string | null>(null);
   // Complete-trip dialog form
-  const [completeForm, setCompleteForm] = useState({ store: "", account_id: "", amount: "" });
+  const [completeForm, setCompleteForm] = useState({ store: "", account_id: "", amount: "", record_transaction: true });
   // Collapsed category ids on the list. Default is expanded; user can toggle.
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
 
@@ -621,14 +622,14 @@ export default function ShoppingPage() {
   });
 
   const completeTrip = useMutation({
-    mutationFn: async (opts: { store: string; accountId: string; amountCents: number }) => {
+    mutationFn: async (opts: { store: string; accountId: string; amountCents: number; recordTransaction: boolean }) => {
       if (!activeTrip || !user) return;
       const totalForTrip = opts.amountCents > 0
         ? opts.amountCents
         : items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
 
-      // 1. Create the "Пазар" expense transaction for this shop
-      if (opts.amountCents > 0 && opts.accountId) {
+      // 1. Optionally create the "Пазар" expense transaction for this shop
+      if (opts.recordTransaction && opts.amountCents > 0 && opts.accountId) {
         const note = opts.store.trim()
           ? `${opts.store.trim()} · ${activeTrip.name}`
           : activeTrip.name;
@@ -661,7 +662,7 @@ export default function ShoppingPage() {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["account-balances"] });
       setConfirmCompleteOpen(false);
-      setCompleteForm({ store: "", account_id: "", amount: "" });
+      setCompleteForm({ store: "", account_id: "", amount: "", record_transaction: true });
       toast.success("Trip completed");
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to complete trip"),
@@ -1076,6 +1077,7 @@ export default function ShoppingPage() {
                     store: "",
                     account_id: accounts[0]?.id ?? "",
                     amount: actualTotal > 0 ? (actualTotal / 100).toFixed(2) : "",
+                    record_transaction: true,
                   });
                   setConfirmCompleteOpen(true);
                 }}
@@ -1387,7 +1389,7 @@ export default function ShoppingPage() {
             onSubmit={(e) => {
               e.preventDefault();
               const cents = parseCurrencyToCents(completeForm.amount);
-              if (!completeForm.account_id) {
+              if (completeForm.record_transaction && !completeForm.account_id) {
                 toast.error("Pick an account");
                 return;
               }
@@ -1395,51 +1397,69 @@ export default function ShoppingPage() {
                 store: completeForm.store,
                 accountId: completeForm.account_id,
                 amountCents: cents,
+                recordTransaction: completeForm.record_transaction,
               });
             }}
           >
             <p className="text-xs text-muted-foreground">
-              The list will be archived and a new active trip will start. A "Пазар" expense will be recorded with the details below.
+              The list will be archived and a new active trip will start.
+              {completeForm.record_transaction
+                ? ' A "Пазар" expense will be recorded with the details below.'
+                : " No transaction will be recorded."}
             </p>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Store</label>
-              <Input
-                autoFocus
-                value={completeForm.store}
-                onChange={(e) => setCompleteForm((f) => ({ ...f, store: e.target.value }))}
-                placeholder="e.g. Kaufland, Lidl…"
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div className="space-y-0.5">
+                <label className="text-sm font-medium">Record as expense</label>
+                <p className="text-xs text-muted-foreground">Add a transaction to your account</p>
+              </div>
+              <Switch
+                checked={completeForm.record_transaction}
+                onCheckedChange={(v) => setCompleteForm((f) => ({ ...f, record_transaction: v }))}
               />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Account</label>
-              <Select
-                value={completeForm.account_id}
-                onValueChange={(v) => setCompleteForm((f) => ({ ...f, account_id: v }))}
-              >
-                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                <SelectContent>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Amount</label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={completeForm.amount}
-                onChange={(e) => setCompleteForm((f) => ({ ...f, amount: e.target.value }))}
-                placeholder="0.00"
-              />
-              {actualTotal > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Prefilled from Actual paid ({formatCurrency(actualTotal)})
-                </p>
-              )}
-            </div>
+            {completeForm.record_transaction && (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Store</label>
+                  <Input
+                    autoFocus
+                    value={completeForm.store}
+                    onChange={(e) => setCompleteForm((f) => ({ ...f, store: e.target.value }))}
+                    placeholder="e.g. Kaufland, Lidl…"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Account</label>
+                  <Select
+                    value={completeForm.account_id}
+                    onValueChange={(v) => setCompleteForm((f) => ({ ...f, account_id: v }))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Amount</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={completeForm.amount}
+                    onChange={(e) => setCompleteForm((f) => ({ ...f, amount: e.target.value }))}
+                    placeholder="0.00"
+                  />
+                  {actualTotal > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Prefilled from Actual paid ({formatCurrency(actualTotal)})
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setConfirmCompleteOpen(false)}>
                 Cancel
