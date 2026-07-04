@@ -662,7 +662,7 @@ export default function ShoppingPage() {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["account-balances"] });
       setConfirmCompleteOpen(false);
-      setCompleteForm({ store: "", account_id: "", amount: "" });
+      setCompleteForm({ store: "", account_id: "", amount: "", record_transaction: true });
       toast.success("Trip completed");
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to complete trip"),
