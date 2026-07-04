@@ -104,7 +104,7 @@ export default function ShoppingPage() {
   const [viewReceiptOpen, setViewReceiptOpen] = useState(false);
   const [activeReceiptUrl, setActiveReceiptUrl] = useState<string | null>(null);
   // Complete-trip dialog form
-  const [completeForm, setCompleteForm] = useState({ store: "", account_id: "", amount: "" });
+  const [completeForm, setCompleteForm] = useState({ store: "", account_id: "", amount: "", record_transaction: true });
   // Collapsed category ids on the list. Default is expanded; user can toggle.
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
 
