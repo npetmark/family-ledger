@@ -622,14 +622,14 @@ export default function ShoppingPage() {
   });
 
   const completeTrip = useMutation({
-    mutationFn: async (opts: { store: string; accountId: string; amountCents: number }) => {
+    mutationFn: async (opts: { store: string; accountId: string; amountCents: number; recordTransaction: boolean }) => {
       if (!activeTrip || !user) return;
       const totalForTrip = opts.amountCents > 0
         ? opts.amountCents
         : items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
 
-      // 1. Create the "Пазар" expense transaction for this shop
-      if (opts.amountCents > 0 && opts.accountId) {
+      // 1. Optionally create the "Пазар" expense transaction for this shop
+      if (opts.recordTransaction && opts.amountCents > 0 && opts.accountId) {
         const note = opts.store.trim()
           ? `${opts.store.trim()} · ${activeTrip.name}`
           : activeTrip.name;
