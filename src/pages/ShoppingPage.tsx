@@ -655,6 +655,23 @@ export default function ShoppingPage() {
         })
         .eq("id", activeTrip.id);
       if (error) throw error;
+
+      // 3. Carry over any unchecked items to a fresh active trip
+      const uncheckedIds = items.filter((i) => !i.checked).map((i) => i.id);
+      if (uncheckedIds.length > 0) {
+        const nextName = `Shopping — ${format(new Date(), "EEE d MMM")}`;
+        const { data: newTrip, error: newTripErr } = await supabase
+          .from("shopping_trips")
+          .insert({ user_id: user.id, name: nextName })
+          .select("id")
+          .single();
+        if (newTripErr) throw newTripErr;
+        const { error: moveErr } = await supabase
+          .from("shopping_items")
+          .update({ trip_id: newTrip.id })
+          .in("id", uncheckedIds);
+        if (moveErr) throw moveErr;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] });
