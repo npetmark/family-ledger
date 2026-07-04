@@ -1077,6 +1077,7 @@ export default function ShoppingPage() {
                     store: "",
                     account_id: accounts[0]?.id ?? "",
                     amount: actualTotal > 0 ? (actualTotal / 100).toFixed(2) : "",
+                    record_transaction: true,
                   });
                   setConfirmCompleteOpen(true);
                 }}
