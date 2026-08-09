@@ -175,16 +175,16 @@
     .animate-fade-in,
     .animate-slide-in-right,
     .animate-count-up {
-      animation: none;
-      opacity: 1;
+      animation: none !important;
+      opacity: 1 !important;
     }
 
     .backdrop-blur-sm,
     .backdrop-blur,
     .backdrop-blur-md,
     .backdrop-blur-lg {
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
     }
 
     .shadow-sm,
@@ -192,12 +192,12 @@
     .shadow-lg,
     .shadow-xl,
     .shadow-2xl {
-      box-shadow: none;
+      box-shadow: none !important;
     }
 
     svg {
-      filter: none;
-      will-change: auto;
+      filter: none !important;
+      will-change: auto !important;
     }
   }
 }
