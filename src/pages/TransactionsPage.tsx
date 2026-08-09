@@ -224,7 +224,6 @@ export default function TransactionsPage() {
     });
   };
 
-
   const selectPreset = (preset: FilterPreset) => {
     if (preset === "custom") {
       setCustomRange({});
@@ -232,22 +231,19 @@ export default function TransactionsPage() {
       setCustomOpen(true);
       return;
     }
+    const anchor = activePreset === "custom" ? new Date() : anchorDate;
+    setAnchorDate(anchor);
     setActivePreset(preset);
-    setDateFilter(getPresetRange(preset, selectedYear, selectedMonth));
+    setDateFilter(getAnchoredRange(preset, anchor));
   };
 
-  const handleYearChange = (year: string) => {
-    const y = parseInt(year);
-    setSelectedYear(y);
-    if (activePreset === "year") setDateFilter(getPresetRange("year", y));
-    if (activePreset === "month") setDateFilter(getPresetRange("month", y, selectedMonth));
+  const stepPeriod = (dir: 1 | -1) => {
+    if (activePreset === "custom") return;
+    const next = shiftAnchor(activePreset, anchorDate, dir);
+    setAnchorDate(next);
+    setDateFilter(getAnchoredRange(activePreset, next));
   };
 
-  const handleMonthChange = (month: string) => {
-    const m = parseInt(month);
-    setSelectedMonth(m);
-    if (activePreset === "month") setDateFilter(getPresetRange("month", selectedYear, m));
-  };
 
   const confirmCustomRange = () => {
     if (customRange.from && customRange.to) {
