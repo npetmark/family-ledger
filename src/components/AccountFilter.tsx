@@ -31,7 +31,7 @@ export function getFilteredAccountIds(
     case "all-visible":
       return accounts.filter((a) => a.is_visible).map((a) => a.id);
     case "custom":
-      return filter.customAccountIds?.length ? filter.customAccountIds : null;
+      return filter.customAccountIds ?? [];
     default:
       return null;
   }
