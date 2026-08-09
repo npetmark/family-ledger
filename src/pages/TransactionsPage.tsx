@@ -459,7 +459,7 @@ export default function TransactionsPage() {
               month={calendarMonth}
               onMonthChange={setCalendarMonth}
               classNames={{
-                caption: "flex justify-center pt-1 relative items-center",
+                caption: isMobile ? "hidden" : "flex justify-center pt-1 relative items-center",
                 caption_label: "text-sm font-medium",
                 nav: "hidden",
               }}
