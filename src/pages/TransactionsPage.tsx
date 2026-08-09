@@ -79,9 +79,8 @@ export default function TransactionsPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
   const [activePreset, setActivePreset] = useState<FilterPreset>("month");
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [dateFilter, setDateFilter] = useState(getPresetRange("month"));
+  const [anchorDate, setAnchorDate] = useState(new Date());
+  const [dateFilter, setDateFilter] = useState(getAnchoredRange("month", new Date()));
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [customOpen, setCustomOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
