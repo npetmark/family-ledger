@@ -79,6 +79,10 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
     onChange({ mode: "all-visible" });
   };
 
+  const clearAll = () => {
+    onChange({ mode: "custom", customAccountIds: [] });
+  };
+
   const isAccountSelected = (accountId: string) => {
     if (value.mode === "all-visible") {
       return accounts.find((a) => a.id === accountId)?.is_visible ?? false;
