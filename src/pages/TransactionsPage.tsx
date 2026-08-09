@@ -426,22 +426,24 @@ export default function TransactionsPage() {
 
       {/* Custom range dialog */}
       <Dialog open={customOpen} onOpenChange={setCustomOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-fit max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Select Date Range</DialogTitle>
           </DialogHeader>
-          <div className="flex items-center justify-between gap-2 px-2">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCalendarMonth(prev => subMonths(prev, 1))}>
+          <div className="flex items-center justify-between gap-2">
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCalendarMonth(prev => subMonths(prev, 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm font-medium">
-              {format(calendarMonth, "MMMM yyyy")} – {format(addMonths(calendarMonth, 1), "MMMM yyyy")}
+            <span className="text-xs sm:text-sm font-medium text-center truncate">
+              {isMobile
+                ? format(calendarMonth, "MMMM yyyy")
+                : `${format(calendarMonth, "MMMM yyyy")} – ${format(addMonths(calendarMonth, 1), "MMMM yyyy")}`}
             </span>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCalendarMonth(prev => addMonths(prev, 1))}>
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCalendarMonth(prev => addMonths(prev, 1))}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <div className="flex items-center justify-center w-full overflow-x-auto">
+          <div className="flex items-center justify-center w-full">
             <Calendar
               weekStartsOn={1}
               mode="range"
@@ -450,8 +452,8 @@ export default function TransactionsPage() {
                 if (range) setCustomRange({ from: range.from, to: range.to });
                 else setCustomRange({});
               }}
-              numberOfMonths={2}
-              className="pointer-events-auto mx-auto"
+              numberOfMonths={isMobile ? 1 : 2}
+              className="pointer-events-auto mx-auto p-0"
               month={calendarMonth}
               onMonthChange={setCalendarMonth}
               classNames={{
@@ -461,11 +463,12 @@ export default function TransactionsPage() {
               }}
             />
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-row justify-end gap-2">
             <Button variant="outline" onClick={() => setCustomOpen(false)}>Cancel</Button>
             <Button onClick={confirmCustomRange} disabled={!customRange.from || !customRange.to}>Confirm</Button>
           </DialogFooter>
         </DialogContent>
+      </Dialog>
       </Dialog>
 
       {/* Edit transaction dialog */}
