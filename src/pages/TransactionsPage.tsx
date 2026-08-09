@@ -74,6 +74,7 @@ function formatAnchorLabel(preset: FilterPreset, anchor: Date): string {
 
 export default function TransactionsPage() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
