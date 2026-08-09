@@ -27,29 +27,50 @@ import {
 
 type FilterPreset = "day" | "week" | "month" | "year" | "custom";
 
-function getPresetRange(preset: FilterPreset, year?: number, month?: number): { from: Date; to: Date } {
-  const now = new Date();
+function getAnchoredRange(preset: FilterPreset, anchor: Date): { from: Date; to: Date } {
   switch (preset) {
     case "day":
-      return { from: startOfDay(now), to: now };
+      return { from: startOfDay(anchor), to: endOfDay(anchor) };
     case "week":
-      return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
-    case "year": {
-      const y = year ?? now.getFullYear();
-      return { from: startOfYear(new Date(y, 0, 1)), to: endOfYear(new Date(y, 0, 1)) };
-    }
+      return { from: startOfWeek(anchor, { weekStartsOn: 1 }), to: endOfWeek(anchor, { weekStartsOn: 1 }) };
+    case "year":
+      return { from: startOfYear(anchor), to: endOfYear(anchor) };
     case "month":
-    default: {
-      const m = month ?? now.getMonth();
-      const y = year ?? now.getFullYear();
-      const d = new Date(y, m, 1);
-      return { from: startOfMonth(d), to: endOfMonth(d) };
-    }
+    default:
+      return { from: startOfMonth(anchor), to: endOfMonth(anchor) };
   }
 }
 
-const AVAILABLE_YEARS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
-const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function shiftAnchor(preset: FilterPreset, anchor: Date, dir: 1 | -1): Date {
+  switch (preset) {
+    case "day":
+      return addDays(anchor, dir);
+    case "week":
+      return addDays(anchor, dir * 7);
+    case "year":
+      return addYears(anchor, dir);
+    case "month":
+    default:
+      return addMonths(anchor, dir);
+  }
+}
+
+function formatAnchorLabel(preset: FilterPreset, anchor: Date): string {
+  switch (preset) {
+    case "day":
+      return format(anchor, "EEE, d MMM yyyy");
+    case "week": {
+      const from = startOfWeek(anchor, { weekStartsOn: 1 });
+      const to = endOfWeek(anchor, { weekStartsOn: 1 });
+      return `${format(from, "d MMM")} – ${format(to, "d MMM yyyy")}`;
+    }
+    case "year":
+      return format(anchor, "yyyy");
+    case "month":
+    default:
+      return format(anchor, "MMMM yyyy");
+  }
+}
 
 export default function TransactionsPage() {
   const { user } = useAuth();
