@@ -48,9 +48,11 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
 
   const label = isAllVisible
     ? "All accounts"
-    : selectedCount === accounts.length
-      ? "All accounts"
-      : `${selectedCount} account${selectedCount !== 1 ? "s" : ""}`;
+    : selectedCount === 0
+      ? "No accounts"
+      : selectedCount === accounts.length
+        ? "All accounts"
+        : `${selectedCount} account${selectedCount !== 1 ? "s" : ""}`;
 
   const toggleAccount = (accountId: string) => {
     const currentIds = value.mode === "all-visible"
