@@ -95,10 +95,10 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-60 p-0" align="end">
-        <div className="p-2 border-b border-border">
+        <div className="p-2 border-b border-border flex items-center gap-1">
           <button
             type="button"
-            className="w-full text-left text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted/50 transition-colors"
+            className="flex-1 text-left text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted/50 transition-colors"
             onClick={selectAll}
           >
             {isAllVisible ? (
@@ -109,6 +109,13 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
             ) : (
               "Select all"
             )}
+          </button>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted/50 transition-colors shrink-0"
+            onClick={clearAll}
+          >
+            Clear
           </button>
         </div>
         <div className="max-h-[240px] overflow-y-auto">
