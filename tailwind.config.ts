@@ -103,12 +103,12 @@ export default {
           to: { height: "0" },
         },
         "fade-in": {
-          from: { opacity: "0", transform: "translateY(8px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
+          from: { opacity: "0" },
+          to: { opacity: "1" },
         },
         "slide-in-right": {
-          from: { opacity: "0", transform: "translateX(16px)" },
-          to: { opacity: "1", transform: "translateX(0)" },
+          from: { opacity: "0" },
+          to: { opacity: "1" },
         },
         "count-up": {
           from: { opacity: "0" },
