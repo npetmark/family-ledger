@@ -167,4 +167,37 @@
       animation: none;
     }
   }
+
+  /* Android Chromium can render the lower-left edge of translucent rounded
+     layers as a folded triangle. Keep mobile surfaces on the normal paint
+     path instead of compositing them for blur, filters, shadows, or fades. */
+  @media (max-width: 640px) {
+    .animate-fade-in,
+    .animate-slide-in-right,
+    .animate-count-up {
+      animation: none;
+      opacity: 1;
+    }
+
+    .backdrop-blur-sm,
+    .backdrop-blur,
+    .backdrop-blur-md,
+    .backdrop-blur-lg {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    .shadow-sm,
+    .shadow-md,
+    .shadow-lg,
+    .shadow-xl,
+    .shadow-2xl {
+      box-shadow: none;
+    }
+
+    svg {
+      filter: none;
+      will-change: auto;
+    }
+  }
 }
