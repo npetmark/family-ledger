@@ -469,7 +469,6 @@ export default function TransactionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      </Dialog>
 
       {/* Edit transaction dialog */}
       <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) { setEditingTransaction(null); setForm(emptyForm); } }}>
