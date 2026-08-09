@@ -151,34 +151,10 @@
 }
 
 @layer base {
-  /* Avoid stale GPU tiles (ghost/smear artifacts) from composited entry animations
-     on mobile Chromium/Edge: never leave a promoted layer behind. */
-  .animate-fade-in,
-  .animate-slide-in-right,
-  .animate-count-up {
-    will-change: auto;
-    transform: none;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .animate-fade-in,
-    .animate-slide-in-right,
-    .animate-count-up {
-      animation: none;
-    }
-  }
-
   /* Android Chromium can render the lower-left edge of translucent rounded
      layers as a folded triangle. Keep mobile surfaces on the normal paint
      path instead of compositing them for blur, filters, shadows, or fades. */
   @media (max-width: 640px) {
-    .animate-fade-in,
-    .animate-slide-in-right,
-    .animate-count-up {
-      animation: none !important;
-      opacity: 1 !important;
-    }
-
     .backdrop-blur-sm,
     .backdrop-blur,
     .backdrop-blur-md,

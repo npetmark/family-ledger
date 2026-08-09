@@ -148,7 +148,7 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl w-full animate-fade-in overflow-hidden">
+    <div className="space-y-6 max-w-4xl w-full overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Categories</h1>

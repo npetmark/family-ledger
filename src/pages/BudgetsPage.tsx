@@ -244,7 +244,7 @@ export default function BudgetsPage() {
   const budgetExceedsIncome = totalBudget > 0 && incomeTotal > 0 && totalBudget > incomeTotal;
 
   return (
-    <div className="space-y-6 max-w-4xl animate-fade-in">
+    <div className="space-y-6 max-w-4xl">
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Budgets</h1>
