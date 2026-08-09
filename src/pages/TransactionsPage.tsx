@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AccountFilter, AccountFilterValue, getFilteredAccountIds } from "@/components/AccountFilter";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
