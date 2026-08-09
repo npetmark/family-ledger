@@ -406,42 +406,23 @@ export default function TransactionsPage() {
             : "Custom"}
         </Button>
 
-        {activePreset === "month" && (
-          <>
-            <Select value={String(selectedMonth)} onValueChange={handleMonthChange}>
-              <SelectTrigger className="w-[130px] h-8"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {MONTH_NAMES.map((m, i) => (
-                  <SelectItem key={i} value={String(i)}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={String(selectedYear)} onValueChange={handleYearChange}>
-              <SelectTrigger className="w-[100px] h-8"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {AVAILABLE_YEARS.map((y) => (
-                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </>
-        )}
-
-        {activePreset === "year" && (
-          <Select value={String(selectedYear)} onValueChange={handleYearChange}>
-            <SelectTrigger className="w-[100px] h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {AVAILABLE_YEARS.map((y) => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
         <AccountFilter accounts={accounts} value={accountFilter} onChange={setAccountFilter} />
       </div>
+
+      {activePreset !== "custom" && (
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => stepPeriod(-1)} aria-label="Previous period">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 text-center text-sm font-medium truncate">
+            {formatAnchorLabel(activePreset, anchorDate)}
+          </div>
+          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => stepPeriod(1)} aria-label="Next period">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
 
       {/* Custom range dialog */}
       <Dialog open={customOpen} onOpenChange={setCustomOpen}>
