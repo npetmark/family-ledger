@@ -31,7 +31,7 @@ export function getFilteredAccountIds(
     case "all-visible":
       return accounts.filter((a) => a.is_visible).map((a) => a.id);
     case "custom":
-      return filter.customAccountIds?.length ? filter.customAccountIds : null;
+      return filter.customAccountIds ?? [];
     default:
       return null;
   }
@@ -48,9 +48,11 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
 
   const label = isAllVisible
     ? "All accounts"
-    : selectedCount === accounts.length
-      ? "All accounts"
-      : `${selectedCount} account${selectedCount !== 1 ? "s" : ""}`;
+    : selectedCount === 0
+      ? "No accounts"
+      : selectedCount === accounts.length
+        ? "All accounts"
+        : `${selectedCount} account${selectedCount !== 1 ? "s" : ""}`;
 
   const toggleAccount = (accountId: string) => {
     const currentIds = value.mode === "all-visible"
@@ -77,6 +79,10 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
     onChange({ mode: "all-visible" });
   };
 
+  const clearAll = () => {
+    onChange({ mode: "custom", customAccountIds: [] });
+  };
+
   const isAccountSelected = (accountId: string) => {
     if (value.mode === "all-visible") {
       return accounts.find((a) => a.id === accountId)?.is_visible ?? false;
@@ -93,10 +99,10 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-60 p-0" align="end">
-        <div className="p-2 border-b border-border">
+        <div className="p-2 border-b border-border flex items-center gap-1">
           <button
             type="button"
-            className="w-full text-left text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted/50 transition-colors"
+            className="flex-1 text-left text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted/50 transition-colors"
             onClick={selectAll}
           >
             {isAllVisible ? (
@@ -107,6 +113,13 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
             ) : (
               "Select all"
             )}
+          </button>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted/50 transition-colors shrink-0"
+            onClick={clearAll}
+          >
+            Clear
           </button>
         </div>
         <div className="max-h-[240px] overflow-y-auto">

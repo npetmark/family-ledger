@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AccountFilter, AccountFilterValue, getFilteredAccountIds } from "@/components/AccountFilter";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Pencil, Banknote } from "lucide-react";
 import { toast } from "sonner";
-import { format, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths } from "date-fns";
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, addDays, addYears } from "date-fns";
 import { getFundSubcategoryId } from "@/lib/fund-accounts";
 import { scheduleUndoableDelete } from "@/lib/shopping";
 import {
@@ -27,40 +28,61 @@ import {
 
 type FilterPreset = "day" | "week" | "month" | "year" | "custom";
 
-function getPresetRange(preset: FilterPreset, year?: number, month?: number): { from: Date; to: Date } {
-  const now = new Date();
+function getAnchoredRange(preset: FilterPreset, anchor: Date): { from: Date; to: Date } {
   switch (preset) {
     case "day":
-      return { from: startOfDay(now), to: now };
+      return { from: startOfDay(anchor), to: endOfDay(anchor) };
     case "week":
-      return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
-    case "year": {
-      const y = year ?? now.getFullYear();
-      return { from: startOfYear(new Date(y, 0, 1)), to: endOfYear(new Date(y, 0, 1)) };
-    }
+      return { from: startOfWeek(anchor, { weekStartsOn: 1 }), to: endOfWeek(anchor, { weekStartsOn: 1 }) };
+    case "year":
+      return { from: startOfYear(anchor), to: endOfYear(anchor) };
     case "month":
-    default: {
-      const m = month ?? now.getMonth();
-      const y = year ?? now.getFullYear();
-      const d = new Date(y, m, 1);
-      return { from: startOfMonth(d), to: endOfMonth(d) };
-    }
+    default:
+      return { from: startOfMonth(anchor), to: endOfMonth(anchor) };
   }
 }
 
-const AVAILABLE_YEARS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
-const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function shiftAnchor(preset: FilterPreset, anchor: Date, dir: 1 | -1): Date {
+  switch (preset) {
+    case "day":
+      return addDays(anchor, dir);
+    case "week":
+      return addDays(anchor, dir * 7);
+    case "year":
+      return addYears(anchor, dir);
+    case "month":
+    default:
+      return addMonths(anchor, dir);
+  }
+}
+
+function formatAnchorLabel(preset: FilterPreset, anchor: Date): string {
+  switch (preset) {
+    case "day":
+      return format(anchor, "EEE, d MMM yyyy");
+    case "week": {
+      const from = startOfWeek(anchor, { weekStartsOn: 1 });
+      const to = endOfWeek(anchor, { weekStartsOn: 1 });
+      return `${format(from, "d MMM")} – ${format(to, "d MMM yyyy")}`;
+    }
+    case "year":
+      return format(anchor, "yyyy");
+    case "month":
+    default:
+      return format(anchor, "MMMM yyyy");
+  }
+}
 
 export default function TransactionsPage() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
   const [activePreset, setActivePreset] = useState<FilterPreset>("month");
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [dateFilter, setDateFilter] = useState(getPresetRange("month"));
+  const [anchorDate, setAnchorDate] = useState(new Date());
+  const [dateFilter, setDateFilter] = useState(getAnchoredRange("month", new Date()));
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [customOpen, setCustomOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -204,7 +226,6 @@ export default function TransactionsPage() {
     });
   };
 
-
   const selectPreset = (preset: FilterPreset) => {
     if (preset === "custom") {
       setCustomRange({});
@@ -212,22 +233,19 @@ export default function TransactionsPage() {
       setCustomOpen(true);
       return;
     }
+    const anchor = activePreset === "custom" ? new Date() : anchorDate;
+    setAnchorDate(anchor);
     setActivePreset(preset);
-    setDateFilter(getPresetRange(preset, selectedYear, selectedMonth));
+    setDateFilter(getAnchoredRange(preset, anchor));
   };
 
-  const handleYearChange = (year: string) => {
-    const y = parseInt(year);
-    setSelectedYear(y);
-    if (activePreset === "year") setDateFilter(getPresetRange("year", y));
-    if (activePreset === "month") setDateFilter(getPresetRange("month", y, selectedMonth));
+  const stepPeriod = (dir: 1 | -1) => {
+    if (activePreset === "custom") return;
+    const next = shiftAnchor(activePreset, anchorDate, dir);
+    setAnchorDate(next);
+    setDateFilter(getAnchoredRange(activePreset, next));
   };
 
-  const handleMonthChange = (month: string) => {
-    const m = parseInt(month);
-    setSelectedMonth(m);
-    if (activePreset === "month") setDateFilter(getPresetRange("month", selectedYear, m));
-  };
 
   const confirmCustomRange = () => {
     if (customRange.from && customRange.to) {
@@ -390,61 +408,44 @@ export default function TransactionsPage() {
             : "Custom"}
         </Button>
 
-        {activePreset === "month" && (
-          <>
-            <Select value={String(selectedMonth)} onValueChange={handleMonthChange}>
-              <SelectTrigger className="w-[130px] h-8"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {MONTH_NAMES.map((m, i) => (
-                  <SelectItem key={i} value={String(i)}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={String(selectedYear)} onValueChange={handleYearChange}>
-              <SelectTrigger className="w-[100px] h-8"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {AVAILABLE_YEARS.map((y) => (
-                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </>
-        )}
-
-        {activePreset === "year" && (
-          <Select value={String(selectedYear)} onValueChange={handleYearChange}>
-            <SelectTrigger className="w-[100px] h-8">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {AVAILABLE_YEARS.map((y) => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
         <AccountFilter accounts={accounts} value={accountFilter} onChange={setAccountFilter} />
       </div>
 
+      {activePreset !== "custom" && (
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => stepPeriod(-1)} aria-label="Previous period">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 text-center text-sm font-medium truncate">
+            {formatAnchorLabel(activePreset, anchorDate)}
+          </div>
+          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => stepPeriod(1)} aria-label="Next period">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+
       {/* Custom range dialog */}
       <Dialog open={customOpen} onOpenChange={setCustomOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-fit max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Select Date Range</DialogTitle>
           </DialogHeader>
-          <div className="flex items-center justify-between gap-2 px-2">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCalendarMonth(prev => subMonths(prev, 1))}>
+          <div className="flex items-center justify-between gap-2">
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCalendarMonth(prev => subMonths(prev, 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm font-medium">
-              {format(calendarMonth, "MMMM yyyy")} – {format(addMonths(calendarMonth, 1), "MMMM yyyy")}
+            <span className="text-xs sm:text-sm font-medium text-center truncate">
+              {isMobile
+                ? format(calendarMonth, "MMMM yyyy")
+                : `${format(calendarMonth, "MMMM yyyy")} – ${format(addMonths(calendarMonth, 1), "MMMM yyyy")}`}
             </span>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCalendarMonth(prev => addMonths(prev, 1))}>
+            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCalendarMonth(prev => addMonths(prev, 1))}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          <div className="flex items-center justify-center w-full overflow-x-auto">
+          <div className="flex items-center justify-center w-full">
             <Calendar
               weekStartsOn={1}
               mode="range"
@@ -453,18 +454,18 @@ export default function TransactionsPage() {
                 if (range) setCustomRange({ from: range.from, to: range.to });
                 else setCustomRange({});
               }}
-              numberOfMonths={2}
-              className="pointer-events-auto mx-auto"
+              numberOfMonths={isMobile ? 1 : 2}
+              className="pointer-events-auto mx-auto p-0"
               month={calendarMonth}
               onMonthChange={setCalendarMonth}
               classNames={{
-                caption: "flex justify-center pt-1 relative items-center",
+                caption: isMobile ? "hidden" : "flex justify-center pt-1 relative items-center",
                 caption_label: "text-sm font-medium",
                 nav: "hidden",
               }}
             />
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-row justify-end gap-2">
             <Button variant="outline" onClick={() => setCustomOpen(false)}>Cancel</Button>
             <Button onClick={confirmCustomRange} disabled={!customRange.from || !customRange.to}>Confirm</Button>
           </DialogFooter>
