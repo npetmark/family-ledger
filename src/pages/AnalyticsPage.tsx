@@ -140,15 +140,25 @@ export default function AnalyticsPage() {
   const { data: yearTransactions = [] } = useQuery({
     queryKey: ["analytics-transactions", user?.id, fromStr, toStr],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("*, subcategories(name, icon, color, main_category_id, main_categories(id, name, color))")
-        .gte("date", fromStr)
-        .lte("date", toStr)
-        .order("date");
-      if (error) throw error;
-      return data;
+      // Fetch in pages — PostgREST caps responses at 1000 rows by default
+      const pageSize = 1000;
+      const all: any[] = [];
+      for (let page = 0; ; page++) {
+        const { data, error } = await supabase
+          .from("transactions")
+          .select("*, subcategories(name, icon, color, main_category_id, main_categories(id, name, color))")
+          .gte("date", fromStr)
+          .lte("date", toStr)
+          .order("date")
+          .order("id")
+          .range(page * pageSize, page * pageSize + pageSize - 1);
+        if (error) throw error;
+        all.push(...(data ?? []));
+        if (!data || data.length < pageSize) break;
+      }
+      return all;
     },
+
     enabled: !!user,
   });
 

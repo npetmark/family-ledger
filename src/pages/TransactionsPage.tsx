@@ -125,15 +125,23 @@ export default function TransactionsPage() {
     queryFn: async () => {
       const fromStr = `${dateFilter.from.getFullYear()}-${String(dateFilter.from.getMonth() + 1).padStart(2, "0")}-${String(dateFilter.from.getDate()).padStart(2, "0")}`;
       const toStr = `${dateFilter.to.getFullYear()}-${String(dateFilter.to.getMonth() + 1).padStart(2, "0")}-${String(dateFilter.to.getDate()).padStart(2, "0")}`;
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("*, subcategories(name, icon, color, main_categories(name, color)), accounts!transactions_account_id_fkey(name, icon)")
-        .gte("date", fromStr)
-        .lte("date", toStr)
-        .order("date", { ascending: false })
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      const pageSize = 1000;
+      const all: any[] = [];
+      for (let page = 0; ; page++) {
+        const { data, error } = await supabase
+          .from("transactions")
+          .select("*, subcategories(name, icon, color, main_categories(name, color)), accounts!transactions_account_id_fkey(name, icon)")
+          .gte("date", fromStr)
+          .lte("date", toStr)
+          .order("date", { ascending: false })
+          .order("created_at", { ascending: false })
+          .range(page * pageSize, page * pageSize + pageSize - 1);
+        if (error) throw error;
+        all.push(...(data ?? []));
+        if (!data || data.length < pageSize) break;
+      }
+      return all;
+
     },
     enabled: !!user,
   });
