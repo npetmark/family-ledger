@@ -388,6 +388,53 @@ export default function AnalyticsPage() {
   const avgExpense = periodCount > 0 ? Math.round(totalExpenses / periodCount) : 0;
   const avgIncome = periodCount > 0 ? Math.round(totalIncome / periodCount) : 0;
 
+  // Average per period, broken down by main category → subcategory
+  const averageBreakdown = useMemo(() => {
+    const divisor = periodCount > 0 ? periodCount : 1;
+    const groups: Record<string, {
+      id: string; name: string; color: string; total: number;
+      subs: Record<string, { name: string; icon: string; total: number; color: string }>;
+    }> = {};
+
+    allCategoryItems.forEach((t) => {
+      const mc = t.subcategories?.main_categories;
+      const mcId = mc?.id || "other";
+      const mcName = mc?.name || "Other";
+      const mcColor = mc?.color || "0 0% 50%";
+      if (!groups[mcId]) groups[mcId] = { id: mcId, name: mcName, color: mcColor, total: 0, subs: {} };
+      groups[mcId].total += t.amount;
+
+      const subId = t.subcategory_id || "uncategorized";
+      const sub = groups[mcId].subs[subId] ||
+        (groups[mcId].subs[subId] = {
+          name: t.subcategories?.name || "Uncategorized",
+          icon: t.subcategories?.icon || "circle",
+          total: 0,
+          color: mcColor,
+        });
+      sub.total += t.amount;
+    });
+
+    return Object.values(groups)
+      .map((g) => {
+        const subs = Object.values(g.subs).sort((a, b) => b.total - a.total);
+        return {
+          id: g.id,
+          name: g.name,
+          color: g.color,
+          avg: Math.round(g.total / divisor),
+          subs: subs.map((s, i) => ({
+            name: s.name,
+            icon: s.icon,
+            avg: Math.round(s.total / divisor),
+            color: getSubcategoryShade(g.color, i, subs.length),
+          })),
+        };
+      })
+      .filter((g) => g.avg > 0)
+      .sort((a, b) => b.avg - a.avg);
+  }, [allCategoryItems, periodCount]);
+
   const customTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
