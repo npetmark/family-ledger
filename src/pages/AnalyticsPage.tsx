@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, Sparkles, Loader2, AlertTriangle, CheckCircle, Info, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, eachDayOfInterval, eachMonthOfInterval, differenceInDays } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, eachDayOfInterval, eachMonthOfInterval, differenceInDays, getDaysInMonth } from "date-fns";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const AVAILABLE_YEARS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
@@ -396,7 +396,15 @@ export default function AnalyticsPage() {
     if (averageMode === "daily") {
       return eachDayOfInterval({ start: dateFilter.from, end }).length;
     }
-    return eachMonthOfInterval({ start: dateFilter.from, end }).length;
+    // Fractional months: partial months count as (days covered / days in month)
+    return eachMonthOfInterval({ start: dateFilter.from, end }).reduce((sum, monthStart) => {
+      const mStart = startOfMonth(monthStart);
+      const mEnd = endOfMonth(monthStart);
+      const from = dateFilter.from > mStart ? dateFilter.from : mStart;
+      const to = end < mEnd ? end : mEnd;
+      const daysCovered = differenceInDays(to, from) + 1;
+      return sum + daysCovered / getDaysInMonth(monthStart);
+    }, 0);
   }, [averageMode, dateFilter]);
 
 
@@ -840,7 +848,7 @@ export default function AnalyticsPage() {
                 {averageMode === "daily" ? "Daily average" : "Monthly average"} by category
               </CardTitle>
               <CardDescription>
-                Averaged over {periodCount} {averageMode === "daily" ? (periodCount === 1 ? "day" : "days") : (periodCount === 1 ? "month" : "months")} in the selected period
+                Averaged over {averageMode === "daily" ? periodCount : Math.round(periodCount * 10) / 10} {averageMode === "daily" ? (periodCount === 1 ? "day" : "days") : (periodCount === 1 ? "month" : "months")} in the selected period
               </CardDescription>
             </CardHeader>
             <CardContent>
