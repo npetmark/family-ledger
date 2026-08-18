@@ -848,7 +848,7 @@ export default function AnalyticsPage() {
                 {averageMode === "daily" ? "Daily average" : "Monthly average"} by category
               </CardTitle>
               <CardDescription>
-                Averaged over {periodCount} {averageMode === "daily" ? (periodCount === 1 ? "day" : "days") : (periodCount === 1 ? "month" : "months")} in the selected period
+                Averaged over {averageMode === "daily" ? periodCount : Math.round(periodCount * 10) / 10} {averageMode === "daily" ? (periodCount === 1 ? "day" : "days") : (periodCount === 1 ? "month" : "months")} in the selected period
               </CardDescription>
             </CardHeader>
             <CardContent>
