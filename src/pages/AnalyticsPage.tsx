@@ -396,7 +396,15 @@ export default function AnalyticsPage() {
     if (averageMode === "daily") {
       return eachDayOfInterval({ start: dateFilter.from, end }).length;
     }
-    return eachMonthOfInterval({ start: dateFilter.from, end }).length;
+    // Fractional months: partial months count as (days covered / days in month)
+    return eachMonthOfInterval({ start: dateFilter.from, end }).reduce((sum, monthStart) => {
+      const mStart = startOfMonth(monthStart);
+      const mEnd = endOfMonth(monthStart);
+      const from = dateFilter.from > mStart ? dateFilter.from : mStart;
+      const to = end < mEnd ? end : mEnd;
+      const daysCovered = differenceInDays(to, from) + 1;
+      return sum + daysCovered / getDaysInMonth(monthStart);
+    }, 0);
   }, [averageMode, dateFilter]);
 
 
