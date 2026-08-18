@@ -388,6 +388,53 @@ export default function AnalyticsPage() {
   const avgExpense = periodCount > 0 ? Math.round(totalExpenses / periodCount) : 0;
   const avgIncome = periodCount > 0 ? Math.round(totalIncome / periodCount) : 0;
 
+  // Average per period, broken down by main category → subcategory
+  const averageBreakdown = useMemo(() => {
+    const divisor = periodCount > 0 ? periodCount : 1;
+    const groups: Record<string, {
+      id: string; name: string; color: string; total: number;
+      subs: Record<string, { name: string; icon: string; total: number; color: string }>;
+    }> = {};
+
+    allCategoryItems.forEach((t) => {
+      const mc = t.subcategories?.main_categories;
+      const mcId = mc?.id || "other";
+      const mcName = mc?.name || "Other";
+      const mcColor = mc?.color || "0 0% 50%";
+      if (!groups[mcId]) groups[mcId] = { id: mcId, name: mcName, color: mcColor, total: 0, subs: {} };
+      groups[mcId].total += t.amount;
+
+      const subId = t.subcategory_id || "uncategorized";
+      const sub = groups[mcId].subs[subId] ||
+        (groups[mcId].subs[subId] = {
+          name: t.subcategories?.name || "Uncategorized",
+          icon: t.subcategories?.icon || "circle",
+          total: 0,
+          color: mcColor,
+        });
+      sub.total += t.amount;
+    });
+
+    return Object.values(groups)
+      .map((g) => {
+        const subs = Object.values(g.subs).sort((a, b) => b.total - a.total);
+        return {
+          id: g.id,
+          name: g.name,
+          color: g.color,
+          avg: Math.round(g.total / divisor),
+          subs: subs.map((s, i) => ({
+            name: s.name,
+            icon: s.icon,
+            avg: Math.round(s.total / divisor),
+            color: getSubcategoryShade(g.color, i, subs.length),
+          })),
+        };
+      })
+      .filter((g) => g.avg > 0)
+      .sort((a, b) => b.avg - a.avg);
+  }, [allCategoryItems, periodCount]);
+
   const customTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
@@ -770,6 +817,53 @@ export default function AnalyticsPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Average breakdown by category & subcategory */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-base font-medium">
+                {averageMode === "daily" ? "Daily average" : "Monthly average"} by category
+              </CardTitle>
+              <CardDescription>
+                Averaged over {periodCount} {averageMode === "daily" ? (periodCount === 1 ? "day" : "days") : (periodCount === 1 ? "month" : "months")} in the selected period
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {averageBreakdown.length > 0 ? (
+                <div className="space-y-5">
+                  {averageBreakdown.map((cat) => (
+                    <div key={cat.id} className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: `hsl(${cat.color})` }} />
+                          <span className="text-sm font-medium truncate">{cat.name}</span>
+                        </div>
+                        <span className="text-sm font-mono-numbers font-semibold whitespace-nowrap flex-shrink-0">
+                          {formatCurrency(cat.avg)}
+                          <span className="text-xs text-muted-foreground ml-1">/{averageMode === "daily" ? "day" : "mo"}</span>
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 pl-4 border-l border-border">
+                        {cat.subs.map((sub, i) => (
+                          <div key={i} className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style={{ background: `hsl(${sub.color} / 0.15)` }}>
+                                <DynamicIcon name={sub.icon} className="h-3 w-3" style={{ color: `hsl(${sub.color})` }} />
+                              </div>
+                              <span className="text-sm text-muted-foreground truncate">{sub.name}</span>
+                            </div>
+                            <span className="text-sm font-mono-numbers whitespace-nowrap flex-shrink-0">{formatCurrency(sub.avg)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-[120px] text-sm text-muted-foreground">No data for this period</div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
