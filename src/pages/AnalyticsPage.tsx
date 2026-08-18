@@ -379,11 +379,16 @@ export default function AnalyticsPage() {
   }, [activePreset, dateFilter]);
 
   const periodCount = useMemo(() => {
+    // Don't count future days/months — cap the range at today (year-to-date)
+    const now = new Date();
+    const end = dateFilter.to > now ? now : dateFilter.to;
+    if (end < dateFilter.from) return 1;
     if (averageMode === "daily") {
-      return eachDayOfInterval({ start: dateFilter.from, end: dateFilter.to }).length;
+      return eachDayOfInterval({ start: dateFilter.from, end }).length;
     }
-    return eachMonthOfInterval({ start: dateFilter.from, end: dateFilter.to }).length;
+    return eachMonthOfInterval({ start: dateFilter.from, end }).length;
   }, [averageMode, dateFilter]);
+
 
   const avgExpense = periodCount > 0 ? Math.round(totalExpenses / periodCount) : 0;
   const avgIncome = periodCount > 0 ? Math.round(totalIncome / periodCount) : 0;
