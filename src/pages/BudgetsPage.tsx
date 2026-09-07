@@ -241,7 +241,6 @@ export default function BudgetsPage() {
     .map((sub) => sub.id);
   const totalBudget = expenseSubIds.reduce((s, id) => s + getBudget(id), 0);
   const totalSpent = expenseSubIds.reduce((s, id) => s + getSpent(id), 0);
-  const budgetExceedsIncome = totalBudget > 0 && incomeTotal > 0 && totalBudget > incomeTotal;
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -294,7 +293,7 @@ export default function BudgetsPage() {
             <div className="flex items-center gap-4 text-sm">
               <div className="text-right">
                 <div className="text-xs text-muted-foreground">Budget</div>
-                <span className={`font-mono-numbers font-semibold ${budgetExceedsIncome ? "text-destructive animate-pulse" : ""}`}>
+                <span className="font-mono-numbers font-semibold">
                   {formatCurrency(totalBudget)}
                 </span>
               </div>
@@ -306,7 +305,7 @@ export default function BudgetsPage() {
               </div>
               <div className="text-right">
                 <div className="text-xs text-muted-foreground">Income</div>
-                <span className={`font-mono-numbers font-semibold ${budgetExceedsIncome ? "text-destructive animate-pulse" : ""}`}>
+                <span className="font-mono-numbers font-semibold">
                   {formatCurrency(incomeTotal)}
                 </span>
               </div>
