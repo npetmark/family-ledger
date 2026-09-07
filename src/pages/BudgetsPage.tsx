@@ -241,7 +241,6 @@ export default function BudgetsPage() {
     .map((sub) => sub.id);
   const totalBudget = expenseSubIds.reduce((s, id) => s + getBudget(id), 0);
   const totalSpent = expenseSubIds.reduce((s, id) => s + getSpent(id), 0);
-  const budgetExceedsIncome = totalBudget > 0 && incomeTotal > 0 && totalBudget > incomeTotal;
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -294,7 +293,7 @@ export default function BudgetsPage() {
             <div className="flex items-center gap-4 text-sm">
               <div className="text-right">
                 <div className="text-xs text-muted-foreground">Budget</div>
-                <span className={`font-mono-numbers font-semibold ${budgetExceedsIncome ? "text-destructive animate-pulse" : ""}`}>
+                <span className="font-mono-numbers font-semibold">
                   {formatCurrency(totalBudget)}
                 </span>
               </div>
@@ -306,7 +305,7 @@ export default function BudgetsPage() {
               </div>
               <div className="text-right">
                 <div className="text-xs text-muted-foreground">Income</div>
-                <span className={`font-mono-numbers font-semibold ${budgetExceedsIncome ? "text-destructive animate-pulse" : ""}`}>
+                <span className="font-mono-numbers font-semibold">
                   {formatCurrency(incomeTotal)}
                 </span>
               </div>
@@ -344,8 +343,10 @@ export default function BudgetsPage() {
           const mainPct = mainBudgetTotal > 0 ? Math.min((mainSpentTotal / mainBudgetTotal) * 100, 100) : 0;
           const isMainOver = mainSpentTotal > mainBudgetTotal && mainBudgetTotal > 0;
           const targetPct = BUDGET_TARGETS[mainName];
-          // Share of the total plan, so the three main categories always sum to 100%
+          // Share of the total plan (independent of income), so the main categories always sum to 100%
           const budgetedPct = totalBudget > 0 ? (mainBudgetTotal / totalBudget) * 100 : 0;
+          const targetAmount = targetPct !== undefined ? Math.round((totalBudget * targetPct) / 100) : 0;
+          const offTarget = targetPct !== undefined && Math.abs(budgetedPct - targetPct) > 2;
 
           return (
             <Card key={mainName}>
@@ -356,13 +357,13 @@ export default function BudgetsPage() {
                     {targetPct !== undefined && (
                       <>
                         <Badge variant="secondary" className="text-xs font-mono-numbers">
-                          Target {targetPct}%
+                          Target {targetPct}% ({formatCurrency(targetAmount)})
                         </Badge>
                         <Badge
                           variant="outline"
-                          className="text-xs font-mono-numbers"
+                          className={`text-xs font-mono-numbers ${offTarget ? "text-warning border-warning/40" : ""}`}
                         >
-                          Budgeted {budgetedPct.toFixed(1)}%
+                          Budgeted {budgetedPct.toFixed(1)}% of plan
                         </Badge>
                       </>
                     )}
