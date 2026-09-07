@@ -344,7 +344,8 @@ export default function BudgetsPage() {
           const mainPct = mainBudgetTotal > 0 ? Math.min((mainSpentTotal / mainBudgetTotal) * 100, 100) : 0;
           const isMainOver = mainSpentTotal > mainBudgetTotal && mainBudgetTotal > 0;
           const targetPct = BUDGET_TARGETS[mainName];
-          const budgetedPct = incomeTotal > 0 ? (mainBudgetTotal / incomeTotal) * 100 : 0;
+          // Share of the total plan, so the three main categories always sum to 100%
+          const budgetedPct = totalBudget > 0 ? (mainBudgetTotal / totalBudget) * 100 : 0;
 
           return (
             <Card key={mainName}>
