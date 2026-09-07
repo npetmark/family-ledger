@@ -358,13 +358,13 @@ export default function BudgetsPage() {
                     {targetPct !== undefined && (
                       <>
                         <Badge variant="secondary" className="text-xs font-mono-numbers">
-                          Target {targetPct}%
+                          Target {targetPct}% ({formatCurrency(targetAmount)})
                         </Badge>
                         <Badge
                           variant="outline"
-                          className="text-xs font-mono-numbers"
+                          className={`text-xs font-mono-numbers ${offTarget ? "text-warning border-warning/40" : ""}`}
                         >
-                          Budgeted {budgetedPct.toFixed(1)}%
+                          Budgeted {budgetedPct.toFixed(1)}% of plan
                         </Badge>
                       </>
                     )}
