@@ -293,7 +293,7 @@ export default function BudgetsPage() {
             <div className="flex items-center gap-4 text-sm">
               <div className="text-right">
                 <div className="text-xs text-muted-foreground">Budget</div>
-                <span className="font-mono-numbers font-semibold">
+                <span className={`font-mono-numbers font-semibold ${totalBudget > incomeTotal && incomeTotal > 0 ? "text-destructive animate-pulse" : ""}`}>
                   {formatCurrency(totalBudget)}
                 </span>
               </div>
@@ -363,7 +363,7 @@ export default function BudgetsPage() {
                           variant="outline"
                           className={`text-xs font-mono-numbers ${offTarget ? "text-warning border-warning/40" : ""}`}
                         >
-                          Budgeted {budgetedPct.toFixed(1)}% of plan
+                          Budgeted {budgetedPct.toFixed(1)}%
                         </Badge>
                       </>
                     )}
