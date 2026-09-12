@@ -8,7 +8,6 @@ export const FUND_KEYWORD_TO_SUBCATEGORY: Record<string, string> = {
   "Emergency": 'Фонд "Аварии"',
   "Gifts": "Подаръци",
   "Car": 'Фонд "Автомобил"',
-  "T212": 'Фонд "Автомобил"',
 };
 
 /**
