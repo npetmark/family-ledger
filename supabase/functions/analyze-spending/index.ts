@@ -107,7 +107,7 @@ Provide analysis of spending patterns, trends, and actionable suggestions.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gemini-1.5-pro",
+        model: "gemini-1.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
