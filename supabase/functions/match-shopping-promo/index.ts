@@ -244,7 +244,7 @@ async function classifyItems(
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       messages: [
         { role: "system", content: "You translate and classify grocery items. Output JSON only." },
         { role: "user", content: prompt },
