@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Match shopping items against znamcenite.bg promotions via their public JSON API.
 // Caches the full feed for 6h; uses Lovable AI to both translate EN->BG and
 // classify each query into the znamcenite category/subcategory slugs so that
