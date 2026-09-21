@@ -83,7 +83,7 @@ Rules:
 - Do not invent items not visible on the receipt.`;
 
     const aiBody = {
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash-lite",
       messages: [
         { role: "system", content: systemPrompt },
         {

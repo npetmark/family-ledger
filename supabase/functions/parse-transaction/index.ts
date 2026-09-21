@@ -159,7 +159,7 @@ If unclear whether user wants a transaction or budget, ask for clarification.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gemini-2.5-pro",
+        model: "gemini-3.5-flash-lite",
         messages: aiMessages,
       }),
     });
