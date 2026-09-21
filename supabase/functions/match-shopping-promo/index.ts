@@ -3,7 +3,7 @@
 // classify each query into the znamcenite category/subcategory slugs so that
 // we only consider promos in the right subcategory (e.g. "chicken fillet"
 // matches raw chicken but not chicken meatballs).
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -208,11 +208,7 @@ async function getPromos(admin: any): Promise<Promo[]> {
   return cached ?? [];
 }
 
-function detectLang(s: string): "bg" | "en" | "other" {
-  if (/[\u0400-\u04FF]/.test(s)) return "bg";
-  if (/^[A-Za-z\s\d.,'’-]+$/.test(s)) return "en";
-  return "other";
-}
+
 
 type ItemClassification = {
   bg: string;

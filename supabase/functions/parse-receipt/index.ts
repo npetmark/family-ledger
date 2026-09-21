@@ -1,7 +1,7 @@
 // Parses a shopping receipt image and matches its line items against the
 // current trip's shopping list. Returns matched items (with actual paid
 // prices) and unmatched lines that should be added as excess.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

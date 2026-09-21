@@ -1,4 +1,4 @@
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals } from "@std/assert";
 import { parsePackSize } from "./index.ts";
 
 Deno.test("parsePackSize - Bulgarian piece counts", () => {
