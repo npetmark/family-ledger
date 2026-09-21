@@ -62,12 +62,16 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+This project is configured to run fully self-hosted via GitHub Pages (for the frontend) and Supabase (for the backend and AI capabilities). 
 
-## Can I connect a custom domain to my Lovable project?
+Deployment of the frontend is fully automated via GitHub Actions whenever changes are pushed to the `main` branch. 
 
-Yes, you can!
+To deploy the backend, run the following using the Supabase CLI:
+1. `supabase link --project-ref YOUR_PROJECT_ID`
+2. `supabase db push` (to migrate your database schema)
+3. `supabase functions deploy` (to deploy the edge functions)
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Setting up AI Functionality
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+This app uses Google Gemini for features like scanning receipts and analyzing spending. You must add your Gemini API Key directly into your Supabase Edge Function Secrets:
+`supabase secrets set GEMINI_API_KEY=your_google_api_key_here`
