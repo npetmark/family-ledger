@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'bearfinance',
   webDir: 'dist',
   server: {
-    url: 'https://bd3365d7-fa60-45f2-a718-84e764e50922.lovableproject.com?forceHideBadge=true',
+    url: 'https://npetmark.github.io/family-ledger/',
     cleartext: true,
   },
 };

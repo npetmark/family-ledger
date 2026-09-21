@@ -3,7 +3,7 @@
 // classify each query into the znamcenite category/subcategory slugs so that
 // we only consider promos in the right subcategory (e.g. "chicken fillet"
 // matches raw chicken but not chicken meatballs).
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -208,11 +208,7 @@ async function getPromos(admin: any): Promise<Promo[]> {
   return cached ?? [];
 }
 
-function detectLang(s: string): "bg" | "en" | "other" {
-  if (/[\u0400-\u04FF]/.test(s)) return "bg";
-  if (/^[A-Za-z\s\d.,'’\-]+$/.test(s)) return "en";
-  return "other";
-}
+
 
 type ItemClassification = {
   bg: string;
@@ -244,7 +240,7 @@ async function classifyItems(
     `Taxonomy: ${JSON.stringify(taxonomy)}\n` +
     `Items: ${JSON.stringify(names)}\n` +
     `Reply with JSON: {"items":{"<original name>":{"bg":"...","subSlugs":[...],"parentSlugs":[...]}}}`;
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
@@ -342,7 +338,7 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") ?? "";
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
 
     const userClient = createClient(SUPABASE_URL, ANON, {
       global: { headers: { Authorization: authHeader } },
@@ -381,7 +377,7 @@ Deno.serve(async (req) => {
     const classification = await classifyItems(
       items.map((it) => it.name),
       tree,
-      LOVABLE_API_KEY,
+      GEMINI_API_KEY,
     );
 
     let updated = 0;
