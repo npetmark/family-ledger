@@ -8,8 +8,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
-        <main className="flex-1 min-w-0 flex flex-col min-h-screen overflow-hidden">
-          <header className="h-14 flex items-center justify-between border-b border-border px-4 bg-background sticky top-0 z-10">
+        <main className="flex-1 min-w-0 flex flex-col min-h-screen overflow-hidden gradient-bg">
+          <header className="h-14 flex items-center justify-between border-b border-border/50 px-4 bg-background/80 backdrop-blur-md sticky top-0 z-10 transition-colors">
             <SidebarTrigger />
             <ThemeToggle />
           </header>

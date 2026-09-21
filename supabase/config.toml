@@ -1,13 +1,19 @@
 project_id = "clgwzbxmjmxktwreubqc"
 
 [functions.analyze-spending]
-verify_jwt = false
+verify_jwt = true
 
 [functions.data-export]
-verify_jwt = false
+verify_jwt = true
 
 [functions.parse-receipt]
 verify_jwt = true
 
 [functions.categorize-shopping-item]
+verify_jwt = true
+
+[functions.parse-transaction]
+verify_jwt = true
+
+[functions.match-shopping-promo]
 verify_jwt = true
