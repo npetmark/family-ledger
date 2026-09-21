@@ -61,8 +61,8 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
     const accountsList = accounts.map((a: any) => `- "${a.name}" (id: ${a.id}, type: ${a.account_type})`).join("\n");
     const categoriesList = subcategories.map((s: any) => `- "${s.name}" under "${s.main_categories?.name}" (id: ${s.id})`).join("\n");
@@ -153,10 +153,10 @@ If unclear whether user wants a transaction or budget, ask for clarification.`;
       aiMessages.push({ role: "user", content: message });
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
