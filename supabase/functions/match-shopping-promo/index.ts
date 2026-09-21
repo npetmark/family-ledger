@@ -210,7 +210,7 @@ async function getPromos(admin: any): Promise<Promo[]> {
 
 function detectLang(s: string): "bg" | "en" | "other" {
   if (/[\u0400-\u04FF]/.test(s)) return "bg";
-  if (/^[A-Za-z\s\d.,'’\-]+$/.test(s)) return "en";
+  if (/^[A-Za-z\s\d.,'’-]+$/.test(s)) return "en";
   return "other";
 }
 
