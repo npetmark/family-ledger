@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Parses a shopping receipt image and matches its line items against the
 // current trip's shopping list. Returns matched items (with actual paid
 // prices) and unmatched lines that should be added as excess.

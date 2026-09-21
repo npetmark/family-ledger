@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Translates a Bulgarian (or other-language) shopping item to English and
 // picks the best matching category from the user's category list.
 //
