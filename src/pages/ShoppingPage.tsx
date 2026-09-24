@@ -104,7 +104,7 @@ export default function ShoppingPage() {
   const [viewReceiptOpen, setViewReceiptOpen] = useState(false);
   const [activeReceiptUrl, setActiveReceiptUrl] = useState<string | null>(null);
   // Complete-trip dialog form
-  const [completeForm, setCompleteForm] = useState({ store: "", account_id: "", amount: "", record_transaction: true });
+  const [completeForm, setCompleteForm] = useState({ store: "", account_id: "", amount: "", record_transaction: true, date: format(new Date(), "yyyy-MM-dd") });
   // Collapsed category ids on the list. Default is expanded; user can toggle.
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
 
@@ -536,7 +536,7 @@ export default function ShoppingPage() {
   });
 
   const completeTrip = useMutation({
-    mutationFn: async (opts: { store: string; accountId: string; amountCents: number; recordTransaction: boolean }) => {
+    mutationFn: async (opts: { store: string; accountId: string; amountCents: number; recordTransaction: boolean; date: string }) => {
       if (!activeTrip || !user) return;
       const totalForTrip = opts.amountCents > 0
         ? opts.amountCents
@@ -553,7 +553,7 @@ export default function ShoppingPage() {
           subcategory_id: groceriesSubcategoryId ?? null,
           transaction_type: "expense",
           amount: opts.amountCents,
-          date: format(new Date(), "yyyy-MM-dd"),
+          date: opts.date,
           note,
         });
         if (txErr) throw txErr;
@@ -564,7 +564,8 @@ export default function ShoppingPage() {
         .from("shopping_trips")
         .update({
           status: "completed",
-          completed_at: new Date().toISOString(),
+          started_at: new Date(opts.date).toISOString(),
+          completed_at: new Date(opts.date).toISOString(),
           total_cents: totalForTrip || null,
         })
         .eq("id", activeTrip.id);
@@ -593,7 +594,7 @@ export default function ShoppingPage() {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["account-balances"] });
       setConfirmCompleteOpen(false);
-      setCompleteForm({ store: "", account_id: "", amount: "", record_transaction: true });
+      setCompleteForm({ store: "", account_id: "", amount: "", record_transaction: true, date: format(new Date(), "yyyy-MM-dd") });
       toast.success("Trip completed");
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to complete trip"),
@@ -1009,6 +1010,7 @@ export default function ShoppingPage() {
                     account_id: accounts[0]?.id ?? "",
                     amount: actualTotal > 0 ? (actualTotal / 100).toFixed(2) : "",
                     record_transaction: true,
+                    date: format(new Date(), "yyyy-MM-dd"),
                   });
                   setConfirmCompleteOpen(true);
                 }}
@@ -1329,6 +1331,7 @@ export default function ShoppingPage() {
                 accountId: completeForm.account_id,
                 amountCents: cents,
                 recordTransaction: completeForm.record_transaction,
+                date: completeForm.date,
               });
             }}
           >
@@ -1338,6 +1341,15 @@ export default function ShoppingPage() {
                 ? ' A "Пазар" expense will be recorded with the details below.'
                 : " No transaction will be recorded."}
             </p>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Shopping Date</label>
+              <Input
+                type="date"
+                value={completeForm.date}
+                onChange={(e) => setCompleteForm((f) => ({ ...f, date: e.target.value }))}
+                required
+              />
+            </div>
             <div className="flex items-center justify-between rounded-md border p-3">
               <div className="space-y-0.5">
                 <label className="text-sm font-medium">Record as expense</label>
