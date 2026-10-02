@@ -172,6 +172,39 @@ export default function AnalyticsPage() {
     enabled: !!user,
   });
 
+  const { data: accountBalances = [] } = useQuery({
+    queryKey: ["account-balances", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_account_balances");
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        id: r.account_id,
+        name: r.name,
+        currency: r.currency,
+        account_type: r.account_type,
+        icon: r.icon,
+        is_visible: r.is_visible,
+        sort_order: r.sort_order,
+        starting_balance: r.starting_balance,
+        computed_balance: r.balance,
+      }));
+    },
+    enabled: !!user,
+  });
+
+  const { data: futureTransactions = [] } = useQuery({
+    queryKey: ["analytics-future-tx", user?.id, toStr],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("amount, transaction_type, account_id, transfer_to_account_id")
+        .gt("date", toStr);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const { data: mainCategories = [] } = useQuery({
     queryKey: ["main_categories", user?.id],
     queryFn: async () => {
@@ -256,8 +289,27 @@ export default function AnalyticsPage() {
   // Net Savings = Investments only
   const netSavings = totalInvestments;
 
-  // Remaining Balance (Carry-over) = Total Income - Total Expenses (including investments)
-  const remainingBalance = totalIncome - allExpenseLike.reduce((s, t) => s + t.amount, 0);
+  // Remaining Balance (Carry-over) = Total Assets at the end of the selected period
+  let endOfPeriodAssets = accountBalances
+    .filter((a) => filteredAccountIds ? filteredAccountIds.includes(a.id) : true)
+    .reduce((sum, a) => sum + a.computed_balance, 0);
+
+  // Rollback future transactions to get exact balance at `toStr`
+  futureTransactions.forEach((t) => {
+    const fromVisible = filteredAccountIds ? filteredAccountIds.includes(t.account_id) : true;
+    const toVisible = t.transfer_to_account_id && (filteredAccountIds ? filteredAccountIds.includes(t.transfer_to_account_id) : true);
+
+    if (t.transaction_type === "income" && fromVisible) {
+      endOfPeriodAssets -= t.amount;
+    } else if (t.transaction_type === "expense" && fromVisible) {
+      endOfPeriodAssets += t.amount;
+    } else if (t.transaction_type === "transfer") {
+      if (fromVisible) endOfPeriodAssets += t.amount; // Money that left visible account in future is added back
+      if (toVisible) endOfPeriodAssets -= t.amount;   // Money that entered visible account in future is subtracted
+    }
+  });
+
+  const remainingBalance = endOfPeriodAssets;
 
   // For pie/category charts, use ALL expense-like (including investments) and income so all categories appear
   const allExpenses = allExpenseLike;
