@@ -256,6 +256,9 @@ export default function AnalyticsPage() {
   // Net Savings = Investments only
   const netSavings = totalInvestments;
 
+  // Remaining Balance (Carry-over) = Total Income - Total Expenses (including investments)
+  const remainingBalance = totalIncome - allExpenseLike.reduce((s, t) => s + t.amount, 0);
+
   // For pie/category charts, use ALL expense-like (including investments) and income so all categories appear
   const allExpenses = allExpenseLike;
   const allCategoryItems = [...allExpenseLike, ...incomes];
@@ -578,7 +581,7 @@ export default function AnalyticsPage() {
       </Dialog>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Income</p>
@@ -601,13 +604,21 @@ export default function AnalyticsPage() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">{averageMode === "daily" ? "Daily" : "Monthly"} Average Expense</p>
+            <p className="text-sm text-muted-foreground">Remaining Balance</p>
+            <p className={`text-2xl font-semibold font-mono-numbers mt-1 ${remainingBalance >= 0 ? "text-income" : "text-expense"}`}>
+              {formatCurrency(remainingBalance)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">{averageMode === "daily" ? "Daily" : "Monthly"} Avg Expense</p>
             <p className="text-2xl font-semibold font-mono-numbers mt-1 text-expense">{formatCurrency(avgExpense)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">{averageMode === "daily" ? "Daily" : "Monthly"} Average Income</p>
+            <p className="text-sm text-muted-foreground">{averageMode === "daily" ? "Daily" : "Monthly"} Avg Income</p>
             <p className="text-2xl font-semibold font-mono-numbers mt-1 text-income">{formatCurrency(avgIncome)}</p>
           </CardContent>
         </Card>
