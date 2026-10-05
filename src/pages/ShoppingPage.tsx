@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useShoppingCategories, useActiveShoppingTrip, useShoppingItems, useShoppingSuggestions, useTopSuggested, usePastShoppingTrips } from "@/hooks/queries/useShopping";
+import { useAccounts } from "@/hooks/queries/useAccounts";
+import { useGroceriesSubcategoryId } from "@/hooks/queries/useCategories";
 import { shoppingRepository } from "@/repositories/shoppingRepository";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
