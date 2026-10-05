@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useAccounts } from "@/hooks/queries/useAccounts";
+import { useBudgetsWithCategories } from "@/hooks/queries/useBudgets";
+import { useTransactions } from "@/hooks/queries/useTransactions";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, getMonthYear } from "@/lib/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,47 +37,19 @@ export function BudgetBurndown() {
   const { user } = useAuth();
   const monthYear = getMonthYear();
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: accounts = [] } = useAccounts(user?.id);
 
-  const { data: budgets = [] } = useQuery({
-    queryKey: ["budgets", user?.id, monthYear],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("budgets")
-        .select("*, subcategories(name, icon, main_categories(name, id, sort_order))")
-        .eq("month_year", monthYear);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: budgets = [] } = useBudgetsWithCategories(user?.id, monthYear);
 
-  const { data: transactions = [] } = useQuery({
-    queryKey: ["transactions-for-budget", user?.id, monthYear],
-    queryFn: async () => {
-      const now = new Date();
-      const y = now.getFullYear(), m = now.getMonth();
-      const startOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-01`;
-      const lastDay = new Date(y, m + 1, 0).getDate();
-      const endOfMonth = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("subcategory_id, amount, account_id, transaction_type, subcategories(id, name, icon, main_categories(id, name, sort_order))")
-        .gte("date", startOfMonth)
-        .lte("date", endOfMonth);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const now = new Date();
+  const dateFilter = useMemo(() => {
+    return {
+      from: new Date(now.getFullYear(), now.getMonth(), 1),
+      to: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+    };
+  }, [monthYear]); // Intentionally using monthYear to trigger reload if it changes
+
+  const { data: transactions = [] } = useTransactions(user?.id, dateFilter);
 
   const INCOME_CATEGORY = "Приходи";
 

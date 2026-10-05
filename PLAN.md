@@ -5,7 +5,8 @@ We are currently executing a phased migration to support multi-user households w
 ## Current Status
 - **Phase 1: Map and pin behavior** is **COMPLETE**.
 - **Phase 2: Design** is **COMPLETE**.
-- **Phase 3: Refactor** is **PENDING**.
+- **Phase 3: Refactor** is **COMPLETE**.
+- **Phase 4: Schema + Auth + RLS Migration** is **PENDING**.
 
 ---
 

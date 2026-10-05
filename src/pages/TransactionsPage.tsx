@@ -2,6 +2,10 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AccountFilter, AccountFilterValue, getFilteredAccountIds } from "@/components/AccountFilter";
 import { supabase } from "@/integrations/supabase/client";
+import { useAccounts } from "@/hooks/queries/useAccounts";
+import { useActiveSubcategories } from "@/hooks/queries/useCategories";
+import { useTransactions, useSaveTransaction, useDeleteTransaction } from "@/hooks/queries/useTransactions";
+import { transactionRepository } from "@/repositories/transactionRepository";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
@@ -77,7 +81,6 @@ export default function TransactionsPage() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<any>(null);
   const [activePreset, setActivePreset] = useState<FilterPreset>("month");
@@ -100,108 +103,16 @@ export default function TransactionsPage() {
 
   const [form, setForm] = useState(emptyForm);
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: accounts = [] } = useAccounts(user?.id);
 
-  const { data: subcategories = [] } = useQuery({
-    queryKey: ["subcategories", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("subcategories").select("*, main_categories(name)").eq("is_active", true).order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: subcategories = [] } = useActiveSubcategories(user?.id);
 
-  const { data: transactions = [] } = useQuery({
-    queryKey: ["transactions", user?.id, dateFilter.from.toISOString(), dateFilter.to.toISOString()],
-    queryFn: async () => {
-      const fromStr = `${dateFilter.from.getFullYear()}-${String(dateFilter.from.getMonth() + 1).padStart(2, "0")}-${String(dateFilter.from.getDate()).padStart(2, "0")}`;
-      const toStr = `${dateFilter.to.getFullYear()}-${String(dateFilter.to.getMonth() + 1).padStart(2, "0")}-${String(dateFilter.to.getDate()).padStart(2, "0")}`;
-      const pageSize = 1000;
-      const all: any[] = [];
-      for (let page = 0; ; page++) {
-        const { data, error } = await supabase
-          .from("transactions")
-          .select("*, subcategories(name, icon, color, main_categories(name, color)), accounts!transactions_account_id_fkey(name, icon)")
-          .gte("date", fromStr)
-          .lte("date", toStr)
-          .order("date", { ascending: false })
-          .order("created_at", { ascending: false })
-          .range(page * pageSize, page * pageSize + pageSize - 1);
-        if (error) throw error;
-        all.push(...(data ?? []));
-        if (!data || data.length < pageSize) break;
-      }
-      return all;
+  const { data: transactions = [] } = useTransactions(user?.id, dateFilter);
 
-    },
-    enabled: !!user,
-  });
 
-  const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      let subcategoryId: string | null = null;
-      if (data.transaction_type === "transfer" && data.transfer_to_account_id) {
-        const destAccount = accounts.find((a) => a.id === data.transfer_to_account_id);
-        if (destAccount) subcategoryId = getFundSubcategoryId(destAccount.name, subcategories);
-      } else if (data.transaction_type !== "transfer") {
-        subcategoryId = data.subcategory_id || null;
-      }
-      const payload = {
-        user_id: user!.id,
-        transaction_type: data.transaction_type,
-        amount: parseCurrencyToCents(data.amount),
-        date: format(data.date, "yyyy-MM-dd"),
-        account_id: data.account_id,
-        subcategory_id: subcategoryId,
-        note: data.note,
-        transfer_to_account_id: data.transaction_type === "transfer" ? data.transfer_to_account_id || null : null,
-      };
-      const { error } = await supabase.from("transactions").insert(payload);
-      if (error) throw error;
-    },
+
+  const updateMutation = useSaveTransaction({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["account-balances"] });
-      setOpen(false);
-      setForm(emptyForm);
-      toast.success("Transaction added");
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      let subcategoryId: string | null = null;
-      if (data.transaction_type === "transfer" && data.transfer_to_account_id) {
-        const destAccount = accounts.find((a) => a.id === data.transfer_to_account_id);
-        if (destAccount) subcategoryId = getFundSubcategoryId(destAccount.name, subcategories);
-      } else if (data.transaction_type !== "transfer") {
-        subcategoryId = data.subcategory_id || null;
-      }
-      const payload = {
-        transaction_type: data.transaction_type,
-        amount: parseCurrencyToCents(data.amount),
-        date: format(data.date, "yyyy-MM-dd"),
-        account_id: data.account_id,
-        subcategory_id: subcategoryId,
-        note: data.note,
-        transfer_to_account_id: data.transaction_type === "transfer" ? data.transfer_to_account_id || null : null,
-      };
-      const { error } = await supabase.from("transactions").update(payload).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["account-balances"] });
       setEditOpen(false);
       setEditingTransaction(null);
       toast.success("Transaction updated");
@@ -209,27 +120,40 @@ export default function TransactionsPage() {
     onError: (e) => toast.error(e.message),
   });
 
+  const handleUpdate = (data: any) => {
+    let subcategoryId: string | null = null;
+    if (data.transaction_type === "transfer" && data.transfer_to_account_id) {
+      const destAccount = accounts.find((a) => a.id === data.transfer_to_account_id);
+      if (destAccount) subcategoryId = getFundSubcategoryId(destAccount.name, subcategories);
+    } else if (data.transaction_type !== "transfer") {
+      subcategoryId = data.subcategory_id || null;
+    }
+    const payload = {
+      transaction_type: data.transaction_type,
+      amount: parseCurrencyToCents(data.amount),
+      date: format(data.date, "yyyy-MM-dd"),
+      account_id: data.account_id,
+      subcategory_id: subcategoryId,
+      note: data.note,
+      transfer_to_account_id: data.transaction_type === "transfer" ? data.transfer_to_account_id || null : null,
+    };
+    updateMutation.mutate({ id: editingTransaction!.id, payload });
+  };
+
   const [pendingDeleteTxId, setPendingDeleteTxId] = useState<string | null>(null);
 
+  const deleteMutation = useDeleteTransaction({
+    onSuccess: () => {},
+    onError: (e) => toast.error(e.message),
+  });
+
   const performDelete = (id: string) => {
-    const keys = [["transactions"], ["account-balances"]];
-    const snapshots = keys.map((k) => [k, queryClient.getQueryData(k)] as const);
-    // Optimistically remove from caches
-    keys.forEach((k) => {
-      queryClient.setQueriesData({ queryKey: k }, (old: any) => {
-        if (!Array.isArray(old)) return old;
-        return old.filter((t: any) => t.id !== id);
-      });
-    });
     scheduleUndoableDelete({
       message: "Transaction deleted",
       onConfirm: async () => {
-        const { error } = await supabase.from("transactions").delete().eq("id", id);
-        if (error) throw error;
-        keys.forEach((k) => queryClient.invalidateQueries({ queryKey: k }));
+        deleteMutation.mutate(id);
       },
       onUndo: () => {
-        snapshots.forEach(([k, snap]) => queryClient.setQueryData(k as any, snap));
       },
     });
   };
@@ -487,7 +411,7 @@ export default function TransactionsPage() {
             <DialogTitle>Edit Transaction</DialogTitle>
           </DialogHeader>
           {renderTransactionForm(
-            (e) => { e.preventDefault(); if (editingTransaction) updateMutation.mutate({ id: editingTransaction.id, data: form }); },
+            (e) => { e.preventDefault(); if (editingTransaction) handleUpdate(form); },
             "Save Changes",
             updateMutation.isPending
           )}
