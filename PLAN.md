@@ -3,13 +3,14 @@
 We are currently executing a phased migration to support multi-user households with their own logins and accounts, maintaining shared visibility. 
 
 ## Current Status
-- **Phase 1: Map and pin behavior** is currently **IN PROGRESS**.
+- **Phase 1: Map and pin behavior** is **COMPLETE**.
+- **Phase 2: Design** is **WAITING FOR APPROVAL** (ADR generated).
 
 ---
 
 ## Phases
 
-### 1. Map and pin behavior (IN PROGRESS)
+### 1. Map and pin behavior (COMPLETE)
 - [x] Explore the repo (tech stack, commands, data flow).
 - [x] Document CURRENT Supabase setup (`docs/CURRENT_SCHEMA.md`).
 - [x] Write `docs/ARCHITECTURE.md`.
@@ -17,8 +18,8 @@ We are currently executing a phased migration to support multi-user households w
 - [x] Add characterization tests pinning CURRENT behavior of money-related logic.
 - [x] Create `ANTIGRAVITY.md` and `PLAN.md`.
 
-### 2. Design
-- Output an ADR in `docs/adr/` and wait for approval. Must cover:
+### 2. Design (WAITING FOR APPROVAL)
+- [x] Output an ADR in `docs/adr/0001-multi-user-households.md` and wait for approval. Must cover:
   - **Data model**: `households`, `household_members` (role), `accounts` (with `household_id` and nullable `owner_user_id` where null = joint), `transactions` (with `created_by`), household-level budgets/categories, `device_tokens` for push.
   - **Permission model**: Both members can view everything; edit/create/delete limited to owned accounts (or both for joint); enforced in RLS. *Pending questions: transfers between members' accounts, editing the other member's records, who can change account ownership, invitation flow.*
   - **UI behavior**: Logged-in user's accounts shown first; add-record account picker lists writable accounts only.
