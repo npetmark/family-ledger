@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useMainCategories, useSubcategories, useSaveMainCategory, useDeleteMainCategory, useSaveSubcategory, useDeleteSubcategory } from "@/hooks/queries/useCategories";
 import { useAuth } from "@/hooks/useAuth";
 import { DynamicIcon, availableIcons } from "@/components/DynamicIcon";
 import { ColorPicker } from "@/components/ColorPicker";
@@ -35,40 +34,11 @@ export default function CategoriesPage() {
   const [editingSub, setEditingSub] = useState<any>(null);
   const [subForm, setSubForm] = useState({ name: "", icon: "circle", main_category_id: "", is_active: true, color: "168 35% 38%" });
 
-  const { data: mainCategories = [] } = useQuery({
-    queryKey: ["main_categories", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("main_categories").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: mainCategories = [] } = useMainCategories(user?.id);
+  const { data: subcategories = [] } = useSubcategories(user?.id);
 
-  const { data: subcategories = [] } = useQuery({
-    queryKey: ["subcategories-all", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("subcategories").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
-
-  // Main category mutations
-  const saveMainMutation = useMutation({
-    mutationFn: async (data: typeof mainForm) => {
-      if (editingMain) {
-        const { error } = await supabase.from("main_categories").update({ name: data.name, color: data.color }).eq("id", editingMain.id);
-        if (error) throw error;
-      } else {
-        const maxSort = mainCategories.length;
-        const { error } = await supabase.from("main_categories").insert({ user_id: user!.id, name: data.name, color: data.color, sort_order: maxSort });
-        if (error) throw error;
-      }
-    },
+  const saveMainMutation = useSaveMainCategory({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["main_categories"] });
       setMainOpen(false);
       setEditingMain(null);
       setMainForm({ name: "", color: "215 55% 52%" });
@@ -77,37 +47,13 @@ export default function CategoriesPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  const deleteMainMutation = useMutation({
-    mutationFn: async (id: string) => {
-      // Delete subcategories first
-      const { error: subErr } = await supabase.from("subcategories").delete().eq("main_category_id", id);
-      if (subErr) throw subErr;
-      const { error } = await supabase.from("main_categories").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["main_categories"] });
-      queryClient.invalidateQueries({ queryKey: ["subcategories-all"] });
-      toast.success("Category deleted");
-    },
+  const deleteMainMutation = useDeleteMainCategory({
+    onSuccess: () => toast.success("Category deleted"),
     onError: (e) => toast.error(e.message),
   });
 
-  // Subcategory mutations
-  const saveSubMutation = useMutation({
-    mutationFn: async (data: typeof subForm) => {
-      if (editingSub) {
-        const { error } = await supabase.from("subcategories").update({ name: data.name, icon: data.icon, main_category_id: data.main_category_id, is_active: data.is_active, color: data.color }).eq("id", editingSub.id);
-        if (error) throw error;
-      } else {
-        const subs = subcategories.filter((s) => s.main_category_id === data.main_category_id);
-        const { error } = await supabase.from("subcategories").insert({ user_id: user!.id, name: data.name, icon: data.icon, main_category_id: data.main_category_id, is_active: data.is_active, color: data.color, sort_order: subs.length });
-        if (error) throw error;
-      }
-    },
+  const saveSubMutation = useSaveSubcategory({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["subcategories-all"] });
-      queryClient.invalidateQueries({ queryKey: ["subcategories"] });
       setSubOpen(false);
       setEditingSub(null);
       setSubForm({ name: "", icon: "circle", main_category_id: "", is_active: true, color: "168 35% 38%" });
@@ -116,18 +62,36 @@ export default function CategoriesPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  const deleteSubMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("subcategories").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["subcategories-all"] });
-      queryClient.invalidateQueries({ queryKey: ["subcategories"] });
-      toast.success("Subcategory deleted");
-    },
+  const deleteSubMutation = useDeleteSubcategory({
+    onSuccess: () => toast.success("Subcategory deleted"),
     onError: (e) => toast.error(e.message),
   });
+
+  const handleSaveMain = (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload = {
+      user_id: user!.id,
+      name: mainForm.name,
+      color: mainForm.color,
+      ...(editingMain ? {} : { sort_order: mainCategories.length })
+    };
+    saveMainMutation.mutate({ id: editingMain?.id, payload });
+  };
+
+  const handleSaveSub = (e: React.FormEvent) => {
+    e.preventDefault();
+    const subs = subcategories.filter((s) => s.main_category_id === subForm.main_category_id);
+    const payload = {
+      user_id: user!.id,
+      name: subForm.name,
+      icon: subForm.icon,
+      main_category_id: subForm.main_category_id,
+      is_active: subForm.is_active,
+      color: subForm.color,
+      ...(editingSub ? {} : { sort_order: subs.length })
+    };
+    saveSubMutation.mutate({ id: editingSub?.id, payload });
+  };
 
   const openEditMain = (cat: any) => {
     setEditingMain(cat);
@@ -228,7 +192,7 @@ export default function CategoriesPage() {
           <DialogHeader>
             <DialogTitle>{editingMain ? "Edit Category" : "New Category"}</DialogTitle>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); saveMainMutation.mutate(mainForm); }}>
+          <form className="space-y-4" onSubmit={handleSaveMain}>
             <div className="space-y-2">
               <Label>Name</Label>
               <Input value={mainForm.name} onChange={(e) => setMainForm({ ...mainForm, name: e.target.value })} required />
@@ -250,7 +214,7 @@ export default function CategoriesPage() {
           <DialogHeader>
             <DialogTitle>{editingSub ? "Edit Subcategory" : "New Subcategory"}</DialogTitle>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); saveSubMutation.mutate(subForm); }}>
+          <form className="space-y-4" onSubmit={handleSaveSub}>
             <div className="space-y-2">
               <Label>Name</Label>
               <Input value={subForm.name} onChange={(e) => setSubForm({ ...subForm, name: e.target.value })} required />

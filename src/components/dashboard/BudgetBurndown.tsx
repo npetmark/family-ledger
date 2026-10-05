@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useAccounts } from "@/hooks/queries/useAccounts";
+import { useBudgetsWithCategories } from "@/hooks/queries/useBudgets";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, getMonthYear } from "@/lib/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,28 +36,9 @@ export function BudgetBurndown() {
   const { user } = useAuth();
   const monthYear = getMonthYear();
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: accounts = [] } = useAccounts(user?.id);
 
-  const { data: budgets = [] } = useQuery({
-    queryKey: ["budgets", user?.id, monthYear],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("budgets")
-        .select("*, subcategories(name, icon, main_categories(name, id, sort_order))")
-        .eq("month_year", monthYear);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: budgets = [] } = useBudgetsWithCategories(user?.id, monthYear);
 
   const { data: transactions = [] } = useQuery({
     queryKey: ["transactions-for-budget", user?.id, monthYear],

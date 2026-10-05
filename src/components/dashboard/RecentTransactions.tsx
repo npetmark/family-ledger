@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { scheduleUndoableDelete } from "@/lib/shopping";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,19 +54,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
     transfer_to_account_id: "",
   });
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ["subcategories-with-main", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("subcategories")
-        .select("*, main_categories(name, id, color, sort_order)")
-        .eq("is_active", true)
-        .order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user && editOpen,
-  });
+  const { data: categories = [] } = useActiveSubcategories(user?.id);
 
   const grouped = categories.reduce((acc: Record<string, { name: string; color: string; sortOrder: number; items: any[] }>, sub) => {
     const main = (sub as any).main_categories;

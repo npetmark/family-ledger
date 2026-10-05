@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useAccounts, useAccountBalances, useSaveAccount, useDeleteAccount } from "@/hooks/queries/useAccounts";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents, availableCurrencies } from "@/lib/financial";
 import { DynamicIcon, availableIcons } from "@/components/DynamicIcon";
@@ -18,30 +17,12 @@ const accountTypes = ["cash", "bank", "investment", "custom"];
 
 export default function AccountsPage() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ name: "", icon: "wallet", account_type: "bank", starting_balance: "", is_visible: true, currency: "EUR" });
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
-
-  const { data: balanceRows = [] } = useQuery({
-    queryKey: ["account-balances", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_account_balances");
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !!user,
-  });
+  const { data: accounts = [] } = useAccounts(user?.id);
+  const { data: balanceRows = [] } = useAccountBalances(user?.id);
 
   const balanceMap = new Map<string, number>(
     balanceRows.map((r: any) => [r.account_id, Number(r.balance)])
@@ -49,29 +30,10 @@ export default function AccountsPage() {
 
   const computeBalance = (acc: any) => balanceMap.get(acc.id) ?? acc.starting_balance;
 
+  const resetForm = () => setForm({ name: "", icon: "wallet", account_type: "bank", starting_balance: "", is_visible: true, currency: "EUR" });
 
-  const saveMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const payload = {
-        name: data.name,
-        icon: data.icon,
-        account_type: data.account_type,
-        is_visible: data.is_visible,
-        currency: data.currency,
-        user_id: user!.id,
-        starting_balance: parseCurrencyToCents(data.starting_balance),
-      };
-      if (editing) {
-        const { error } = await supabase.from("accounts").update(payload).eq("id", editing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("accounts").insert(payload);
-        if (error) throw error;
-      }
-    },
+  const saveMutation = useSaveAccount({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["account-balances"] });
       setOpen(false);
       setEditing(null);
       resetForm();
@@ -80,19 +42,25 @@ export default function AccountsPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("accounts").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      toast.success("Account deleted");
-    },
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload = {
+      name: form.name,
+      icon: form.icon,
+      account_type: form.account_type,
+      is_visible: form.is_visible,
+      currency: form.currency,
+      user_id: user!.id,
+      starting_balance: parseCurrencyToCents(form.starting_balance),
+    };
+    saveMutation.mutate({ id: editing?.id, payload });
+  };
+
+  const deleteMutation = useDeleteAccount({
+    onSuccess: () => toast.success("Account deleted"),
     onError: (e) => toast.error(e.message),
   });
 
-  const resetForm = () => setForm({ name: "", icon: "wallet", account_type: "bank", starting_balance: "", is_visible: true, currency: "EUR" });
 
   const openEdit = (acc: any) => {
     setEditing(acc);
@@ -126,7 +94,7 @@ export default function AccountsPage() {
             <DialogHeader>
               <DialogTitle>{editing ? "Edit Account" : "New Account"}</DialogTitle>
             </DialogHeader>
-            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(form); }}>
+            <form className="space-y-4" onSubmit={handleSave}>
               <div className="space-y-2">
                 <Label>Name</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />

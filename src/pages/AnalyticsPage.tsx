@@ -2,6 +2,8 @@ import { useState, useMemo, useRef, useCallback } from "react";
 import { AccountFilter, AccountFilterValue, getFilteredAccountIds } from "@/components/AccountFilter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAccounts, useAccountBalances } from "@/hooks/queries/useAccounts";
+import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/financial";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -162,35 +164,20 @@ export default function AnalyticsPage() {
     enabled: !!user,
   });
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: accounts = [] } = useAccounts(user?.id);
 
-  const { data: accountBalances = [] } = useQuery({
-    queryKey: ["account-balances", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_account_balances");
-      if (error) throw error;
-      return (data ?? []).map((r: any) => ({
-        id: r.account_id,
-        name: r.name,
-        currency: r.currency,
-        account_type: r.account_type,
-        icon: r.icon,
-        is_visible: r.is_visible,
-        sort_order: r.sort_order,
-        starting_balance: r.starting_balance,
-        computed_balance: r.balance,
-      }));
-    },
-    enabled: !!user,
-  });
+  const { data: rawAccountBalances = [] } = useAccountBalances(user?.id);
+  const accountBalances = rawAccountBalances.map((r: any) => ({
+    id: r.account_id,
+    name: r.name,
+    currency: r.currency,
+    account_type: r.account_type,
+    icon: r.icon,
+    is_visible: r.is_visible,
+    sort_order: r.sort_order,
+    starting_balance: r.starting_balance,
+    computed_balance: r.balance,
+  }));
 
   const { data: futureTransactions = [] } = useQuery({
     queryKey: ["analytics-future-tx", user?.id, toStr],
@@ -215,15 +202,7 @@ export default function AnalyticsPage() {
     enabled: !!user,
   });
 
-  const { data: subcategories = [] } = useQuery({
-    queryKey: ["subcategories-analytics", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("subcategories").select("*, main_categories(name, color)").eq("is_active", true).order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: subcategories = [] } = useActiveSubcategories(user?.id);
 
   // Filter transactions by account
   const filteredAccountIds = getFilteredAccountIds(accounts, accountFilter);

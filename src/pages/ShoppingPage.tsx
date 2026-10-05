@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useShoppingCategories, useActiveShoppingTrip, useShoppingItems, useShoppingSuggestions, useTopSuggested, usePastShoppingTrips } from "@/hooks/queries/useShopping";
+import { shoppingRepository } from "@/repositories/shoppingRepository";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -117,97 +118,29 @@ export default function ShoppingPage() {
   // Fetch a fresh signed URL for the active trip's receipt whenever it changes.
 
   // -------- queries
-  const { data: categories = [] } = useQuery({
-    queryKey: ["shopping-categories", user?.id],
-    queryFn: async (): Promise<Category[]> => {
-      const { data, error } = await supabase
-        .from("shopping_categories")
-        .select("*")
-        .order("sort_order");
-      if (error) throw error;
-      return data as any;
-    },
-    enabled: !!user,
-  });
+  const { data: categories = [] } = useShoppingCategories();
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("id, name").order("sort_order");
-      if (error) throw error;
-      return data as { id: string; name: string }[];
-    },
-    enabled: !!user,
-  });
+  const { data: accounts = [] } = useAccounts(user?.id);
 
-  const { data: groceriesSubcategoryId } = useQuery({
-    queryKey: ["groceries-subcategory", user?.id],
-    queryFn: async (): Promise<string | null> => {
-      const { data, error } = await supabase
-        .from("subcategories")
-        .select("id, name")
-        .in("name", ["Пазар", "Groceries"]);
-      if (error) throw error;
-      const pick = data?.find((s) => s.name === "Пазар") ?? data?.[0];
-      return pick?.id ?? null;
-    },
-    enabled: !!user,
-  });
+  const { data: groceriesSubcategoryId } = useGroceriesSubcategoryId(user?.id);
 
-  const { data: activeTrip } = useQuery({
-    queryKey: ["shopping-active-trip", user?.id],
-    queryFn: async (): Promise<Trip | null> => {
-      const { data, error } = await supabase
-        .from("shopping_trips")
-        .select("*")
-        .eq("status", "active")
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      if (data) return data as any;
-      // Auto-create
-      const name = `Shopping — ${format(new Date(), "EEE d MMM")}`;
-      const { data: created, error: cErr } = await supabase
-        .from("shopping_trips")
-        .insert({ user_id: user!.id, name })
-        .select()
-        .single();
-      if (cErr) throw cErr;
-      return created as any;
-    },
-    enabled: !!user,
-  });
+  const { data: activeTrip } = useActiveShoppingTrip(user?.id);
 
   // Fetch a fresh signed URL whenever the active trip's receipt changes.
   useEffect(() => {
     setActiveReceiptUrl(null);
     if (!activeTrip?.receipt_path) return;
     let cancelled = false;
-    supabase.storage
-      .from("shopping-receipts")
-      .createSignedUrl(activeTrip.receipt_path, 600)
-      .then(({ data }) => {
-        if (!cancelled && data?.signedUrl) setActiveReceiptUrl(data.signedUrl);
+    shoppingRepository.createSignedUrl(activeTrip.receipt_path, 600)
+      .then((url) => {
+        if (!cancelled && url) setActiveReceiptUrl(url);
       });
     return () => { cancelled = true; };
   }, [activeTrip?.receipt_path]);
 
 
 
-  const { data: items = [] } = useQuery({
-    queryKey: ["shopping-items", activeTrip?.id],
-    queryFn: async (): Promise<Item[]> => {
-      const { data, error } = await supabase
-        .from("shopping_items")
-        .select("*")
-        .eq("trip_id", activeTrip!.id)
-        .order("created_at");
-      if (error) throw error;
-      return data as any;
-    },
-    enabled: !!activeTrip?.id,
-  });
+  const { data: items = [] } = useShoppingItems(activeTrip?.id);
 
   // Auto-refresh promo data for items that were matched before pack-size parsing existed.
   // Targets items with a matched promo store but no pack_size — refreshed once per item per session.
@@ -229,53 +162,11 @@ export default function ShoppingPage() {
   }, [items, activeTrip?.id, queryClient]);
 
 
-  const { data: suggestions = [] } = useQuery({
-    queryKey: ["shopping-suggestions", user?.id, debounced],
-    queryFn: async (): Promise<DictEntry[]> => {
-      if (debounced.length < 1) return [];
-      const norm = normalizeName(debounced);
-      const { data, error } = await supabase
-        .from("shopping_item_dictionary")
-        .select("*")
-        .ilike("normalized_name", `${norm}%`)
-        .order("usage_count", { ascending: false })
-        .limit(8);
-      if (error) throw error;
-      return data as any;
-    },
-    enabled: !!user && debounced.length > 0,
-  });
+  const { data: suggestions = [] } = useShoppingSuggestions(debounced, !!user);
 
-  const { data: topSuggested = [] } = useQuery({
-    queryKey: ["shopping-top-suggested", user?.id],
-    queryFn: async (): Promise<DictEntry[]> => {
-      const { data, error } = await supabase
-        .from("shopping_item_dictionary")
-        .select("*")
-        .gt("usage_count", 0)
-        .order("usage_count", { ascending: false })
-        .order("last_used_at", { ascending: false })
-        .limit(12);
-      if (error) throw error;
-      return data as any;
-    },
-    enabled: !!user,
-  });
+  const { data: topSuggested = [] } = useTopSuggested(!!user);
 
-  const { data: pastTrips = [] } = useQuery({
-    queryKey: ["shopping-past-trips", user?.id],
-    queryFn: async (): Promise<Trip[]> => {
-      const { data, error } = await supabase
-        .from("shopping_trips")
-        .select("*")
-        .neq("status", "active")
-        .order("started_at", { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      return data as any;
-    },
-    enabled: !!user && pastOpen,
-  });
+  const { data: pastTrips = [] } = usePastShoppingTrips(pastOpen ? user?.id : undefined);
 
   // -------- mutations
   const addItem = useMutation({
@@ -299,18 +190,8 @@ export default function ShoppingPage() {
       let dictId: string | null = payload.dictEntry?.id ?? null;
       if (!categoryId) {
         // Prefer the user's own learned mapping; fall back to any shared entry.
-        const { data: own } = await supabase
-          .from("shopping_item_dictionary")
-          .select("id, category_id")
-          .eq("user_id", user.id)
-          .eq("normalized_name", norm)
-          .maybeSingle();
-        const existing = own ?? (await supabase
-          .from("shopping_item_dictionary")
-          .select("id, category_id")
-          .eq("normalized_name", norm)
-          .limit(1)
-          .maybeSingle()).data;
+        const own = await shoppingRepository.findDictionaryEntry(norm);
+        const existing = own ?? (await shoppingRepository.findDictionaryEntry(norm));
         if (existing) {
           categoryId = existing.category_id;
           dictId = existing.id;
@@ -324,19 +205,11 @@ export default function ShoppingPage() {
       // Look up last known price for this item (across all this user's trips)
       let defaultPriceCents: number | null = null;
       {
-        const { data: lastPriced } = await supabase
-          .from("shopping_items")
-          .select("price_cents")
-          .eq("user_id", user.id)
-          .eq("normalized_name", norm)
-          .not("price_cents", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        const lastPriced = await shoppingRepository.findLastPricedItem(norm);
         if (lastPriced?.price_cents != null) defaultPriceCents = lastPriced.price_cents;
       }
 
-      const { data: inserted, error } = await supabase.from("shopping_items").insert({
+      const inserted = await shoppingRepository.createItem({
         user_id: user.id,
         trip_id: activeTrip.id,
         category_id: categoryId,
@@ -346,8 +219,7 @@ export default function ShoppingPage() {
         unit: parsed.unit,
         price_cents: defaultPriceCents,
         sort_order: items.length,
-      }).select("id").single();
-      if (error) throw error;
+      });
 
       // Fire-and-forget promo lookup
       if (inserted?.id) {
@@ -358,25 +230,18 @@ export default function ShoppingPage() {
 
       // Upsert dictionary entry + bump usage
       if (dictId) {
-        await supabase
-          .from("shopping_item_dictionary")
-          .update({ usage_count: (payload.dictEntry?.usage_count ?? 0) + 1, last_used_at: new Date().toISOString(), category_id: categoryId })
-          .eq("id", dictId);
+        await shoppingRepository.updateDictionaryEntry(dictId, { usage_count: (payload.dictEntry?.usage_count ?? 0) + 1, last_used_at: new Date().toISOString(), category_id: categoryId });
       } else {
-        await supabase
-          .from("shopping_item_dictionary")
-          .insert({
-            user_id: user.id,
-            normalized_name: norm,
-            display_name: display,
-            language: lang,
-            category_id: categoryId,
-            usage_count: 1,
-            last_used_at: new Date().toISOString(),
-            translation_key: norm,
-          })
-          .select()
-          .maybeSingle();
+        await shoppingRepository.insertDictionaryEntry({
+          user_id: user.id,
+          normalized_name: norm,
+          display_name: display,
+          language: lang,
+          category_id: categoryId,
+          usage_count: 1,
+          last_used_at: new Date().toISOString(),
+          translation_key: norm,
+        });
       }
 
       // Auto-translation intentionally disabled: keep whatever language the user typed.
@@ -392,11 +257,7 @@ export default function ShoppingPage() {
 
   const toggleChecked = useMutation({
     mutationFn: async (it: Item) => {
-      const { error } = await supabase
-        .from("shopping_items")
-        .update({ checked: !it.checked })
-        .eq("id", it.id);
-      if (error) throw error;
+      await shoppingRepository.updateItem(it.id, { checked: !it.checked });
     },
     onMutate: async (it) => {
       await queryClient.cancelQueries({ queryKey: ["shopping-items", activeTrip?.id] });
@@ -423,8 +284,7 @@ export default function ShoppingPage() {
       },
     ) => {
       const { id, _prevCategoryId, _translation, ...fields } = patch;
-      const { error } = await supabase.from("shopping_items").update(fields).eq("id", id);
-      if (error) throw error;
+      await shoppingRepository.updateItem(id, fields);
 
       if (!user) return;
 
@@ -440,12 +300,7 @@ export default function ShoppingPage() {
       if (!norm || (!categoryChanged && !translationNorm)) return;
 
       // Look up the current entry for this normalized name (if any)
-      const { data: self } = await supabase
-        .from("shopping_item_dictionary")
-        .select("id, translation_key, language, category_id")
-        .eq("user_id", user.id)
-        .eq("normalized_name", norm)
-        .maybeSingle();
+      const self = await shoppingRepository.findDictionaryEntry(norm);
 
       // Decide the translation_key:
       // - reuse the self entry's key if it exists
@@ -454,12 +309,7 @@ export default function ShoppingPage() {
       let translationKey: string | null = self?.translation_key ?? null;
 
       if (!translationKey && translationNorm) {
-        const { data: counterpart } = await supabase
-          .from("shopping_item_dictionary")
-          .select("id, translation_key")
-          .eq("user_id", user.id)
-          .eq("normalized_name", translationNorm)
-          .maybeSingle();
+        const counterpart = await shoppingRepository.findDictionaryEntry(translationNorm);
         translationKey = counterpart?.translation_key ?? null;
       }
 
@@ -475,7 +325,7 @@ export default function ShoppingPage() {
 
       // Upsert the self entry
       if (!self) {
-        await supabase.from("shopping_item_dictionary").insert({
+        await shoppingRepository.insertDictionaryEntry({
           user_id: user.id,
           normalized_name: norm,
           display_name: display,
@@ -486,19 +336,14 @@ export default function ShoppingPage() {
       } else {
         const update: Record<string, any> = { translation_key: translationKey };
         if (categoryChanged) update.category_id = effectiveCategoryId;
-        await supabase.from("shopping_item_dictionary").update(update).eq("id", self.id);
+        await shoppingRepository.updateDictionaryEntry(self.id, update);
       }
 
       // Upsert the translation counterpart if the user provided one
       if (translationNorm && translationDisplay) {
-        const { data: counterpart } = await supabase
-          .from("shopping_item_dictionary")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("normalized_name", translationNorm)
-          .maybeSingle();
+        const counterpart = await shoppingRepository.findDictionaryEntry(translationNorm);
         if (!counterpart) {
-          await supabase.from("shopping_item_dictionary").insert({
+          await shoppingRepository.insertDictionaryEntry({
             user_id: user.id,
             normalized_name: translationNorm,
             display_name: translationDisplay,
@@ -507,23 +352,16 @@ export default function ShoppingPage() {
             translation_key: translationKey,
           });
         } else {
-          await supabase
-            .from("shopping_item_dictionary")
-            .update({
-              translation_key: translationKey,
-              ...(effectiveCategoryId ? { category_id: effectiveCategoryId } : {}),
-            })
-            .eq("id", counterpart.id);
+          await shoppingRepository.updateDictionaryEntry(counterpart.id, {
+            translation_key: translationKey,
+            ...(effectiveCategoryId ? { category_id: effectiveCategoryId } : {}),
+          });
         }
       }
 
       // Propagate the category to every entry sharing this translation_key
       if (categoryChanged && translationKey && effectiveCategoryId) {
-        await supabase
-          .from("shopping_item_dictionary")
-          .update({ category_id: effectiveCategoryId })
-          .eq("user_id", user.id)
-          .eq("translation_key", translationKey);
+        await shoppingRepository.updateDictionaryCategoryByTranslationKey(translationKey, effectiveCategoryId, user.id);
       }
     },
     onSuccess: () => {
@@ -547,7 +385,7 @@ export default function ShoppingPage() {
         const note = opts.store.trim()
           ? `${opts.store.trim()} · ${activeTrip.name}`
           : activeTrip.name;
-        const { error: txErr } = await supabase.from("transactions").insert({
+        await shoppingRepository.createTransaction({
           user_id: user.id,
           account_id: opts.accountId,
           subcategory_id: groceriesSubcategoryId ?? null,
@@ -556,36 +394,22 @@ export default function ShoppingPage() {
           date: opts.date,
           note,
         });
-        if (txErr) throw txErr;
       }
 
       // 2. Complete the trip
-      const { error } = await supabase
-        .from("shopping_trips")
-        .update({
+      await shoppingRepository.updateTrip(activeTrip.id, {
           status: "completed",
           started_at: new Date(opts.date).toISOString(),
           completed_at: new Date(opts.date).toISOString(),
           total_cents: totalForTrip || null,
-        })
-        .eq("id", activeTrip.id);
-      if (error) throw error;
+        });
 
       // 3. Carry over any unchecked items to a fresh active trip
       const uncheckedIds = items.filter((i) => !i.checked).map((i) => i.id);
       if (uncheckedIds.length > 0) {
         const nextName = `Shopping — ${format(new Date(), "EEE d MMM")}`;
-        const { data: newTrip, error: newTripErr } = await supabase
-          .from("shopping_trips")
-          .insert({ user_id: user.id, name: nextName })
-          .select("id")
-          .single();
-        if (newTripErr) throw newTripErr;
-        const { error: moveErr } = await supabase
-          .from("shopping_items")
-          .update({ trip_id: newTrip.id })
-          .in("id", uncheckedIds);
-        if (moveErr) throw moveErr;
+        const newTrip = await shoppingRepository.createTrip(user.id, nextName);
+        await shoppingRepository.moveItemsToTrip(newTrip.id, uncheckedIds);
       }
     },
     onSuccess: () => {
@@ -603,8 +427,7 @@ export default function ShoppingPage() {
   const renameTrip = useMutation({
     mutationFn: async (name: string) => {
       if (!activeTrip) return;
-      const { error } = await supabase.from("shopping_trips").update({ name }).eq("id", activeTrip.id);
-      if (error) throw error;
+      await shoppingRepository.updateTrip(activeTrip.id, { name });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] }),
   });
@@ -612,11 +435,7 @@ export default function ShoppingPage() {
   const clearSuggestions = useMutation({
     mutationFn: async () => {
       if (!user) return;
-      const { error } = await supabase
-        .from("shopping_item_dictionary")
-        .update({ usage_count: 0, last_used_at: null })
-        .eq("user_id", user.id);
-      if (error) throw error;
+      await shoppingRepository.clearDictionaryUsage(user.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shopping-top-suggested", user?.id] });
@@ -640,8 +459,7 @@ export default function ShoppingPage() {
     scheduleUndoableDelete({
       message: "Item deleted",
       onConfirm: async () => {
-        const { error } = await supabase.from("shopping_items").delete().eq("id", id);
-        if (error) throw error;
+        await shoppingRepository.deleteItem(id);
       },
       onUndo: () => {
         if (prev) queryClient.setQueryData(key, prev);
@@ -655,9 +473,8 @@ export default function ShoppingPage() {
     if (!activeTrip || !user) return;
     const ext = file.name.split(".").pop() || "bin";
     const path = `${user.id}/${activeTrip.id}/receipt-${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("shopping-receipts").upload(path, file, { upsert: true });
-    if (error) { toast.error(error.message); return; }
-    await supabase.from("shopping_trips").update({ receipt_path: path }).eq("id", activeTrip.id);
+    await shoppingRepository.uploadReceipt(path, file);
+    await shoppingRepository.updateTrip(activeTrip.id, { receipt_path: path });
     queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] });
     toast.success("Receipt attached");
   };
@@ -678,10 +495,7 @@ export default function ShoppingPage() {
       // Also store the receipt on the trip
       uploadReceipt(file).catch(() => {});
 
-      const { data, error } = await supabase.functions.invoke("parse-receipt", {
-        body: { image: dataUrl, trip_id: activeTrip.id },
-      });
-      if (error) throw error;
+      const data = await shoppingRepository.parseReceipt(activeTrip.receipt_path!, undefined);
       const result = data as ReceiptResult;
       setReceiptResult(result);
       // Pre-select all unmatched items for adding as excess
@@ -706,10 +520,7 @@ export default function ShoppingPage() {
     try {
       // Update matched items with actual prices, mark as checked
       for (const m of snapshot.matched) {
-        await supabase
-          .from("shopping_items")
-          .update({ actual_price_cents: m.actual_price_cents, checked: true })
-          .eq("id", m.item_id);
+        await shoppingRepository.updateItem(m.item_id, { actual_price_cents: m.actual_price_cents, checked: true });
       }
       // Insert selected unmatched as excess — dedupe within this batch by
       // (normalized_name, actual_price_cents) so the same line can't land
@@ -742,11 +553,7 @@ export default function ShoppingPage() {
         });
       if (toInsert.length > 0) {
         // Skip any (name, price) combo that already exists on this trip as excess.
-        const { data: existingExcess } = await supabase
-          .from("shopping_items")
-          .select("name, actual_price_cents")
-          .eq("trip_id", activeTrip.id)
-          .eq("is_excess", true);
+        const existingExcess = await shoppingRepository.getExistingExcessMatches(activeTrip.id, []);
         const existingKeys = new Set(
           (existingExcess ?? []).map((r: any) => `${normalizeName(r.name)}::${r.actual_price_cents}`),
         );
@@ -754,8 +561,7 @@ export default function ShoppingPage() {
           (r) => !existingKeys.has(`${r.normalized_name}::${r.actual_price_cents}`),
         );
         if (filtered.length > 0) {
-          const { error } = await supabase.from("shopping_items").insert(filtered);
-          if (error) throw error;
+          await shoppingRepository.insertItemsBulk(filtered);
         }
       }
       await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
@@ -775,12 +581,8 @@ export default function ShoppingPage() {
     if (!snap || !activeTrip) return;
     const { excess, prevTarget } = snap;
     try {
-      const { error: revertErr } = await supabase
-        .from("shopping_items")
-        .update(prevTarget)
-        .eq("id", targetId);
-      if (revertErr) throw revertErr;
-      const { error: insErr } = await supabase.from("shopping_items").insert({
+      await shoppingRepository.updateItem(targetId, prevTarget);
+      await shoppingRepository.createItem({
         id: excess.id,
         trip_id: excess.trip_id,
         user_id: user!.id,
@@ -795,7 +597,6 @@ export default function ShoppingPage() {
         actual_price_cents: excess.actual_price_cents,
         is_excess: true,
       });
-      if (insErr) throw insErr;
       setRecentLinks((m) => { const n = { ...m }; delete n[targetId]; return n; });
       await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
       toast.success("Link undone");
@@ -810,13 +611,8 @@ export default function ShoppingPage() {
     if (!target) return;
     const prevTarget = { actual_price_cents: target.actual_price_cents, checked: target.checked };
     try {
-      const { error: upErr } = await supabase
-        .from("shopping_items")
-        .update({ actual_price_cents: excess.actual_price_cents, checked: true })
-        .eq("id", targetId);
-      if (upErr) throw upErr;
-      const { error: delErr } = await supabase.from("shopping_items").delete().eq("id", excess.id);
-      if (delErr) throw delErr;
+      await shoppingRepository.updateItem(targetId, { actual_price_cents: excess.actual_price_cents, checked: true });
+      await shoppingRepository.deleteItem(excess.id);
       setRecentLinks((m) => ({ ...m, [targetId]: { excess, prevTarget } }));
       await queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] });
       setMatchExcessFor(null);
@@ -1810,24 +1606,12 @@ function ItemEditDialog({
 
 function PastTripRow({ trip }: { trip: Trip }) {
   const [open, setOpen] = useState(false);
-  const { data: items = [] } = useQuery({
-    queryKey: ["shopping-items", trip.id],
-    queryFn: async (): Promise<Item[]> => {
-      const { data, error } = await supabase
-        .from("shopping_items")
-        .select("*")
-        .eq("trip_id", trip.id)
-        .order("created_at");
-      if (error) throw error;
-      return data as any;
-    },
-    enabled: open,
-  });
+  const { data: items = [] } = useShoppingItems(open ? trip.id : undefined);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   useEffect(() => {
     if (open && trip.receipt_path && !receiptUrl) {
-      supabase.storage.from("shopping-receipts").createSignedUrl(trip.receipt_path, 300).then(({ data }) => {
-        if (data?.signedUrl) setReceiptUrl(data.signedUrl);
+      shoppingRepository.createSignedUrl(trip.receipt_path, 300).then((url) => {
+        if (url) setReceiptUrl(url);
       });
     }
   }, [open, trip.receipt_path, receiptUrl]);
