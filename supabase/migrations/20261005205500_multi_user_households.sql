@@ -31,7 +31,7 @@ ALTER TABLE public.main_categories ADD COLUMN household_id uuid REFERENCES publi
 ALTER TABLE public.subcategories ADD COLUMN household_id uuid REFERENCES public.households(id);
 ALTER TABLE public.budgets ADD COLUMN household_id uuid REFERENCES public.households(id);
 ALTER TABLE public.recurring_transactions ADD COLUMN household_id uuid REFERENCES public.households(id);
-ALTER TABLE public.pending_transactions ADD COLUMN household_id uuid REFERENCES public.households(id);
+-- ALTER TABLE public.pending_transactions ADD COLUMN household_id uuid REFERENCES public.households(id);
 ALTER TABLE public.transaction_templates ADD COLUMN household_id uuid REFERENCES public.households(id);
 
 ALTER TABLE public.shopping_trips ADD COLUMN household_id uuid REFERENCES public.households(id);
@@ -66,7 +66,7 @@ BEGIN
         UPDATE public.subcategories SET household_id = new_household_id WHERE user_id = user_rec.user_id;
         UPDATE public.budgets SET household_id = new_household_id WHERE user_id = user_rec.user_id;
         UPDATE public.recurring_transactions SET household_id = new_household_id WHERE user_id = user_rec.user_id;
-        UPDATE public.pending_transactions SET household_id = new_household_id WHERE user_id = user_rec.user_id;
+        -- UPDATE public.pending_transactions SET household_id = new_household_id WHERE user_id = user_rec.user_id;
         UPDATE public.transaction_templates SET household_id = new_household_id WHERE user_id = user_rec.user_id;
         
         UPDATE public.shopping_trips SET household_id = new_household_id WHERE user_id = user_rec.user_id;
@@ -81,7 +81,7 @@ ALTER TABLE public.main_categories ALTER COLUMN household_id SET NOT NULL;
 ALTER TABLE public.subcategories ALTER COLUMN household_id SET NOT NULL;
 ALTER TABLE public.budgets ALTER COLUMN household_id SET NOT NULL;
 ALTER TABLE public.recurring_transactions ALTER COLUMN household_id SET NOT NULL;
-ALTER TABLE public.pending_transactions ALTER COLUMN household_id SET NOT NULL;
+-- ALTER TABLE public.pending_transactions ALTER COLUMN household_id SET NOT NULL;
 ALTER TABLE public.transaction_templates ALTER COLUMN household_id SET NOT NULL;
 ALTER TABLE public.shopping_trips ALTER COLUMN household_id SET NOT NULL;
 ALTER TABLE public.shopping_categories ALTER COLUMN household_id SET NOT NULL;
@@ -158,13 +158,13 @@ CREATE POLICY "Users manage transactions for accessible accounts" ON public.tran
     )
 );
 
--- Pending Transactions
-DROP POLICY IF EXISTS "Users manage own pending_transactions" ON public.pending_transactions;
-CREATE POLICY "Users manage household pending transactions" ON public.pending_transactions FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.household_members hm WHERE hm.household_id = pending_transactions.household_id AND hm.user_id = auth.uid())
-) WITH CHECK (
-    EXISTS (SELECT 1 FROM public.household_members hm WHERE hm.household_id = household_id AND hm.user_id = auth.uid())
-);
+-- Pending Transactions (Does not exist)
+-- DROP POLICY IF EXISTS "Users manage own pending_transactions" ON public.pending_transactions;
+-- CREATE POLICY "Users manage household pending transactions" ON public.pending_transactions FOR ALL USING (
+--     EXISTS (SELECT 1 FROM public.household_members hm WHERE hm.household_id = pending_transactions.household_id AND hm.user_id = auth.uid())
+-- ) WITH CHECK (
+--     EXISTS (SELECT 1 FROM public.household_members hm WHERE hm.household_id = household_id AND hm.user_id = auth.uid())
+-- );
 
 -- Transaction Templates
 DROP POLICY IF EXISTS "Users manage own templates" ON public.transaction_templates;
