@@ -4,7 +4,8 @@ We are currently executing a phased migration to support multi-user households w
 
 ## Current Status
 - **Phase 1: Map and pin behavior** is **COMPLETE**.
-- **Phase 2: Design** is **WAITING FOR APPROVAL** (ADR generated).
+- **Phase 2: Design** is **COMPLETE**.
+- **Phase 3: Refactor** is **PENDING**.
 
 ---
 
