@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMainCategories, useSubcategories, useSaveMainCategory, useDeleteMainCategory, useSaveSubcategory, useDeleteSubcategory } from "@/hooks/queries/useCategories";
 import { useAuth } from "@/hooks/useAuth";
 import { DynamicIcon, availableIcons } from "@/components/DynamicIcon";

@@ -4,6 +4,7 @@ import { useShoppingCategories, useActiveShoppingTrip, useShoppingItems, useShop
 import { useAccounts } from "@/hooks/queries/useAccounts";
 import { useGroceriesSubcategoryId } from "@/hooks/queries/useCategories";
 import { shoppingRepository } from "@/repositories/shoppingRepository";
+import { transactionRepository } from "@/repositories/transactionRepository";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,9 +43,10 @@ import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 
 type Category = {
   id: string; name: string; emoji: string; color: string; sort_order: number;
+  created_at?: string; is_default?: boolean; updated_at?: string; user_id?: string;
 };
 type Trip = {
-  id: string; name: string; status: "active" | "completed" | "archived";
+  id: string; name: string; status: string;
   started_at: string; completed_at: string | null;
   total_cents: number | null; receipt_path: string | null; notes: string | null;
 };
@@ -61,10 +63,10 @@ type Item = {
   normalized_name: string; quantity: number; unit: string | null;
   checked: boolean; price_cents: number | null; sort_order: number;
   created_at: string;
-  promo_stores: string[] | null;
+  promo_stores: any;
   promo_price_cents: number | null;
   promo_pack_size: number | null;
-  promo_offers: PromoOffer[] | null;
+  promo_offers: any;
   promo_checked_at: string | null;
   actual_price_cents: number | null;
   is_excess: boolean;
@@ -120,7 +122,8 @@ export default function ShoppingPage() {
   // Fetch a fresh signed URL for the active trip's receipt whenever it changes.
 
   // -------- queries
-  const { data: categories = [] } = useShoppingCategories();
+  const { data: categoriesData = [] } = useShoppingCategories();
+  const categories = categoriesData as Category[];
 
   const { data: accounts = [] } = useAccounts(user?.id);
 
@@ -142,7 +145,8 @@ export default function ShoppingPage() {
 
 
 
-  const { data: items = [] } = useShoppingItems(activeTrip?.id);
+  const { data = [] } = useShoppingItems(activeTrip?.id);
+  const items = data as unknown as Item[];
 
   // Auto-refresh promo data for items that were matched before pack-size parsing existed.
   // Targets items with a matched promo store but no pack_size — refreshed once per item per session.
@@ -387,7 +391,7 @@ export default function ShoppingPage() {
         const note = opts.store.trim()
           ? `${opts.store.trim()} · ${activeTrip.name}`
           : activeTrip.name;
-        await shoppingRepository.createTransaction({
+        await transactionRepository.createTransaction({
           user_id: user.id,
           account_id: opts.accountId,
           subcategory_id: groceriesSubcategoryId ?? null,
