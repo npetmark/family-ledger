@@ -21,7 +21,7 @@ const BUDGET_TARGETS: Record<string, string> = {
   "Инвестиции": "30%",
 };
 
-export default function CategoriesPage() {
+export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -113,16 +113,26 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl w-full overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Categories</h1>
-          <p className="text-sm text-muted-foreground mt-1">50/30/20 budgeting model</p>
+    <div className={`space-y-6 w-full overflow-hidden ${isEmbedded ? '' : 'max-w-4xl'}`}>
+      {!isEmbedded && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">Categories</h1>
+            <p className="text-sm text-muted-foreground mt-1">50/30/20 budgeting model</p>
+          </div>
+          <Button onClick={() => { setEditingMain(null); setMainForm({ name: "", color: "215 55% 52%" }); setMainOpen(true); }} className="w-full sm:w-auto">
+            <Plus className="h-4 w-4 mr-2" /> Add Category
+          </Button>
         </div>
-        <Button onClick={() => { setEditingMain(null); setMainForm({ name: "", color: "215 55% 52%" }); setMainOpen(true); }} className="w-full sm:w-auto">
-          <Plus className="h-4 w-4 mr-2" /> Add Category
-        </Button>
-      </div>
+      )}
+
+      {isEmbedded && (
+        <div className="flex justify-end">
+          <Button onClick={() => { setEditingMain(null); setMainForm({ name: "", color: "215 55% 52%" }); setMainOpen(true); }} size="sm">
+            <Plus className="h-4 w-4 mr-2" /> Add Category
+          </Button>
+        </div>
+      )}
 
       <div className="space-y-6">
         {mainCategories.map((cat) => {

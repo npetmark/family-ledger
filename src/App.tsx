@@ -10,11 +10,11 @@ import AuthPage from "@/pages/AuthPage";
 import DashboardPage from "@/pages/DashboardPage";
 import TransactionsPage from "@/pages/TransactionsPage";
 import AccountsPage from "@/pages/AccountsPage";
-import CategoriesPage from "@/pages/CategoriesPage";
 import BudgetsPage from "@/pages/BudgetsPage";
 import RecurringPage from "@/pages/RecurringPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import ShoppingPage from "@/pages/ShoppingPage";
+import SettingsPage from "@/pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,11 +40,11 @@ function AppRoutes() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/accounts" element={<AccountsPage />} />
-        <Route path="/categories" element={<CategoriesPage />} />
         <Route path="/budgets" element={<BudgetsPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/recurring" element={<RecurringPage />} />
         <Route path="/shopping" element={<ShoppingPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
