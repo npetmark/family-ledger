@@ -1,5 +1,8 @@
+// deno-lint-ignore no-import-prefix
 import { createClient } from "npm:@supabase/supabase-js@2.42.0";
+// deno-lint-ignore no-import-prefix
 import { initializeApp, cert, getApps } from "npm:firebase-admin@12.1.0/app";
+// deno-lint-ignore no-import-prefix
 import { getMessaging } from "npm:firebase-admin@12.1.0/messaging";
 
 // Initialize Firebase Admin (only once)
