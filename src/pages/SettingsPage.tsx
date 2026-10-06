@@ -17,12 +17,13 @@ export default function SettingsPage() {
 
   // Fetch household info
   const { data: householdInfo } = useQuery({
-    queryKey: ["household-info"],
+    queryKey: ["household-info", user?.id],
     queryFn: async () => {
+      if (!user) return null;
       const { data: members, error: memberErr } = await supabase
         .from("household_members")
         .select("household_id")
-        .eq("user_id", user?.id)
+        .eq("user_id", user.id)
         .single();
       if (memberErr || !members) return null;
 
