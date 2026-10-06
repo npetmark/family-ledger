@@ -38,8 +38,10 @@ We are currently executing a phased migration to support multi-user households w
 - [x] Run data migration on a copy first.
 
 ### 5. Features
-- Introduce multi-user UI features, one small branch each.
-
+- **Phase 5.1: Invitations**: Create the flow to invite another user to a household.
+- **Phase 5.2: Ownership Toggles**: Allow changing an account from individual to joint.
+- **Phase 5.3: Data Entry**: Restrict account pickers to writable accounts only.
+- **Phase 5.4: Account Sorting**: Show logged-in user's and joint accounts first in lists.
 ### 6. Notifications
 - Firebase Cloud Messaging web push (service worker on GitHub Pages, iOS install requirement).
 - Server-side sending via Supabase Edge Function or DB webhook (no Firebase server credentials in client).
