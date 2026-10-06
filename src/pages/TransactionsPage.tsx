@@ -22,7 +22,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DynamicIcon } from "@/components/DynamicIcon";
-import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Pencil, Banknote, Users, User } from "lucide-react";
+import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Pencil, Banknote, Users, User, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, addDays, addYears } from "date-fns";
 import { getFundSubcategoryId } from "@/lib/fund-accounts";
@@ -93,6 +93,8 @@ export default function TransactionsPage() {
   const [customOpen, setCustomOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [accountFilter, setAccountFilter] = useState<AccountFilterValue>({ mode: "all-visible" });
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
 
   const emptyForm = {
     transaction_type: "expense",
@@ -118,6 +120,17 @@ export default function TransactionsPage() {
   }, [accounts, user?.id]);
 
   const { data: subcategories = [] } = useActiveSubcategories(user?.id);
+
+  const grouped = subcategories.reduce((acc: Record<string, { name: string; color: string; sortOrder: number; items: any[] }>, sub) => {
+    const main = (sub as any).main_categories;
+    if (!main) return acc;
+    if (!acc[main.id]) acc[main.id] = { name: main.name, color: main.color, sortOrder: main.sort_order, items: [] };
+    acc[main.id].items.push(sub);
+    return acc;
+  }, {});
+
+  const sortedGroups = Object.entries(grouped).sort(([, a], [, b]) => a.sortOrder - b.sortOrder);
+  const selectedSubcategory = subcategories.find((c: any) => c.id === form.subcategory_id);
 
   const { data: transactions = [] } = useTransactions(user?.id, dateFilter);
 
@@ -221,101 +234,7 @@ export default function TransactionsPage() {
   const totalIncome = filteredTransactions.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0);
   const totalExpenses = filteredTransactions.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0);
 
-  const renderTransactionForm = (onSubmit: (e: React.FormEvent) => void, submitLabel: string, isPending: boolean) => (
-    <form className="space-y-4" onSubmit={onSubmit}>
-      <div className="grid grid-cols-3 gap-2">
-        {(["expense", "income", "transfer"] as const).map((type) => {
-          const isActive = form.transaction_type === type;
-          const colorMap = {
-            expense: isActive ? "bg-expense text-expense-foreground hover:bg-expense/90" : "border-expense/40 text-expense hover:bg-expense/10",
-            income: isActive ? "bg-income text-income-foreground hover:bg-income/90" : "border-income/40 text-income hover:bg-income/10",
-            transfer: isActive ? "bg-transfer text-transfer-foreground hover:bg-transfer/90" : "border-transfer/40 text-transfer hover:bg-transfer/10",
-          };
-          return (
-            <Button key={type} type="button" variant={isActive ? "default" : "outline"} size="sm" className={`capitalize ${colorMap[type]}`} onClick={() => setForm({ ...form, transaction_type: type })}>
-              {type}
-            </Button>
-          );
-        })}
-      </div>
-      <div className="space-y-2">
-        <Label>Amount</Label>
-        <Input type="number" step="0.01" min="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required placeholder="0.00" />
-      </div>
-      <div className="space-y-2">
-        <Label>Date</Label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="w-full justify-start">
-              <CalendarIcon className="h-4 w-4 mr-2" />
-              {format(form.date, "PPP")}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0">
-            <Calendar mode="single" selected={form.date} onSelect={(d) => d && setForm({ ...form, date: d })} className="pointer-events-auto" weekStartsOn={1} />
-          </PopoverContent>
-        </Popover>
-      </div>
-      <div className="space-y-2">
-        <Label>Account</Label>
-        <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
-          <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-          <SelectContent>
-            {writableAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      {form.transaction_type === "transfer" ? (
-        <div className="space-y-2">
-          <Label>Transfer To</Label>
-          <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
-            <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-            <SelectContent>
-              {writableAccounts.filter((a) => a.id !== form.account_id).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <Label>Category</Label>
-          <Select value={form.subcategory_id} onValueChange={(v) => setForm({ ...form, subcategory_id: v })}>
-            <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-            <SelectContent>
-              {(() => {
-                const grouped: Record<string, any[]> = {};
-                subcategories.forEach((s: any) => {
-                  const mainName = s.main_categories?.name || "Other";
-                  if (!grouped[mainName]) grouped[mainName] = [];
-                  grouped[mainName].push(s);
-                });
-                return Object.entries(grouped).map(([mainName, subs]) => (
-                  <div key={mainName}>
-                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{mainName}</div>
-                    {subs.map((s: any) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </div>
-                ));
-              })()}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-      <div className="space-y-2">
-        <Label>Note (optional)</Label>
-        <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={2} />
-      </div>
-      <Button type="submit" className={`w-full ${
-        form.transaction_type === "income" ? "bg-income hover:bg-income/90 text-income-foreground" :
-        form.transaction_type === "transfer" ? "bg-transfer hover:bg-transfer/90 text-transfer-foreground" :
-        "bg-expense hover:bg-expense/90 text-expense-foreground"
-      }`} disabled={isPending}>
-        {submitLabel}
-      </Button>
-    </form>
-  );
+  // old renderTransactionForm removed
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -416,22 +335,158 @@ export default function TransactionsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit transaction dialog */}
+      {/* Edit Dialog */}
       <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) { setEditingTransaction(null); setForm(emptyForm); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Transaction</DialogTitle>
           </DialogHeader>
-          {renderTransactionForm(
-            (e) => { e.preventDefault(); if (editingTransaction) handleUpdate(form); },
-            "Save Changes",
-            updateMutation.isPending
-          )}
-          {editingTransaction && (
-            <DialogFooter className="sm:justify-start">
+          <div className="space-y-4">
+            <div>
+              <Label>Type</Label>
+              <Select value={form.transaction_type} onValueChange={(v) => setForm({ ...form, transaction_type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expense">Expense</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="transfer">Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Amount</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>Date</Label>
+              <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(form.date, "PPP")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={form.date}
+                    onSelect={(d) => { if (d) { setForm({ ...form, date: d }); setDateOpen(false); } }}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div>
+              <Label>{form.transaction_type === "transfer" ? "From Account" : "Account"}</Label>
+              <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {writableAccounts.map((a: any) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      <div className="flex items-center gap-2">
+                        <DynamicIcon name={a.icon} className="h-4 w-4" />
+                        {a.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {form.transaction_type === "transfer" && (
+              <div>
+                <Label>To Account</Label>
+                <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {writableAccounts.filter((a: any) => a.id !== form.account_id).map((a: any) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        <div className="flex items-center gap-2">
+                          <DynamicIcon name={a.icon} className="h-4 w-4" />
+                          {a.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {form.transaction_type !== "transfer" && (
+              <div>
+                <Label>Category</Label>
+                <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      {selectedSubcategory ? (
+                        <div className="flex items-center gap-2">
+                          <DynamicIcon name={selectedSubcategory.icon} className="h-4 w-4" />
+                          {selectedSubcategory.name}
+                        </div>
+                      ) : (
+                        "Select category"
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-0" align="start">
+                    <div
+                      className="max-h-64 overflow-y-auto overscroll-contain touch-pan-y p-1"
+                      onWheel={(e) => e.stopPropagation()}
+                      onTouchMove={(e) => e.stopPropagation()}
+                    >
+                      {sortedGroups.map(([mainId, group]) => (
+                        <Collapsible key={mainId} defaultOpen>
+                          <CollapsibleTrigger className="flex w-full items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-muted/50 rounded">
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 [&[data-state=open]>svg]:rotate-90" />
+                            <div
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: `hsl(${group.color})` }}
+                            />
+                            {group.name}
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="ml-4">
+                              {group.items.map((sub: any) => (
+                                <button
+                                  key={sub.id}
+                                  className={`flex w-full items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted/50 ${
+                                    form.subcategory_id === sub.id ? "bg-primary/10 text-primary" : ""
+                                  }`}
+                                  onClick={() => {
+                                    setForm({ ...form, subcategory_id: sub.id });
+                                    setCategoryOpen(false);
+                                  }}
+                                >
+                                  <DynamicIcon name={sub.icon} className="h-4 w-4" />
+                                  {sub.name}
+                                </button>
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+            <div>
+              <Label>Note</Label>
+              <Textarea
+                value={form.note}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex-row justify-between sm:justify-between pt-2">
+            {editingTransaction && (
               <Button
-                type="button"
-                variant="destructive"
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
                 onClick={() => {
                   const id = editingTransaction.id;
                   setEditOpen(false);
@@ -439,10 +494,18 @@ export default function TransactionsPage() {
                   setPendingDeleteTxId(id);
                 }}
               >
-                Delete transaction
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete
               </Button>
-            </DialogFooter>
-          )}
+            )}
+            {!editingTransaction && <div />}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => { setEditOpen(false); setEditingTransaction(null); }}>Cancel</Button>
+              <Button onClick={() => handleUpdate(form)} disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -519,9 +582,9 @@ export default function TransactionsPage() {
             className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors group cursor-pointer"
             onClick={() => openEditDialog(t)}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                 style={{ background: `hsl(${t.subcategories?.color || groupColor} / 0.12)` }}
               >
                 {t.transaction_type === "transfer" ? (
@@ -532,11 +595,11 @@ export default function TransactionsPage() {
                   <DynamicIcon name={t.subcategories?.icon || "circle"} className="h-4 w-4" style={{ color: `hsl(${t.subcategories?.color || groupColor})` }} />
                 )}
               </div>
-              <div>
-                <p className="text-sm font-medium">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium break-words">
                   {t.subcategories?.name || t.note || (t.transaction_type === "transfer" ? "Transfer" : "Transaction")}
                 </p>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 flex-wrap">
                   <span className="truncate flex items-center gap-1.5">
                     {(t as any).accounts?.name}
                     {account && (
@@ -552,13 +615,13 @@ export default function TransactionsPage() {
                   {t.note && t.subcategories?.name ? (
                     <>
                       <span>·</span>
-                      <span className="truncate">{t.note}</span>
+                      <span className="break-words line-clamp-2">{t.note}</span>
                     </>
                   ) : null}
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pl-2">
               <span className={`font-mono-numbers text-sm font-medium whitespace-nowrap flex-shrink-0 ${
                 t.transaction_type === "income" ? "text-income" :
                 t.transaction_type === "transfer" ? "text-transfer" : "text-expense"
@@ -617,8 +680,8 @@ export default function TransactionsPage() {
                                   >
                                     <DynamicIcon name={sg.icon} className="h-4 w-4" style={{ color: `hsl(${sg.color})` }} />
                                   </div>
-                                  <div className="text-left">
-                                    <p className="text-sm font-medium">{sg.name}</p>
+                                  <div className="text-left min-w-0 flex-1">
+                                    <p className="text-sm font-medium break-words">{sg.name}</p>
                                     <p className="text-xs text-muted-foreground">{sortedTxns.length} transactions</p>
                                   </div>
                                 </div>
