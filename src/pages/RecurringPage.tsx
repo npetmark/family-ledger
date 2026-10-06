@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useAccounts } from "@/hooks/queries/useAccounts";
+import { useActiveSubcategories } from "@/hooks/queries/useCategories";
+import { useRecurringTransactions, useSaveRecurringTransaction, useDeleteRecurringTransaction } from "@/hooks/queries/useTransactions";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 import { DynamicIcon } from "@/components/DynamicIcon";
@@ -36,62 +38,14 @@ export default function RecurringPage() {
     note: "",
   });
 
-  const { data: recurring = [] } = useQuery({
-    queryKey: ["recurring", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("recurring_transactions")
-        .select("*, subcategories(name, icon), accounts!recurring_transactions_account_id_fkey(name)")
-        .order("next_due_date");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: recurring = [] } = useRecurringTransactions(user?.id);
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: accounts = [] } = useAccounts(user?.id);
 
-  const { data: subcategories = [] } = useQuery({
-    queryKey: ["subcategories", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("subcategories").select("*, main_categories(name)").eq("is_active", true).order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: subcategories = [] } = useActiveSubcategories(user?.id);
 
-  const saveMutation = useMutation({
-    mutationFn: async (data: typeof form) => {
-      const payload = {
-        user_id: user!.id,
-        transaction_type: data.transaction_type,
-        amount: parseCurrencyToCents(data.amount),
-        frequency: data.frequency,
-        next_due_date: format(data.next_due_date, "yyyy-MM-dd"),
-        start_date: format(data.next_due_date, "yyyy-MM-dd"),
-        account_id: data.account_id,
-        subcategory_id: data.subcategory_id || null,
-        note: data.note,
-      };
-      if (editing) {
-        const { error } = await supabase.from("recurring_transactions").update(payload).eq("id", editing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("recurring_transactions").insert(payload);
-        if (error) throw error;
-      }
-    },
+  const saveMutation = useSaveRecurringTransaction({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["recurring"] });
       setOpen(false);
       setEditing(null);
       resetForm();
@@ -100,15 +54,27 @@ export default function RecurringPage() {
     onError: (e) => toast.error(e.message),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("recurring_transactions").delete().eq("id", id);
-      if (error) throw error;
-    },
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload = {
+      user_id: user!.id,
+      transaction_type: form.transaction_type,
+      amount: parseCurrencyToCents(form.amount),
+      frequency: form.frequency,
+      next_due_date: format(form.next_due_date, "yyyy-MM-dd"),
+      start_date: format(form.next_due_date, "yyyy-MM-dd"),
+      account_id: form.account_id,
+      subcategory_id: form.subcategory_id || null,
+      note: form.note,
+    };
+    saveMutation.mutate({ id: editing?.id, payload });
+  };
+
+  const deleteMutation = useDeleteRecurringTransaction({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["recurring"] });
       toast.success("Deleted");
     },
+    onError: (e) => toast.error(e.message),
   });
 
   const resetForm = () => setForm({ transaction_type: "expense", amount: "", frequency: "monthly", next_due_date: new Date(), account_id: "", subcategory_id: "", note: "" });
@@ -202,7 +168,7 @@ export default function RecurringPage() {
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Recurring" : "New Recurring Transaction"}</DialogTitle>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(form); }}>
+          <form className="space-y-4" onSubmit={handleSave}>
             <div className="grid grid-cols-2 gap-2">
               {(["expense", "income"] as const).map((type) => (
                 <Button key={type} type="button" variant={form.transaction_type === type ? "default" : "outline"} size="sm" className="capitalize" onClick={() => setForm({ ...form, transaction_type: type })}>

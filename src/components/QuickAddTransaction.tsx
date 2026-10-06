@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAccounts } from "@/hooks/queries/useAccounts";
+import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useAuth } from "@/hooks/useAuth";
 import { parseCurrencyToCents } from "@/lib/financial";
 import { Button } from "@/components/ui/button";
@@ -41,25 +43,9 @@ export function QuickAddTransaction() {
     transfer_to_account_id: "",
   });
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user && open,
-  });
+  const { data: accounts = [] } = useAccounts(user?.id);
 
-  const { data: subcategories = [] } = useQuery({
-    queryKey: ["subcategories", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("subcategories").select("*, main_categories(name, color)").eq("is_active", true).order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user && open,
-  });
+  const { data: subcategories = [] } = useActiveSubcategories(user?.id);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof form) => {

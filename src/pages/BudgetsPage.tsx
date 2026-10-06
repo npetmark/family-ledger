@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAccounts } from "@/hooks/queries/useAccounts";
+import { useActiveSubcategories } from "@/hooks/queries/useCategories";
+import { useBudgets, useSaveBudgets, useDeleteBudgets } from "@/hooks/queries/useBudgets";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents, getMonthYear } from "@/lib/financial";
 import { DynamicIcon } from "@/components/DynamicIcon";
@@ -29,39 +32,11 @@ export default function BudgetsPage() {
   const [budgetVersion, setBudgetVersion] = useState(0);
   const monthYear = getMonthYear(currentDate);
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: accounts = [] } = useAccounts(user?.id);
 
-  const { data: subcategories = [] } = useQuery({
-    queryKey: ["subcategories-with-main", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("subcategories")
-        .select("*, main_categories(name, sort_order)")
-        .eq("is_active", true)
-        .order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: subcategories = [] } = useActiveSubcategories(user?.id);
 
-  const { data: budgets = [] } = useQuery({
-    queryKey: ["budgets", user?.id, monthYear],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("budgets").select("*").eq("month_year", monthYear);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: budgets = [] } = useBudgets(user?.id, monthYear);
 
   const { data: transactions = [] } = useQuery({
     queryKey: ["transactions-for-budgets", user?.id, monthYear],
@@ -84,15 +59,7 @@ export default function BudgetsPage() {
   });
 
   const prevMonthYear = getMonthYear(subMonths(currentDate, 1));
-  const { data: prevBudgets = [] } = useQuery({
-    queryKey: ["budgets", user?.id, prevMonthYear],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("budgets").select("*").eq("month_year", prevMonthYear);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: prevBudgets = [] } = useBudgets(user?.id, prevMonthYear);
 
   // Previous month transactions for reference spending
   const { data: prevTransactions = [] } = useQuery({
@@ -115,12 +82,18 @@ export default function BudgetsPage() {
     enabled: !!user,
   });
 
+  const saveBudgetsMutation = useSaveBudgets({
+    onSuccess: () => toast.success("Budget updated"),
+    onError: (e) => toast.error(e.message),
+  });
+
   const copyFromPreviousMonth = useMutation({
     mutationFn: async () => {
       if (prevBudgets.length === 0) throw new Error("No budgets found in previous month");
-      const existing = budgets.map((b) => b.subcategory_id);
-      const toInsert = prevBudgets
-        .filter((pb) => !existing.includes(pb.subcategory_id))
+      const existingIds = budgets.map((b) => b.subcategory_id);
+      
+      const inserts = prevBudgets
+        .filter((pb) => !existingIds.includes(pb.subcategory_id))
         .map((pb) => ({
           user_id: user!.id,
           subcategory_id: pb.subcategory_id,
@@ -128,78 +101,61 @@ export default function BudgetsPage() {
           amount: pb.amount,
           alert_threshold: pb.alert_threshold,
         }));
-      const toUpdate = prevBudgets.filter((pb) => existing.includes(pb.subcategory_id));
-      if (toInsert.length > 0) {
-        const { error } = await supabase.from("budgets").insert(toInsert);
-        if (error) throw error;
-      }
-      for (const pb of toUpdate) {
-        const existingBudget = budgets.find((b) => b.subcategory_id === pb.subcategory_id);
-        if (existingBudget) {
-          const { error } = await supabase
-            .from("budgets")
-            .update({ amount: pb.amount, alert_threshold: pb.alert_threshold })
-            .eq("id", existingBudget.id);
-          if (error) throw error;
-        }
-      }
+        
+      const updates = prevBudgets
+        .filter((pb) => existingIds.includes(pb.subcategory_id))
+        .map((pb) => {
+          const existingBudget = budgets.find((b) => b.subcategory_id === pb.subcategory_id)!;
+          return {
+            id: existingBudget.id,
+            payload: { amount: pb.amount, alert_threshold: pb.alert_threshold }
+          };
+        });
+
+      await saveBudgetsMutation.mutateAsync({ inserts, updates });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["budgets"] });
       toast.success("Budget copied from previous month");
     },
     onError: (e) => toast.error(e.message),
   });
 
   const setBudgetMutation = useMutation({
-    mutationFn: async ({
-      subcategory_id,
-      amount,
-      alert_threshold,
-    }: {
-      subcategory_id: string;
-      amount: string;
-      alert_threshold?: number;
-    }) => {
+    mutationFn: async ({ subcategory_id, amount, alert_threshold }: { subcategory_id: string; amount: string; alert_threshold?: number; }) => {
       const cents = parseCurrencyToCents(amount);
       const existing = budgets.find((b) => b.subcategory_id === subcategory_id);
+      
       if (existing) {
-        const update: any = { amount: cents };
-        if (alert_threshold !== undefined) update.alert_threshold = alert_threshold;
-        const { error } = await supabase.from("budgets").update(update).eq("id", existing.id);
-        if (error) throw error;
+        const payload: any = { amount: cents };
+        if (alert_threshold !== undefined) payload.alert_threshold = alert_threshold;
+        await saveBudgetsMutation.mutateAsync({ inserts: [], updates: [{ id: existing.id, payload }] });
       } else {
-        const { error } = await supabase.from("budgets").insert({
+        const payload = {
           user_id: user!.id,
           subcategory_id,
           month_year: monthYear,
           amount: cents,
           alert_threshold: alert_threshold ?? 90,
-        });
-        if (error) throw error;
+        };
+        await saveBudgetsMutation.mutateAsync({ inserts: [payload], updates: [] });
       }
-    },
+    }
+  });
+
+  const deleteBudgetsMutation = useDeleteBudgets({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["budgets"] });
-      toast.success("Budget updated");
+      setBudgetVersion((v) => v + 1);
+      toast.success("All budgets cleared for this month");
     },
     onError: (e) => toast.error(e.message),
   });
-
 
   const clearBudgetsMutation = useMutation({
     mutationFn: async () => {
       if (budgets.length === 0) throw new Error("No budgets to clear");
       const ids = budgets.map((b) => b.id);
-      const { error } = await supabase.from("budgets").delete().in("id", ids);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      setBudgetVersion((v) => v + 1);
-      queryClient.invalidateQueries({ queryKey: ["budgets"] });
-      toast.success("All budgets cleared for this month");
-    },
-    onError: (e) => toast.error(e.message),
+      await deleteBudgetsMutation.mutateAsync(ids);
+    }
   });
 
   // Group by main category

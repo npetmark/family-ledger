@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAccounts, useAccountBalances } from "@/hooks/queries/useAccounts";
+import { useMainCategories } from "@/hooks/queries/useCategories";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, getMonthYear } from "@/lib/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,15 +19,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [showAllAccounts, setShowAllAccounts] = useState(false);
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: accounts = [] } = useAccounts(user?.id);
 
   const { data: transactions = [] } = useQuery({
     queryKey: ["transactions", user?.id, "current-month"],
@@ -47,36 +41,21 @@ export default function DashboardPage() {
     enabled: !!user,
   });
 
-  const { data: mainCategories = [] } = useQuery({
-    queryKey: ["main_categories", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("main_categories").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: mainCategories = [] } = useMainCategories(user?.id);
 
   // Compute account balances via server-side aggregation
-  const { data: accountBalances = [] } = useQuery({
-    queryKey: ["account-balances", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_account_balances");
-      if (error) throw error;
-      return (data ?? []).map((r: any) => ({
-        id: r.account_id,
-        name: r.name,
-        currency: r.currency,
-        account_type: r.account_type,
-        icon: r.icon,
-        is_visible: r.is_visible,
-        sort_order: r.sort_order,
-        starting_balance: r.starting_balance,
-        computed_balance: r.balance,
-      }));
-    },
-    enabled: !!user,
-  });
+  const { data: rawAccountBalances = [] } = useAccountBalances(user?.id);
+  const accountBalances = rawAccountBalances.map((r: any) => ({
+    id: r.account_id,
+    name: r.name,
+    currency: r.currency,
+    account_type: r.account_type,
+    icon: r.icon,
+    is_visible: r.is_visible,
+    sort_order: r.sort_order,
+    starting_balance: r.starting_balance,
+    computed_balance: r.balance,
+  }));
 
   const totalAssets = accountBalances
     .filter((a) => a.is_visible)

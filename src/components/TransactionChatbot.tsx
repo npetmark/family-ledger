@@ -1,6 +1,10 @@
 import { useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAccounts } from "@/hooks/queries/useAccounts";
+import { useActiveSubcategories, useMainCategories } from "@/hooks/queries/useCategories";
+import { useSaveBudgets } from "@/hooks/queries/useBudgets";
+import { budgetRepository } from "@/repositories/budgetRepository";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/financial";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -49,35 +53,11 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("accounts").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user && open,
-  });
+  const { data: accounts = [] } = useAccounts(user?.id);
 
-  const { data: subcategories = [] } = useQuery({
-    queryKey: ["subcategories", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("subcategories").select("*, main_categories(id, name, color)").eq("is_active", true).order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user && open,
-  });
+  const { data: subcategories = [] } = useActiveSubcategories(user?.id);
 
-  const { data: mainCategories = [] } = useQuery({
-    queryKey: ["main_categories", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("main_categories").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user && open,
-  });
+  const { data: mainCategories = [] } = useMainCategories(user?.id);
 
   const parseMutation = useMutation({
     mutationFn: async ({ message, image, history }: { message?: string; image?: string; history?: { role: string; content: string }[] }) => {
@@ -90,38 +70,31 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
     },
   });
 
+  const saveBudgetsMutation = useSaveBudgets({
+    onSuccess: () => toast.success("Budget updated!"),
+    onError: (e) => toast.error(e.message),
+  });
+
   const saveBudgetMutation = useMutation({
     mutationFn: async (updates: BudgetUpdate[]) => {
+      const inserts = [];
+      const updatesList = [];
       for (const bu of updates) {
-        // Check if budget already exists for this subcategory + month
-        const { data: existing } = await supabase
-          .from("budgets")
-          .select("id")
-          .eq("subcategory_id", bu.subcategory_id)
-          .eq("month_year", bu.month_year)
-          .eq("user_id", user!.id)
-          .maybeSingle();
-
+        const existing = await budgetRepository.findBudget(bu.subcategory_id, bu.month_year, user!.id);
         if (existing) {
-          const { error } = await supabase.from("budgets").update({ amount: bu.amount }).eq("id", existing.id);
-          if (error) throw error;
+          updatesList.push({ id: existing.id, payload: { amount: bu.amount } });
         } else {
-          const { error } = await supabase.from("budgets").insert({
+          inserts.push({
             user_id: user!.id,
             subcategory_id: bu.subcategory_id,
             month_year: bu.month_year,
             amount: bu.amount,
             alert_threshold: 90,
           });
-          if (error) throw error;
         }
       }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["budgets"] });
-      toast.success("Budget updated!");
-    },
-    onError: (e) => toast.error(e.message),
+      await saveBudgetsMutation.mutateAsync({ inserts, updates: updatesList });
+    }
   });
 
   const saveMutation = useMutation({
