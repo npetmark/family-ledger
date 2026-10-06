@@ -31,7 +31,7 @@ export const useHouseholdMembers = (userId?: string) => {
       const userIds = hmData.map((m: any) => m.user_id);
       const { data: profiles, error: pErr } = await supabase
         .from("profiles")
-        .select("id, display_name")
+        .select("id, first_name, last_name, display_name")
         .in("id", userIds);
 
       if (pErr) throw pErr;
