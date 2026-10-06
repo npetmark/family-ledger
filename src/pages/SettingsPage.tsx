@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CategoriesPage from "./CategoriesPage";
 import { useQuery } from "@tanstack/react-query";
+import HouseholdMembers from "@/components/HouseholdMembers";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -108,6 +109,8 @@ export default function SettingsPage() {
                   </Button>
                 </form>
               </div>
+
+              {householdInfo && <HouseholdMembers householdId={householdInfo.id} />}
 
             </CardContent>
           </Card>
