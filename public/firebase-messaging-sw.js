@@ -16,13 +16,5 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage(function(payload) {
-  console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
-    icon: '/icon-192x192.png'
-  };
-
-  self.registration.showNotification(notificationTitle, notificationOptions);
-});
+// Firebase auto-handles background notifications when the 'notification' key is sent from the server.
+// No manual onBackgroundMessage handler is needed for system popups.
