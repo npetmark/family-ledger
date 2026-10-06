@@ -39,13 +39,17 @@ jobs:
         run: npm run lint
 
       - name: Test
+        env:
+          VITE_SUPABASE_PROJECT_ID: "dummy"
+          VITE_SUPABASE_URL: "https://dummy.supabase.co"
+          VITE_SUPABASE_PUBLISHABLE_KEY: "dummy"
         run: npm run test
 
       - name: Build project
         env:
-          VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_PROJECT_ID: "dummy"
+          VITE_SUPABASE_URL: "https://dummy.supabase.co"
+          VITE_SUPABASE_PUBLISHABLE_KEY: "dummy"
         run: npm run build
 
   deploy:
