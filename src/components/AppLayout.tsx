@@ -2,6 +2,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { QuickAddTransaction } from "@/components/QuickAddTransaction";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ProfileSetupDialog } from "@/components/ProfileSetupDialog";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -18,6 +19,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </main>
         <QuickAddTransaction />
+        <ProfileSetupDialog />
       </div>
     </SidebarProvider>
   );
