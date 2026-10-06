@@ -15,6 +15,7 @@ import RecurringPage from "@/pages/RecurringPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import ShoppingPage from "@/pages/ShoppingPage";
 import SettingsPage from "@/pages/SettingsPage";
+import ProfilePage from "@/pages/ProfilePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ function AppRoutes() {
         <Route path="/recurring" element={<RecurringPage />} />
         <Route path="/shopping" element={<ShoppingPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppLayout>
