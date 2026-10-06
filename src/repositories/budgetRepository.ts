@@ -22,7 +22,6 @@ export const budgetRepository = {
       .select("id")
       .eq("subcategory_id", subcategoryId)
       .eq("month_year", monthYear)
-      .eq("user_id", userId)
       .maybeSingle();
     if (error) throw error;
     return data;

@@ -154,7 +154,6 @@ export async function addShoppingItem(opts: {
   const { data: dict } = await supabase
     .from("shopping_item_dictionary")
     .select("id, category_id, display_name, usage_count, translation_key")
-    .eq("user_id", opts.userId)
     .eq("normalized_name", norm)
     .maybeSingle();
 
