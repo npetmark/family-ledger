@@ -23,17 +23,18 @@ export function ProfileSetupDialog() {
   const { user, signOut } = useAuth();
   const { data: profile, isLoading, isError } = useProfile();
   const updateProfile = useUpdateProfile();
-  const [displayName, setDisplayName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
 
-  const needsSetup = !!user && !isLoading && !isError && !profile?.display_name?.trim();
+  const needsSetup = !!user && !isLoading && !isError && !profile?.first_name?.trim();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const name = displayName.trim();
-    if (!name) return;
+    const first = firstName.trim();
+    if (!first) return;
     try {
-      await updateProfile.mutateAsync({ display_name: name });
-      toast.success(`Welcome, ${name}!`);
+      await updateProfile.mutateAsync({ first_name: first, last_name: lastName.trim() });
+      toast.success(`Welcome, ${first}!`);
     } catch (err: any) {
       toast.error(err.message ?? "Failed to save your name");
     }
@@ -54,23 +55,35 @@ export function ProfileSetupDialog() {
               Tell us what to call you. Your name is shown to household members and on your personal accounts.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-4">
-            <Label htmlFor="setup-display-name">Display name</Label>
-            <Input
-              id="setup-display-name"
-              autoFocus
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="e.g. Nikolay"
-              maxLength={60}
-              required
-            />
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="setup-first-name">First name</Label>
+              <Input
+                id="setup-first-name"
+                autoFocus
+                autoComplete="given-name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                maxLength={40}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="setup-last-name">Last name</Label>
+              <Input
+                id="setup-last-name"
+                autoComplete="family-name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                maxLength={40}
+              />
+            </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button type="button" variant="ghost" onClick={signOut}>
               Sign out
             </Button>
-            <Button id="setup-save" type="submit" disabled={!displayName.trim() || updateProfile.isPending}>
+            <Button id="setup-save" type="submit" disabled={!firstName.trim() || updateProfile.isPending}>
               {updateProfile.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Continue
             </Button>

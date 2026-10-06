@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/sidebar";
 import { LayoutDashboard, ArrowLeftRight, Wallet, Target, Repeat, BarChart3, ShoppingCart, Settings, ChevronRight } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useProfile, getDisplayLabel, getInitials } from "@/hooks/queries/useProfile";
+import { useProfile, getDisplayLabel, getFirstName, getInitials } from "@/hooks/queries/useProfile";
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -75,12 +75,12 @@ export function AppSidebar() {
         >
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-              {getInitials(label)}
+              {getInitials(label, profile)}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-foreground">{label}</p>
-            {profile?.display_name?.trim() && (
+            {getFirstName(profile) && (
               <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
             )}
           </div>

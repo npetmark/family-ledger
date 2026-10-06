@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useProfile, useUpdateProfile, getDisplayLabel, getInitials } from "@/hooks/queries/useProfile";
+import { useProfile, useUpdateProfile, getFullName, getInitials } from "@/hooks/queries/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,27 +15,33 @@ export default function ProfilePage() {
   const { data: profile, isLoading } = useProfile();
   const updateProfile = useUpdateProfile();
 
-  const [displayName, setDisplayName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
-    if (profile) setDisplayName(profile.display_name ?? "");
+    if (profile) {
+      setFirstName(profile.first_name ?? "");
+      setLastName(profile.last_name ?? "");
+    }
   }, [profile]);
 
-  const label = getDisplayLabel(profile, user?.email);
-  const nameChanged = displayName.trim() !== (profile?.display_name ?? "").trim();
+  const label = getFullName(profile) || user?.email || "Account";
+  const nameChanged =
+    firstName.trim() !== (profile?.first_name ?? "").trim() ||
+    lastName.trim() !== (profile?.last_name ?? "").trim();
 
   const handleSaveDetails = async (e: React.FormEvent) => {
     e.preventDefault();
-    const name = displayName.trim();
-    if (!name) {
-      toast.error("Name cannot be empty");
+    const first = firstName.trim();
+    if (!first) {
+      toast.error("First name cannot be empty");
       return;
     }
     try {
-      await updateProfile.mutateAsync({ display_name: name });
+      await updateProfile.mutateAsync({ first_name: first, last_name: lastName.trim() });
       toast.success("Profile updated");
     } catch (err: any) {
       toast.error(err.message ?? "Failed to update profile");
@@ -69,7 +75,7 @@ export default function ProfilePage() {
       <div className="flex items-center gap-4">
         <Avatar className="h-14 w-14">
           <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
-            {getInitials(label)}
+            {getInitials(label, profile)}
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0">
@@ -88,16 +94,28 @@ export default function ProfilePage() {
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           ) : (
             <form onSubmit={handleSaveDetails} className="space-y-4 max-w-md">
-              <div className="space-y-2">
-                <Label htmlFor="profile-display-name">Display name</Label>
-                <Input
-                  id="profile-display-name"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="e.g. Nikolay"
-                  maxLength={60}
-                  required
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="profile-first-name">First name</Label>
+                  <Input
+                    id="profile-first-name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    autoComplete="given-name"
+                    maxLength={40}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="profile-last-name">Last name</Label>
+                  <Input
+                    id="profile-last-name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    autoComplete="family-name"
+                    maxLength={40}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="profile-email">Email</Label>
@@ -106,7 +124,7 @@ export default function ProfilePage() {
               <Button
                 id="profile-save-details"
                 type="submit"
-                disabled={!nameChanged || !displayName.trim() || updateProfile.isPending}
+                disabled={!nameChanged || !firstName.trim() || updateProfile.isPending}
               >
                 {updateProfile.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Save changes

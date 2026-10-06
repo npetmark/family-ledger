@@ -311,21 +311,27 @@ export type Database = {
           created_at: string
           currency: string
           display_name: string
+          first_name: string
           id: string
+          last_name: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           currency?: string
           display_name?: string
+          first_name?: string
           id: string
+          last_name?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           currency?: string
           display_name?: string
+          first_name?: string
           id?: string
+          last_name?: string
           updated_at?: string
         }
         Relationships: []

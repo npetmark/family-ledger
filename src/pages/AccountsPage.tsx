@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAccounts, useAccountBalances, useSaveAccount, useDeleteAccount } from "@/hooks/queries/useAccounts";
 import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
+import { getFirstName } from "@/hooks/queries/useProfile";
 import { Badge } from "@/components/ui/badge";
 import { Users, User, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -156,7 +157,7 @@ export default function AccountsPage() {
                     <SelectItem value="shared">Shared (Household)</SelectItem>
                     {householdInfo?.members?.map((m: any) => (
                       <SelectItem key={m.user_id} value={m.user_id}>
-                        Personal - {m.profile?.display_name || "Unknown"} {m.user_id === user?.id ? "(You)" : ""}
+                        Personal - {getFirstName(m.profile) || "Unknown"} {m.user_id === user?.id ? "(You)" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -183,8 +184,10 @@ export default function AccountsPage() {
           const balance = computeBalance(account);
           const isJoint = account.owner_user_id === null;
           const ownerMember = householdInfo?.members?.find((m: any) => m.user_id === account.owner_user_id);
-          const ownerName = ownerMember?.profile?.display_name || "Unknown";
-          const canEdit = isJoint || account.owner_user_id === user?.id;
+          const ownerName = getFirstName(ownerMember?.profile) || "Unknown";
+          // Household owners can edit any account (e.g. to reassign ownership).
+          const canEdit = isJoint || account.owner_user_id === user?.id || isOwner;
+          const canDelete = isJoint || account.owner_user_id === user?.id;
           return (
             <Card key={account.id} className={!account.is_visible ? "opacity-60" : ""}>
               <CardContent className="pt-6">
@@ -203,9 +206,11 @@ export default function AccountsPage() {
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(account)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(account.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {canDelete && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(account.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
