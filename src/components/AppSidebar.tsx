@@ -12,16 +12,7 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, ArrowLeftRight, Wallet, Target, Repeat, LogOut, BarChart3, ShoppingCart, Settings, User, ChevronsUpDown } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { LayoutDashboard, ArrowLeftRight, Wallet, Target, Repeat, BarChart3, ShoppingCart, Settings, ChevronRight } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useProfile, getDisplayLabel, getInitials } from "@/hooks/queries/useProfile";
 
@@ -37,16 +28,10 @@ const navItems = [
 ];
 
 export function AppSidebar() {
-  const { signOut, user } = useAuth();
+  const { user } = useAuth();
   const { isMobile, setOpenMobile } = useSidebar();
   const { data: profile } = useProfile();
-  const navigate = useNavigate();
   const label = getDisplayLabel(profile, user?.email);
-
-  const goToProfile = () => {
-    navigate("/profile");
-    if (isMobile) setOpenMobile(false);
-  };
 
   return (
     <Sidebar>
@@ -81,42 +66,26 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-3 border-t border-border">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              id="sidebar-account-menu"
-              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                  {getInitials(label)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">{label}</p>
-                {profile?.display_name?.trim() && (
-                  <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
-                )}
-              </div>
-              <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-56">
-            <DropdownMenuLabel className="font-normal">
-              <p className="truncate text-sm font-medium">{label}</p>
+        <NavLink
+          id="sidebar-profile-link"
+          to="/profile"
+          className="flex w-full items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          activeClassName="bg-primary/10"
+          onClick={() => { if (isMobile) setOpenMobile(false); }}
+        >
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+              {getInitials(label)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-foreground">{label}</p>
+            {profile?.display_name?.trim() && (
               <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem id="sidebar-profile-link" onSelect={goToProfile}>
-              <User className="h-4 w-4 mr-2" />
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem id="sidebar-sign-out" onSelect={signOut} className="text-destructive focus:text-destructive">
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            )}
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </NavLink>
       </SidebarFooter>
     </Sidebar>
   );
