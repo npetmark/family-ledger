@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CategoriesPage from "./CategoriesPage";
 import { useQuery } from "@tanstack/react-query";
+import HouseholdMembers from "@/components/HouseholdMembers";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -16,12 +17,13 @@ export default function SettingsPage() {
 
   // Fetch household info
   const { data: householdInfo } = useQuery({
-    queryKey: ["household-info"],
+    queryKey: ["household-info", user?.id],
     queryFn: async () => {
+      if (!user) return null;
       const { data: members, error: memberErr } = await supabase
         .from("household_members")
         .select("household_id")
-        .eq("user_id", user?.id)
+        .eq("user_id", user.id)
         .single();
       if (memberErr || !members) return null;
 
@@ -108,6 +110,8 @@ export default function SettingsPage() {
                   </Button>
                 </form>
               </div>
+
+              {householdInfo && <HouseholdMembers householdId={householdInfo.id} />}
 
             </CardContent>
           </Card>

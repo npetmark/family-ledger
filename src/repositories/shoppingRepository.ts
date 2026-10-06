@@ -12,7 +12,6 @@ export const shoppingRepository = {
       .from("shopping_trips")
       .select("*")
       .eq("status", "active")
-      .eq("user_id", userId)
       .maybeSingle();
     if (error) throw error;
     return data;
@@ -34,7 +33,6 @@ export const shoppingRepository = {
       .from("shopping_trips")
       .select("*")
       .eq("status", "completed")
-      .eq("user_id", userId)
       .order("completed_at", { ascending: false })
       .limit(10);
     if (error) throw error;
@@ -80,8 +78,7 @@ export const shoppingRepository = {
   getDictionaryEntries: async (userId: string) => {
     const { data, error } = await supabase
       .from("shopping_item_dictionary")
-      .select("*")
-      .eq("user_id", userId);
+      .select("*");
     if (error) throw error;
     return data;
   },
@@ -205,15 +202,13 @@ export const shoppingRepository = {
     const { error } = await supabase
       .from("shopping_item_dictionary")
       .update({ category_id: categoryId })
-      .eq("user_id", userId)
       .eq("translation_key", translationKey);
     if (error) throw error;
   },
   clearDictionaryUsage: async (userId: string) => {
     const { error } = await supabase
       .from("shopping_item_dictionary")
-      .update({ usage_count: 0, last_used_at: null as any })
-      .eq("user_id", userId);
+      .update({ usage_count: 0, last_used_at: null as any });
     if (error) throw error;
   },
 };
