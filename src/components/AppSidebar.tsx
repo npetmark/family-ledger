@@ -12,7 +12,7 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, ArrowLeftRight, Wallet, Tags, Target, Repeat, LogOut, BarChart3, ShoppingCart } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, Wallet, Target, Repeat, LogOut, BarChart3, ShoppingCart, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
@@ -20,10 +20,10 @@ const navItems = [
   { title: "Transactions", url: "/transactions", icon: ArrowLeftRight },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Accounts", url: "/accounts", icon: Wallet },
-  { title: "Categories", url: "/categories", icon: Tags },
   { title: "Budgets", url: "/budgets", icon: Target },
   { title: "Recurring", url: "/recurring", icon: Repeat },
   { title: "Shopping", url: "/shopping", icon: ShoppingCart },
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
