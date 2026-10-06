@@ -289,7 +289,24 @@ export default function DashboardPage() {
             {(() => {
               const visibleSorted = accountBalances
                 .filter((a) => a.is_visible)
-                .sort((a, b) => b.computed_balance - a.computed_balance);
+                .sort((a, b) => {
+                  const accA = accounts.find((acc) => acc.id === a.id);
+                  const accB = accounts.find((acc) => acc.id === b.id);
+                  
+                  const getRank = (acc: any) => {
+                    if (acc?.owner_user_id === user?.id) return 1;
+                    if (acc?.owner_user_id === null) return 2;
+                    return 3;
+                  };
+                  
+                  const rankA = getRank(accA);
+                  const rankB = getRank(accB);
+                  
+                  if (rankA !== rankB) {
+                    return rankA - rankB;
+                  }
+                  return b.computed_balance - a.computed_balance;
+                });
               const displayedAccounts = showAllAccounts ? visibleSorted : visibleSorted.slice(0, 5);
               const hasMore = visibleSorted.length > 5;
 
