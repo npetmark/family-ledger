@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { useAccounts, useAccountBalances, useSaveAccount, useDeleteAccount } from "@/hooks/queries/useAccounts";
+import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
+import { Badge } from "@/components/ui/badge";
+import { Users, User, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents, availableCurrencies } from "@/lib/financial";
 import { DynamicIcon, availableIcons } from "@/components/DynamicIcon";
@@ -19,10 +22,13 @@ export default function AccountsPage() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [form, setForm] = useState({ name: "", icon: "wallet", account_type: "bank", starting_balance: "", is_visible: true, currency: "EUR" });
+  const [form, setForm] = useState({ name: "", icon: "wallet", account_type: "bank", starting_balance: "", is_visible: true, currency: "EUR", owner_user_id: "shared" });
 
   const { data: accounts = [] } = useAccounts(user?.id);
   const { data: balanceRows = [] } = useAccountBalances(user?.id);
+  const { data: householdInfo } = useHouseholdMembers(user?.id);
+  
+  const isOwner = householdInfo?.myRole === "owner";
 
   const balanceMap = new Map<string, number>(
     balanceRows.map((r: any) => [r.account_id, Number(r.balance)])
@@ -30,7 +36,7 @@ export default function AccountsPage() {
 
   const computeBalance = (acc: any) => balanceMap.get(acc.id) ?? acc.starting_balance;
 
-  const resetForm = () => setForm({ name: "", icon: "wallet", account_type: "bank", starting_balance: "", is_visible: true, currency: "EUR" });
+  const resetForm = () => setForm({ name: "", icon: "wallet", account_type: "bank", starting_balance: "", is_visible: true, currency: "EUR", owner_user_id: "shared" });
 
   const saveMutation = useSaveAccount({
     onSuccess: () => {
@@ -51,6 +57,7 @@ export default function AccountsPage() {
       is_visible: form.is_visible,
       currency: form.currency,
       user_id: user!.id,
+      owner_user_id: form.owner_user_id === "shared" ? null : form.owner_user_id,
       starting_balance: parseCurrencyToCents(form.starting_balance),
     };
     saveMutation.mutate({ id: editing?.id, payload });
@@ -71,6 +78,7 @@ export default function AccountsPage() {
       starting_balance: (acc.starting_balance / 100).toString(),
       is_visible: acc.is_visible,
       currency: acc.currency || "EUR",
+      owner_user_id: acc.owner_user_id || "shared",
     });
     setOpen(true);
   };
@@ -138,8 +146,28 @@ export default function AccountsPage() {
                 <Label>Starting Balance</Label>
                 <Input type="number" step="0.01" value={form.starting_balance} onChange={(e) => setForm({ ...form, starting_balance: e.target.value })} />
               </div>
+              <div className="space-y-2">
+                <Label>Ownership</Label>
+                <Select value={form.owner_user_id} onValueChange={(v) => setForm({ ...form, owner_user_id: v })} disabled={!isOwner}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select owner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="shared">Shared (Household)</SelectItem>
+                    {householdInfo?.members?.map((m: any) => (
+                      <SelectItem key={m.user_id} value={m.user_id}>
+                        Personal - {m.profile?.display_name || "Unknown"} {m.user_id === user?.id ? "(You)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!isOwner && <p className="text-xs text-muted-foreground">Only household owners can change account ownership.</p>}
+              </div>
               <div className="flex items-center justify-between">
-                <Label>Visible in totals</Label>
+                <div>
+                  <Label>Visible in totals</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">Include in dashboard net worth</p>
+                </div>
                 <Switch checked={form.is_visible} onCheckedChange={(v) => setForm({ ...form, is_visible: v })} />
               </div>
               <Button type="submit" className="w-full" disabled={saveMutation.isPending}>
@@ -153,6 +181,10 @@ export default function AccountsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[...accounts].sort((a, b) => (b.is_visible ? 1 : 0) - (a.is_visible ? 1 : 0)).map((account) => {
           const balance = computeBalance(account);
+          const isJoint = account.owner_user_id === null;
+          const ownerMember = householdInfo?.members?.find((m: any) => m.user_id === account.owner_user_id);
+          const ownerName = ownerMember?.profile?.display_name || "Unknown";
+          const canEdit = isJoint || account.owner_user_id === user?.id;
           return (
             <Card key={account.id} className={!account.is_visible ? "opacity-60" : ""}>
               <CardContent className="pt-6">
@@ -166,18 +198,27 @@ export default function AccountsPage() {
                       <p className="text-xs text-muted-foreground capitalize">{account.account_type} · {(account as any).currency || "EUR"}</p>
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(account)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(account.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                  {canEdit && (
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(account)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(account.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
-                <div className="mt-4">
-                  <p className="text-2xl font-semibold font-mono-numbers">{formatCurrency(balance, (account as any).currency || "EUR")}</p>
-                  {!account.is_visible && <p className="text-xs text-muted-foreground mt-1">Hidden from totals</p>}
+                <div className="mt-4 flex items-end justify-between">
+                  <div>
+                    <p className="text-2xl font-semibold font-mono-numbers">{formatCurrency(balance, (account as any).currency || "EUR")}</p>
+                    {!account.is_visible && <p className="text-xs text-muted-foreground mt-1">Hidden from totals</p>}
+                  </div>
+                  {isJoint ? (
+                    <Badge variant="secondary" className="flex items-center gap-1.5 opacity-70"><Users className="h-3 w-3"/> Shared</Badge>
+                  ) : (
+                    <Badge variant="outline" className="flex items-center gap-1.5 opacity-50"><User className="h-3 w-3"/> {ownerName}</Badge>
+                  )}
                 </div>
               </CardContent>
             </Card>
