@@ -23,7 +23,7 @@ export const requestNotificationPermission = async () => {
     if (permission === "granted") {
       // Explicitly register the service worker with the config passed via query parameters
       // This prevents us from having to hardcode secrets in the public/ folder
-      const swUrl = `/firebase-messaging-sw.js?apiKey=${firebaseConfig.apiKey}&projectId=${firebaseConfig.projectId}&messagingSenderId=${firebaseConfig.messagingSenderId}&appId=${firebaseConfig.appId}`;
+      const swUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js?apiKey=${firebaseConfig.apiKey}&projectId=${firebaseConfig.projectId}&messagingSenderId=${firebaseConfig.messagingSenderId}&appId=${firebaseConfig.appId}`;
       const registration = await navigator.serviceWorker.register(swUrl);
 
       const tokenOptions: any = { serviceWorkerRegistration: registration };
