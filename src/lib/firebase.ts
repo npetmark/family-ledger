@@ -67,10 +67,12 @@ const saveTokenToDatabase = async (token: string) => {
   }
 };
 
-export const onMessageListener = () =>
-  new Promise((resolve) => {
-    if (!messaging) return;
-    onMessage(messaging, (payload) => {
-      resolve(payload);
-    });
+export const setupMessageListener = (callback: (payload: any) => void) => {
+  if (!messaging) return () => {};
+  
+  const unsubscribe = onMessage(messaging, (payload) => {
+    callback(payload);
   });
+  
+  return unsubscribe;
+};

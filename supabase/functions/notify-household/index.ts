@@ -47,14 +47,20 @@ Deno.serve(async (req) => {
       throw accError || new Error("Account not found");
     }
 
-    // Get all users in the household EXCEPT the one who created the transaction
-    const { data: members, error: memError } = await supabase
+    // Get all users in the household EXCEPT the one who created the transaction (if known)
+    let membersQuery = supabase
       .from("household_members")
       .select("user_id")
-      .eq("household_id", account.household_id)
-      .neq("user_id", transaction.created_by);
+      .eq("household_id", account.household_id);
+      
+    if (transaction.created_by) {
+      membersQuery = membersQuery.neq("user_id", transaction.created_by);
+    }
+
+    const { data: members, error: memError } = await membersQuery;
 
     if (memError || !members || members.length === 0) {
+      console.log(`No other members found in household ${account.household_id} to notify. memError:`, memError);
       return new Response(JSON.stringify({ message: "No other members to notify" }), { status: 200 });
     }
 
@@ -67,6 +73,7 @@ Deno.serve(async (req) => {
       .in("user_id", userIds);
 
     if (tokensError || !tokens || tokens.length === 0) {
+      console.log(`No device tokens found for users:`, userIds);
       return new Response(JSON.stringify({ message: "No device tokens found for members" }), { status: 200 });
     }
 

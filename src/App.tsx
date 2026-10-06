@@ -5,6 +5,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { setupMessageListener } from "@/lib/firebase";
+import { useEffect } from "react";
+import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { NotificationBanner } from "@/components/NotificationBanner";
 import AuthPage from "@/pages/AuthPage";
@@ -23,6 +26,23 @@ const queryClient = new QueryClient();
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribe = setupMessageListener((payload) => {
+      // Show foreground toast using sonner
+      if (payload.notification) {
+        toast(payload.notification.title, {
+          description: payload.notification.body,
+          duration: 5000,
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user]);
 
   if (loading) {
     return (
