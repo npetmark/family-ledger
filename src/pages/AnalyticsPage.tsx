@@ -165,6 +165,15 @@ export default function AnalyticsPage() {
   });
 
   const { data: accounts = [] } = useAccounts(user?.id);
+  const writableAccounts = useMemo(() => {
+    return accounts
+      .filter((a: any) => a.owner_user_id === null || a.owner_user_id === user?.id)
+      .sort((a: any, b: any) => {
+        if (a.owner_user_id === user?.id && b.owner_user_id === null) return -1;
+        if (a.owner_user_id === null && b.owner_user_id === user?.id) return 1;
+        return a.sort_order - b.sort_order;
+      });
+  }, [accounts, user?.id]);
 
   const { data: rawAccountBalances = [] } = useAccountBalances(user?.id);
   const accountBalances = rawAccountBalances.map((r: any) => ({
@@ -573,7 +582,7 @@ export default function AnalyticsPage() {
           </Select>
         )}
 
-        <AccountFilter accounts={accounts} value={accountFilter} onChange={setAccountFilter} />
+        <AccountFilter accounts={writableAccounts} value={accountFilter} onChange={setAccountFilter} />
       </div>
 
       {/* Custom range dialog */}
