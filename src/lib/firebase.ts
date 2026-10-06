@@ -26,10 +26,12 @@ export const requestNotificationPermission = async () => {
       const swUrl = `/firebase-messaging-sw.js?apiKey=${firebaseConfig.apiKey}&projectId=${firebaseConfig.projectId}&messagingSenderId=${firebaseConfig.messagingSenderId}&appId=${firebaseConfig.appId}`;
       const registration = await navigator.serviceWorker.register(swUrl);
 
-      const currentToken = await getToken(messaging, {
-        serviceWorkerRegistration: registration,
-        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY // We might need this if using web push certs, or let it auto-resolve if default
-      });
+      const tokenOptions: any = { serviceWorkerRegistration: registration };
+      if (import.meta.env.VITE_FIREBASE_VAPID_KEY) {
+        tokenOptions.vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+      }
+
+      const currentToken = await getToken(messaging, tokenOptions);
 
       if (currentToken) {
         // Save the token to our database
