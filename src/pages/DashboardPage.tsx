@@ -1,15 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccounts, useAccountBalances } from "@/hooks/queries/useAccounts";
+import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
+import { getFirstName } from "@/hooks/queries/useProfile";
 import { useMainCategories } from "@/hooks/queries/useCategories";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, getMonthYear } from "@/lib/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DynamicIcon } from "@/components/DynamicIcon";
-import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, Users, User } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { BudgetBurndown } from "@/components/dashboard/BudgetBurndown";
 import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
+import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
@@ -18,6 +21,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 export default function DashboardPage() {
   const { user } = useAuth();
   const [showAllAccounts, setShowAllAccounts] = useState(false);
+  const { data: householdInfo } = useHouseholdMembers(user?.id);
 
   const { data: accounts = [] } = useAccounts(user?.id);
 
@@ -291,22 +295,37 @@ export default function DashboardPage() {
 
               return visibleSorted.length > 0 ? (
                 <div className="space-y-3">
-                  {displayedAccounts.map((account) => (
-                    <div key={account.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  {displayedAccounts.map((accountBalance) => {
+                    const fullAccount = accounts.find((a) => a.id === accountBalance.id);
+                    const isJoint = fullAccount?.owner_user_id === null;
+                    const ownerMember = householdInfo?.members?.find((m: any) => m.user_id === fullAccount?.owner_user_id);
+                    const ownerName = getFirstName(ownerMember?.profile) || "Unknown";
+                    
+                    return (
+                    <div key={accountBalance.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <DynamicIcon name={account.icon} className="h-4 w-4 text-primary" />
+                          <DynamicIcon name={accountBalance.icon} className="h-4 w-4 text-primary" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium">{account.name}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{account.account_type}</p>
+                          <p className="text-sm font-medium flex items-center gap-2">
+                            {accountBalance.name}
+                            {fullAccount && (
+                              isJoint ? (
+                                <Badge variant="secondary" className="h-4 px-1 text-[9px] opacity-70"><Users className="h-2 w-2 mr-1"/> Shared</Badge>
+                              ) : (
+                                <Badge variant="outline" className="h-4 px-1 text-[9px] opacity-50"><User className="h-2 w-2 mr-1"/> {ownerName}</Badge>
+                              )
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground capitalize">{accountBalance.account_type}</p>
                         </div>
                       </div>
                       <span className="font-mono-numbers text-sm font-medium">
-                        {formatCurrency(account.computed_balance)}
+                        {formatCurrency(accountBalance.computed_balance)}
                       </span>
                     </div>
-                  ))}
+                  )})}
                   {hasMore && (
                     <button
                       onClick={() => setShowAllAccounts(!showAllAccounts)}

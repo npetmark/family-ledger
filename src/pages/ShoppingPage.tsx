@@ -126,6 +126,13 @@ export default function ShoppingPage() {
   const categories = categoriesData as Category[];
 
   const { data: accounts = [] } = useAccounts(user?.id);
+  const writableAccounts = accounts
+    .filter((a: any) => a.owner_user_id === null || a.owner_user_id === user?.id)
+    .sort((a: any, b: any) => {
+      if (a.owner_user_id === user?.id && b.owner_user_id === null) return -1;
+      if (a.owner_user_id === null && b.owner_user_id === user?.id) return 1;
+      return a.sort_order - b.sort_order;
+    });
 
   const { data: groceriesSubcategoryId } = useGroceriesSubcategoryId(user?.id);
 
@@ -1181,7 +1188,7 @@ export default function ShoppingPage() {
                   >
                     <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                     <SelectContent>
-                      {accounts.map((a) => (
+                      {writableAccounts.map((a: any) => (
                         <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                       ))}
                     </SelectContent>

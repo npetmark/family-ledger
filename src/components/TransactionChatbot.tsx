@@ -54,6 +54,13 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: accounts = [] } = useAccounts(user?.id);
+  const writableAccounts = accounts
+    .filter(a => a.owner_user_id === null || a.owner_user_id === user?.id)
+    .sort((a, b) => {
+      if (a.owner_user_id === user?.id && b.owner_user_id === null) return -1;
+      if (a.owner_user_id === null && b.owner_user_id === user?.id) return 1;
+      return a.sort_order - b.sort_order;
+    });
 
   const { data: subcategories = [] } = useActiveSubcategories(user?.id);
 
@@ -233,7 +240,7 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
                         <TransactionCard
                           key={j}
                           transaction={t}
-                          accounts={accounts}
+                          accounts={writableAccounts}
                           groupedSubcategories={groupedSubcategories}
                           onUpdate={(field, value) => handleUpdateTransaction(i, j, field, value)}
                         />

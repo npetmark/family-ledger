@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { scheduleUndoableDelete } from "@/lib/shopping";
 import { supabase } from "@/integrations/supabase/client";
 import { useActiveSubcategories } from "@/hooks/queries/useCategories";
+import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
+import { getFirstName } from "@/hooks/queries/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,9 +18,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DynamicIcon } from "@/components/DynamicIcon";
+import { Badge } from "@/components/ui/badge";
 import {
   ArrowUpRight, ArrowDownRight, ArrowLeftRight,
-  Trash2, CalendarIcon, ChevronRight,
+  Trash2, CalendarIcon, ChevronRight, Users, User,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -37,6 +40,7 @@ interface RecentTransactionsProps {
 export function RecentTransactions({ transactions, accounts }: RecentTransactionsProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { data: householdInfo } = useHouseholdMembers(user?.id);
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -55,6 +59,14 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
   });
 
   const { data: categories = [] } = useActiveSubcategories(user?.id);
+
+  const writableAccounts = accounts
+    .filter((a: any) => a.owner_user_id === null || a.owner_user_id === user?.id)
+    .sort((a: any, b: any) => {
+      if (a.owner_user_id === user?.id && b.owner_user_id === null) return -1;
+      if (a.owner_user_id === null && b.owner_user_id === user?.id) return 1;
+      return a.sort_order - b.sort_order;
+    });
 
   const grouped = categories.reduce((acc: Record<string, { name: string; color: string; sortOrder: number; items: any[] }>, sub) => {
     const main = (sub as any).main_categories;
@@ -164,6 +176,11 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                 const categoryName = t.subcategories?.name;
                 const mainCatColor = t.subcategories?.main_categories?.color;
 
+                const account = accounts.find((a: any) => a.id === t.account_id);
+                const isJoint = account?.owner_user_id === null;
+                const ownerMember = householdInfo?.members?.find((m: any) => m.user_id === account?.owner_user_id);
+                const ownerName = getFirstName(ownerMember?.profile) || "Unknown";
+
                 return (
                   <button
                     key={t.id}
@@ -207,8 +224,17 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <span className="truncate">{accountName}</span>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                          <span className="truncate flex items-center gap-1.5">
+                            {accountName}
+                            {account && (
+                              isJoint ? (
+                                <Badge variant="secondary" className="h-4 px-1 text-[9px] opacity-70"><Users className="h-2 w-2 mr-1"/> Shared</Badge>
+                              ) : (
+                                <Badge variant="outline" className="h-4 px-1 text-[9px] opacity-50"><User className="h-2 w-2 mr-1"/> {ownerName}</Badge>
+                              )
+                            )}
+                          </span>
                           {t.note && categoryName && (
                             <>
                               <span>·</span>
@@ -303,7 +329,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
               <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {accounts.map((a: any) => (
+                  {writableAccounts.map((a: any) => (
                     <SelectItem key={a.id} value={a.id}>
                       <div className="flex items-center gap-2">
                         <DynamicIcon name={a.icon} className="h-4 w-4" />
@@ -320,7 +346,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                 <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {accounts.filter((a: any) => a.id !== form.account_id).map((a: any) => (
+                    {writableAccounts.filter((a: any) => a.id !== form.account_id).map((a: any) => (
                       <SelectItem key={a.id} value={a.id}>
                         <div className="flex items-center gap-2">
                           <DynamicIcon name={a.icon} className="h-4 w-4" />

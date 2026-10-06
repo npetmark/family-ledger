@@ -5,11 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAccounts } from "@/hooks/queries/useAccounts";
 import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useTransactions, useSaveTransaction, useDeleteTransaction } from "@/hooks/queries/useTransactions";
-import { transactionRepository } from "@/repositories/transactionRepository";
+import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
+import { getFirstName } from "@/hooks/queries/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +22,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DynamicIcon } from "@/components/DynamicIcon";
-import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Pencil, Banknote } from "lucide-react";
+import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Pencil, Banknote, Users, User } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, addDays, addYears } from "date-fns";
 import { getFundSubcategoryId } from "@/lib/fund-accounts";
@@ -79,6 +81,7 @@ function formatAnchorLabel(preset: FilterPreset, anchor: Date): string {
 
 export default function TransactionsPage() {
   const { user } = useAuth();
+  const { data: householdInfo } = useHouseholdMembers(user?.id);
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
@@ -104,6 +107,15 @@ export default function TransactionsPage() {
   const [form, setForm] = useState(emptyForm);
 
   const { data: accounts = [] } = useAccounts(user?.id);
+  const writableAccounts = useMemo(() => {
+    return accounts
+      .filter((a: any) => a.owner_user_id === null || a.owner_user_id === user?.id)
+      .sort((a: any, b: any) => {
+        if (a.owner_user_id === user?.id && b.owner_user_id === null) return -1;
+        if (a.owner_user_id === null && b.owner_user_id === user?.id) return 1;
+        return a.sort_order - b.sort_order;
+      });
+  }, [accounts, user?.id]);
 
   const { data: subcategories = [] } = useActiveSubcategories(user?.id);
 
@@ -249,7 +261,7 @@ export default function TransactionsPage() {
         <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
           <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
           <SelectContent>
-            {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+            {writableAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -259,7 +271,7 @@ export default function TransactionsPage() {
           <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
             <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
             <SelectContent>
-              {accounts.filter((a) => a.id !== form.account_id).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+              {writableAccounts.filter((a) => a.id !== form.account_id).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -340,7 +352,7 @@ export default function TransactionsPage() {
             : "Custom"}
         </Button>
 
-        <AccountFilter accounts={accounts} value={accountFilter} onChange={setAccountFilter} />
+        <AccountFilter accounts={writableAccounts} value={accountFilter} onChange={setAccountFilter} />
       </div>
 
       {activePreset !== "custom" && (
@@ -495,7 +507,13 @@ export default function TransactionsPage() {
           );
         }
 
-        const renderTransaction = (t: typeof transactions[0], groupColor: string) => (
+        const renderTransaction = (t: typeof transactions[0], groupColor: string) => {
+          const account = accounts.find((a: any) => a.id === t.account_id);
+          const isJoint = account?.owner_user_id === null;
+          const ownerMember = householdInfo?.members?.find((m: any) => m.user_id === account?.owner_user_id);
+          const ownerName = getFirstName(ownerMember?.profile) || "Unknown";
+
+          return (
           <div
             key={t.id}
             className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors group cursor-pointer"
@@ -518,10 +536,26 @@ export default function TransactionsPage() {
                 <p className="text-sm font-medium">
                   {t.subcategories?.name || t.note || (t.transaction_type === "transfer" ? "Transfer" : "Transaction")}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {(t as any).accounts?.name} · {new Date(t.date).toLocaleDateString()}
-                  {t.note && t.subcategories?.name ? ` · ${t.note}` : ""}
-                </p>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                  <span className="truncate flex items-center gap-1.5">
+                    {(t as any).accounts?.name}
+                    {account && (
+                      isJoint ? (
+                        <Badge variant="secondary" className="h-4 px-1 text-[9px] opacity-70"><Users className="h-2 w-2 mr-1"/> Shared</Badge>
+                      ) : (
+                        <Badge variant="outline" className="h-4 px-1 text-[9px] opacity-50"><User className="h-2 w-2 mr-1"/> {ownerName}</Badge>
+                      )
+                    )}
+                  </span>
+                  <span>·</span>
+                  <span className="flex-shrink-0">{new Date(t.date).toLocaleDateString()}</span>
+                  {t.note && t.subcategories?.name ? (
+                    <>
+                      <span>·</span>
+                      <span className="truncate">{t.note}</span>
+                    </>
+                  ) : null}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -534,7 +568,8 @@ export default function TransactionsPage() {
               </span>
             </div>
           </div>
-        );
+          );
+        };
 
         return groups.map((group) => {
           const allTransactions = [...Object.values(group.subGroups).flatMap((sg) => sg.transactions), ...group.ungrouped];

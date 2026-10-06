@@ -41,6 +41,13 @@ export default function RecurringPage() {
   const { data: recurring = [] } = useRecurringTransactions(user?.id);
 
   const { data: accounts = [] } = useAccounts(user?.id);
+  const writableAccounts = accounts
+    .filter(a => a.owner_user_id === null || a.owner_user_id === user?.id)
+    .sort((a, b) => {
+      if (a.owner_user_id === user?.id && b.owner_user_id === null) return -1;
+      if (a.owner_user_id === null && b.owner_user_id === user?.id) return 1;
+      return a.sort_order - b.sort_order;
+    });
 
   const { data: subcategories = [] } = useActiveSubcategories(user?.id);
 
@@ -208,7 +215,7 @@ export default function RecurringPage() {
               <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                 <SelectContent>
-                  {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  {writableAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
