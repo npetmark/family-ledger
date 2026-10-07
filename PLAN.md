@@ -42,9 +42,9 @@ We are currently executing a phased migration to support multi-user households w
 - **Phase 5.2: Ownership Toggles**: Allow changing an account from individual to joint.
 - **Phase 5.3: Data Entry**: Restrict account pickers to writable accounts only.
 - **Phase 5.4: Account Sorting**: Show logged-in user's and joint accounts first in lists.
-### 6. Notifications
-- Firebase Cloud Messaging web push.
-- Server-side sending via Supabase Edge Function or DB webhook.
+### 6. Notifications (COMPLETE)
+- [x] Firebase Cloud Messaging web push.
+- [x] Server-side sending via Supabase Edge Function or DB webhook.
 
 ## Backlog
 - **iOS Push Notifications Compatibility**: Implement PWA requirements (manifest, service worker registration improvements, UI prompt to 'Add to Home Screen') to support push notifications on iOS 16.4+.
