@@ -24,7 +24,8 @@ async function getActorName(supabase: SupabaseClient, userId: string | null): Pr
   if (!userId) return "Someone";
   const { data } = await supabase.from("profiles").select("display_name, first_name").eq("id", userId).single();
   if (data) {
-    return data.display_name || data.first_name || "Someone";
+    if (data.first_name) return data.first_name;
+    if (data.display_name) return data.display_name.split(" ")[0];
   }
   return "Someone";
 }
