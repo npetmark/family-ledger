@@ -33,6 +33,7 @@ export function useSaveBudgets(options?: { onSuccess?: () => void; onError?: (er
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["budgets-with-categories"] });
       options?.onSuccess?.();
     },
     onError: options?.onError,
@@ -46,6 +47,7 @@ export function useDeleteBudgets(options?: { onSuccess?: () => void; onError?: (
     mutationFn: budgetRepository.deleteBudgets,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["budgets-with-categories"] });
       options?.onSuccess?.();
     },
     onError: options?.onError,

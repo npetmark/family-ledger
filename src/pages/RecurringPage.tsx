@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAccounts } from "@/hooks/queries/useAccounts";
 import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useRecurringTransactions, useSaveRecurringTransaction, useDeleteRecurringTransaction } from "@/hooks/queries/useTransactions";
+import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 import { DynamicIcon } from "@/components/DynamicIcon";
@@ -27,6 +28,8 @@ export default function RecurringPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
+
+  const { data: householdInfo } = useHouseholdMembers(user?.id);
 
   const [form, setForm] = useState({
     transaction_type: "expense",
@@ -63,7 +66,7 @@ export default function RecurringPage() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
+    const payload: any = {
       user_id: user!.id,
       transaction_type: form.transaction_type,
       amount: parseCurrencyToCents(form.amount),
@@ -74,6 +77,9 @@ export default function RecurringPage() {
       subcategory_id: form.subcategory_id || null,
       note: form.note,
     };
+    if (householdInfo?.householdId) {
+      payload.household_id = householdInfo.householdId;
+    }
     saveMutation.mutate({ id: editing?.id, payload });
   };
 

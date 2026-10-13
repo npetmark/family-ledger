@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAccounts } from "@/hooks/queries/useAccounts";
 import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useBudgets, useSaveBudgets, useDeleteBudgets } from "@/hooks/queries/useBudgets";
+import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents, getMonthYear } from "@/lib/financial";
 import { DynamicIcon } from "@/components/DynamicIcon";
@@ -31,6 +32,9 @@ export default function BudgetsPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [budgetVersion, setBudgetVersion] = useState(0);
   const monthYear = getMonthYear(currentDate);
+
+  const { data: householdInfo } = useHouseholdMembers(user?.id);
+  const householdId = householdInfo?.householdId;
 
   const { data: accounts = [] } = useAccounts(user?.id);
 
@@ -100,6 +104,7 @@ export default function BudgetsPage() {
           month_year: monthYear,
           amount: pb.amount,
           alert_threshold: pb.alert_threshold,
+          ...(householdId ? { household_id: householdId } : {}),
         }));
         
       const updates = prevBudgets
@@ -130,13 +135,16 @@ export default function BudgetsPage() {
         if (alert_threshold !== undefined) payload.alert_threshold = alert_threshold;
         await saveBudgetsMutation.mutateAsync({ inserts: [], updates: [{ id: existing.id, payload }] });
       } else {
-        const payload = {
+        const payload: any = {
           user_id: user!.id,
           subcategory_id,
           month_year: monthYear,
           amount: cents,
           alert_threshold: alert_threshold ?? 90,
         };
+        if (householdId) {
+          payload.household_id = householdId;
+        }
         await saveBudgetsMutation.mutateAsync({ inserts: [payload], updates: [] });
       }
     }
