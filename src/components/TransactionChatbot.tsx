@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccounts } from "@/hooks/queries/useAccounts";
+import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { useActiveSubcategories, useMainCategories } from "@/hooks/queries/useCategories";
 import { useSaveBudgets } from "@/hooks/queries/useBudgets";
 import { budgetRepository } from "@/repositories/budgetRepository";
@@ -11,12 +12,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Send, ImagePlus, Check, X, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { DynamicIcon } from "@/components/DynamicIcon";
+import { AccountSelectItems } from "@/components/AccountSelectItems";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -54,6 +56,7 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: accounts = [] } = useAccounts(user?.id);
+  const { data: householdInfo } = useHouseholdMembers(user?.id);
   const writableAccounts = accounts
     .filter(a => a.owner_user_id === null || a.owner_user_id === user?.id)
     .sort((a, b) => {
@@ -240,7 +243,9 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
                         <TransactionCard
                           key={j}
                           transaction={t}
-                          accounts={writableAccounts}
+                          accounts={accounts}
+                          currentUserId={user?.id}
+                          householdMembers={householdInfo?.members}
                           groupedSubcategories={groupedSubcategories}
                           onUpdate={(field, value) => handleUpdateTransaction(i, j, field, value)}
                         />
@@ -326,11 +331,15 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
 function TransactionCard({
   transaction: t,
   accounts,
+  currentUserId,
+  householdMembers,
   groupedSubcategories,
   onUpdate,
 }: {
   transaction: ParsedTransaction;
   accounts: any[];
+  currentUserId?: string;
+  householdMembers?: any[];
   groupedSubcategories: any[];
   onUpdate: (field: string, value: string | null) => void;
 }) {
@@ -370,20 +379,21 @@ function TransactionCard({
 
       {/* Editable Account */}
       <div className="space-y-0.5">
-        <label className="text-muted-foreground text-[10px] uppercase tracking-wide">Account</label>
+        <label className="text-muted-foreground text-[10px] uppercase tracking-wide">
+          {t.transaction_type === "transfer" ? "From Account" : "Account"}
+        </label>
         <Select value={t.account_id} onValueChange={(v) => onUpdate("account_id", v)}>
           <SelectTrigger className="h-7 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                <div className="flex items-center gap-1.5">
-                  <DynamicIcon name={a.icon} className="h-3 w-3" />
-                  {a.name}
-                </div>
-              </SelectItem>
-            ))}
+            <AccountSelectItems
+              accounts={accounts}
+              currentUserId={currentUserId}
+              householdMembers={householdMembers}
+              excludeAccountId={t.transaction_type === "transfer" ? t.transfer_to_account_id || undefined : undefined}
+              isTransfer={t.transaction_type === "transfer"}
+            />
           </SelectContent>
         </Select>
       </div>
@@ -397,14 +407,13 @@ function TransactionCard({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {accounts.filter((a) => a.id !== t.account_id).map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  <div className="flex items-center gap-1.5">
-                    <DynamicIcon name={a.icon} className="h-3 w-3" />
-                    {a.name}
-                  </div>
-                </SelectItem>
-              ))}
+              <AccountSelectItems
+                accounts={accounts}
+                currentUserId={currentUserId}
+                householdMembers={householdMembers}
+                excludeAccountId={t.account_id}
+                isTransfer={true}
+              />
             </SelectContent>
           </Select>
         </div>

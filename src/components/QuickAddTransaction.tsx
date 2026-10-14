@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccounts } from "@/hooks/queries/useAccounts";
+import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useAuth } from "@/hooks/useAuth";
 import { parseCurrencyToCents } from "@/lib/financial";
@@ -10,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -20,6 +21,7 @@ import { format } from "date-fns";
 import { getFundSubcategoryId } from "@/lib/fund-accounts";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { TransactionChatbot } from "@/components/TransactionChatbot";
+import { AccountSelectItems } from "@/components/AccountSelectItems";
 import { addShoppingItem, parseShoppingEntry } from "@/lib/shopping";
 
 export function QuickAddTransaction() {
@@ -44,13 +46,7 @@ export function QuickAddTransaction() {
   });
 
   const { data: accounts = [] } = useAccounts(user?.id);
-  const writableAccounts = accounts
-    .filter(a => a.owner_user_id === null || a.owner_user_id === user?.id)
-    .sort((a, b) => {
-      if (a.owner_user_id === user?.id && b.owner_user_id === null) return -1;
-      if (a.owner_user_id === null && b.owner_user_id === user?.id) return 1;
-      return a.sort_order - b.sort_order;
-    });
+  const { data: householdInfo } = useHouseholdMembers(user?.id);
 
   const { data: subcategories = [] } = useActiveSubcategories(user?.id);
 
@@ -203,7 +199,24 @@ export function QuickAddTransaction() {
                   transfer: isActive ? "bg-transfer text-transfer-foreground hover:bg-transfer/90" : "border-transfer/40 text-transfer hover:bg-transfer/10",
                 };
                 return (
-                  <Button key={type} type="button" variant={isActive ? "default" : "outline"} size="sm" className={`capitalize ${colorMap[type]}`} onClick={() => setForm({ ...form, transaction_type: type })}>
+                  <Button
+                    key={type}
+                    type="button"
+                    variant={isActive ? "default" : "outline"}
+                    size="sm"
+                    className={`capitalize ${colorMap[type]}`}
+                    onClick={() => {
+                      const isOther = accounts.some(
+                        (a) => a.id === form.account_id && a.owner_user_id !== null && a.owner_user_id !== user?.id
+                      );
+                      setForm((prev) => ({
+                        ...prev,
+                        transaction_type: type,
+                        account_id: type !== "transfer" && isOther ? "" : prev.account_id,
+                        transfer_to_account_id: type === "transfer" ? prev.transfer_to_account_id : "",
+                      }));
+                    }}
+                  >
                     {type}
                   </Button>
                 );
@@ -228,21 +241,51 @@ export function QuickAddTransaction() {
               </Popover>
             </div>
             <div className="space-y-2">
-              <Label>Account</Label>
-              <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
+              <Label>{form.transaction_type === "transfer" ? "From Account" : "Account"}</Label>
+              <Select
+                value={form.account_id}
+                onValueChange={(v) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    account_id: v,
+                    transfer_to_account_id: prev.transfer_to_account_id === v ? "" : prev.transfer_to_account_id,
+                  }));
+                }}
+              >
                 <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                 <SelectContent position="popper" side="bottom" sideOffset={4} className="max-h-60 overflow-y-auto">
-                  {writableAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  <AccountSelectItems
+                    accounts={accounts}
+                    currentUserId={user?.id}
+                    householdMembers={householdInfo?.members}
+                    excludeAccountId={form.transaction_type === "transfer" ? form.transfer_to_account_id : undefined}
+                    isTransfer={form.transaction_type === "transfer"}
+                  />
                 </SelectContent>
               </Select>
             </div>
             {form.transaction_type === "transfer" ? (
               <div className="space-y-2">
                 <Label>Transfer To</Label>
-                <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
+                <Select
+                  value={form.transfer_to_account_id}
+                  onValueChange={(v) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      transfer_to_account_id: v,
+                      account_id: prev.account_id === v ? "" : prev.account_id,
+                    }));
+                  }}
+                >
                   <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                   <SelectContent position="popper" side="bottom" sideOffset={4} className="max-h-60 overflow-y-auto">
-                    {writableAccounts.filter((a) => a.id !== form.account_id).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                    <AccountSelectItems
+                      accounts={accounts}
+                      currentUserId={user?.id}
+                      householdMembers={householdInfo?.members}
+                      excludeAccountId={form.account_id}
+                      isTransfer={true}
+                    />
                   </SelectContent>
                 </Select>
               </div>

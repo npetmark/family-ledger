@@ -22,6 +22,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DynamicIcon } from "@/components/DynamicIcon";
+import { AccountSelectItems } from "@/components/AccountSelectItems";
 import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Pencil, Banknote, Users, User, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, addDays, addYears } from "date-fns";
@@ -344,7 +345,20 @@ export default function TransactionsPage() {
           <div className="space-y-4">
             <div>
               <Label>Type</Label>
-              <Select value={form.transaction_type} onValueChange={(v) => setForm({ ...form, transaction_type: v })}>
+              <Select
+                value={form.transaction_type}
+                onValueChange={(v) => {
+                  const isOther = accounts.some(
+                    (a: any) => a.id === form.account_id && a.owner_user_id !== null && a.owner_user_id !== user?.id
+                  );
+                  setForm((prev) => ({
+                    ...prev,
+                    transaction_type: v,
+                    account_id: v !== "transfer" && isOther ? "" : prev.account_id,
+                    transfer_to_account_id: v === "transfer" ? prev.transfer_to_account_id : "",
+                  }));
+                }}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="expense">Expense</SelectItem>
@@ -382,34 +396,50 @@ export default function TransactionsPage() {
             </div>
             <div>
               <Label>{form.transaction_type === "transfer" ? "From Account" : "Account"}</Label>
-              <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
+              <Select
+                value={form.account_id}
+                onValueChange={(v) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    account_id: v,
+                    transfer_to_account_id: prev.transfer_to_account_id === v ? "" : prev.transfer_to_account_id,
+                  }));
+                }}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {writableAccounts.map((a: any) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      <div className="flex items-center gap-2">
-                        <DynamicIcon name={a.icon} className="h-4 w-4" />
-                        {a.name}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  <AccountSelectItems
+                    accounts={accounts}
+                    currentUserId={user?.id}
+                    householdMembers={householdInfo?.members}
+                    excludeAccountId={form.transaction_type === "transfer" ? form.transfer_to_account_id : undefined}
+                    isTransfer={form.transaction_type === "transfer"}
+                  />
                 </SelectContent>
               </Select>
             </div>
             {form.transaction_type === "transfer" && (
               <div>
                 <Label>To Account</Label>
-                <Select value={form.transfer_to_account_id} onValueChange={(v) => setForm({ ...form, transfer_to_account_id: v })}>
+                <Select
+                  value={form.transfer_to_account_id}
+                  onValueChange={(v) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      transfer_to_account_id: v,
+                      account_id: prev.account_id === v ? "" : prev.account_id,
+                    }));
+                  }}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {writableAccounts.filter((a: any) => a.id !== form.account_id).map((a: any) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        <div className="flex items-center gap-2">
-                          <DynamicIcon name={a.icon} className="h-4 w-4" />
-                          {a.name}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    <AccountSelectItems
+                      accounts={accounts}
+                      currentUserId={user?.id}
+                      householdMembers={householdInfo?.members}
+                      excludeAccountId={form.account_id}
+                      isTransfer={true}
+                    />
                   </SelectContent>
                 </Select>
               </div>
