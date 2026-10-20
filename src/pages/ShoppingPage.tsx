@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useShoppingCategories, useActiveShoppingTrip, useShoppingItems, useShoppingSuggestions, useTopSuggested, usePastShoppingTrips } from "@/hooks/queries/useShopping";
+import {
+  useShoppingCategories,
+  useActiveShoppingTrips,
+  useShoppingItems,
+  useShoppingSuggestions,
+  useTopSuggested,
+  usePastShoppingTrips,
+  useCreateShoppingTrip,
+  useDeleteShoppingTrip,
+} from "@/hooks/queries/useShopping";
 import { useAccounts } from "@/hooks/queries/useAccounts";
 import { useGroceriesSubcategoryId } from "@/hooks/queries/useCategories";
 import { shoppingRepository } from "@/repositories/shoppingRepository";
@@ -16,7 +25,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -38,8 +47,18 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { computeLineTotalCents, detectLanguage, normalizeName, parseShoppingEntry, rankStoresByDeals, scheduleUndoableDelete, triggerPromoLookup } from "@/lib/shopping";
+import {
+  computeLineTotalCents,
+  detectLanguage,
+  isGeneralShoppingList,
+  normalizeName,
+  parseShoppingEntry,
+  rankStoresByDeals,
+  scheduleUndoableDelete,
+  triggerPromoLookup,
+} from "@/lib/shopping";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
+import { cn } from "@/lib/utils";
 
 type Category = {
   id: string; name: string; emoji: string; color: string; sort_order: number;
@@ -49,6 +68,7 @@ type Trip = {
   id: string; name: string; status: string;
   started_at: string; completed_at: string | null;
   total_cents: number | null; receipt_path: string | null; notes: string | null;
+  is_default?: boolean;
 };
 type PromoOffer = {
   store: string;
@@ -91,6 +111,10 @@ export default function ShoppingPage() {
   const [pastOpen, setPastOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
+  const [confirmDeleteListOpen, setConfirmDeleteListOpen] = useState(false);
+  const [newListDialogOpen, setNewListDialogOpen] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [refreshingPromos, setRefreshingPromos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const receiptInputRef = useRef<HTMLInputElement>(null);
@@ -136,7 +160,41 @@ export default function ShoppingPage() {
 
   const { data: groceriesSubcategoryId } = useGroceriesSubcategoryId(user?.id);
 
-  const { data: activeTrip } = useActiveShoppingTrip(user?.id);
+  const { data: activeTripsData = [], isLoading: tripsLoading } = useActiveShoppingTrips(user?.id);
+  const activeTrips = activeTripsData as Trip[];
+
+  const activeTrip = useMemo(() => {
+    if (!activeTrips.length) return null;
+    if (selectedTripId) {
+      const match = activeTrips.find((t) => t.id === selectedTripId);
+      if (match) return match;
+    }
+    const def = activeTrips.find((t) => t.is_default);
+    return def ?? activeTrips[0];
+  }, [activeTrips, selectedTripId]);
+
+  useEffect(() => {
+    if (activeTrip && activeTrip.id !== selectedTripId) {
+      setSelectedTripId(activeTrip.id);
+    }
+  }, [activeTrip, selectedTripId]);
+
+  const isGeneralList = useMemo(
+    () => isGeneralShoppingList(activeTrip, activeTrips),
+    [activeTrip, activeTrips]
+  );
+
+  const autoCreateTrip = useCreateShoppingTrip({
+    onSuccess: (data) => {
+      if (data?.id) setSelectedTripId(data.id);
+    },
+  });
+
+  useEffect(() => {
+    if (!tripsLoading && user && activeTrips.length === 0 && !autoCreateTrip.isPending) {
+      autoCreateTrip.mutate({ userId: user.id, name: "Shopping", isDefault: true });
+    }
+  }, [tripsLoading, user, activeTrips.length, autoCreateTrip]);
 
   // Fetch a fresh signed URL whenever the active trip's receipt changes.
   useEffect(() => {
@@ -156,23 +214,22 @@ export default function ShoppingPage() {
   const items = data as unknown as Item[];
 
   // Auto-refresh promo data for items that were matched before pack-size parsing existed.
-  // Targets items with a matched promo store but no pack_size — refreshed once per item per session.
+  // Targets items with a matched promo store but no pack_size — ONLY runs on the general list.
   useEffect(() => {
-    if (!items.length) return;
+    if (!isGeneralList || !items.length || !activeTrip) return;
     const stale = items.filter(
       (i) =>
         i.promo_stores && i.promo_stores.length > 0 &&
         ((i.promo_pack_size === null || i.promo_pack_size === undefined) ||
          !i.promo_offers || i.promo_offers.length === 0) &&
         !autoPackRefreshed.current.has(i.id)
-
     );
     if (!stale.length) return;
     stale.forEach((i) => autoPackRefreshed.current.add(i.id));
     triggerPromoLookup(stale.map((i) => i.id))
-      .then(() => queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip?.id] }))
+      .then(() => queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] }))
       .catch((e) => console.warn("auto pack refresh failed", e));
-  }, [items, activeTrip?.id, queryClient]);
+  }, [isGeneralList, items, activeTrip, queryClient]);
 
 
   const { data: suggestions = [] } = useShoppingSuggestions(debounced, !!user);
@@ -182,6 +239,34 @@ export default function ShoppingPage() {
   const { data: pastTrips = [] } = usePastShoppingTrips(pastOpen ? user?.id : undefined);
 
   // -------- mutations
+  const createCustomList = useCreateShoppingTrip({
+    onSuccess: (newTrip) => {
+      toast.success(`List "${newTrip.name}" created`);
+      setNewListName("");
+      setNewListDialogOpen(false);
+      if (newTrip?.id) {
+        setSelectedTripId(newTrip.id);
+      }
+    },
+    onError: (e: any) => {
+      toast.error(e?.message ?? "Failed to create list");
+    },
+  });
+
+  const deleteCurrentList = useDeleteShoppingTrip({
+    onSuccess: () => {
+      const listName = activeTrip?.name ?? "List";
+      toast.success(`List "${listName}" deleted`);
+      setConfirmDeleteListOpen(false);
+      const remaining = activeTrips.filter((t) => t.id !== activeTrip?.id);
+      const fallback = remaining.find((t) => t.is_default) ?? remaining[0];
+      setSelectedTripId(fallback ? fallback.id : null);
+    },
+    onError: (e: any) => {
+      toast.error(e?.message ?? "Failed to delete list");
+    },
+  });
+
   const addItem = useMutation({
     mutationFn: async (payload: { name: string; categoryId: string | null; dictEntry?: DictEntry }) => {
       if (!activeTrip || !user) return;
@@ -234,8 +319,8 @@ export default function ShoppingPage() {
         sort_order: items.length,
       });
 
-      // Fire-and-forget promo lookup
-      if (inserted?.id) {
+      // Fire-and-forget promo lookup ONLY for the general list
+      if (isGeneralList && inserted?.id) {
         triggerPromoLookup([inserted.id])
           .then(() => queryClient.invalidateQueries({ queryKey: ["shopping-items", activeTrip.id] }))
           .catch((e) => console.warn("promo lookup failed", e));
@@ -391,7 +476,7 @@ export default function ShoppingPage() {
       if (!activeTrip || !user) return;
       const totalForTrip = opts.amountCents > 0
         ? opts.amountCents
-        : items.reduce((s, i) => s + (i.price_cents ?? 0), 0);
+        : (hasAnyActual ? actualTotal : expectedTotal);
 
       // 1. Optionally create the "Пазар" expense transaction for this shop
       if (opts.recordTransaction && opts.amountCents > 0 && opts.accountId) {
@@ -411,25 +496,32 @@ export default function ShoppingPage() {
 
       // 2. Complete the trip
       await shoppingRepository.updateTrip(activeTrip.id, {
-          status: "completed",
-          started_at: new Date(opts.date).toISOString(),
-          completed_at: new Date(opts.date).toISOString(),
-          total_cents: totalForTrip || null,
-        });
+        status: "completed",
+        started_at: new Date(opts.date).toISOString(),
+        completed_at: new Date(opts.date).toISOString(),
+        total_cents: totalForTrip || null,
+      });
 
-      // 3. Carry over any unchecked items to a fresh active trip
+      // 3. Always maintain an active trip for this list with unchecked items carried over
       const uncheckedIds = items.filter((i) => !i.checked).map((i) => i.id);
-      if (uncheckedIds.length > 0) {
-        const nextName = `Shopping — ${format(new Date(), "EEE d MMM")}`;
-        const newTrip = await shoppingRepository.createTrip(user.id, nextName);
+      const nextName = isGeneralList
+        ? `Shopping — ${format(new Date(), "EEE d MMM")}`
+        : activeTrip.name;
+      const newTrip = await shoppingRepository.createTrip(user.id, nextName, isGeneralList);
+      if (uncheckedIds.length > 0 && newTrip?.id) {
         await shoppingRepository.moveItemsToTrip(newTrip.id, uncheckedIds);
       }
+      return newTrip;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["shopping-past-trips", user?.id] });
+    onSuccess: (newTrip) => {
+      queryClient.invalidateQueries({ queryKey: ["active-trips"] });
+      queryClient.invalidateQueries({ queryKey: ["active-trip"] });
+      queryClient.invalidateQueries({ queryKey: ["past-trips"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["account-balances"] });
+      if (newTrip?.id) {
+        setSelectedTripId(newTrip.id);
+      }
       setConfirmCompleteOpen(false);
       setCompleteForm({ store: "", account_id: "", amount: "", record_transaction: true, date: format(new Date(), "yyyy-MM-dd") });
       toast.success("Trip completed");
@@ -442,7 +534,10 @@ export default function ShoppingPage() {
       if (!activeTrip) return;
       await shoppingRepository.updateTrip(activeTrip.id, { name });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["shopping-active-trip", user?.id] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["active-trips"] });
+      queryClient.invalidateQueries({ queryKey: ["active-trip"] });
+    },
   });
 
   const clearSuggestions = useMutation({
@@ -685,22 +780,24 @@ export default function ShoppingPage() {
   // manually entered price_cents → null. Per-weight/volume offers (kg/L/g/ml)
   // multiply qty directly without pack rounding.
   const expectedFor = (i: Item): number | null => {
-    const cheapest = i.promo_offers && i.promo_offers.length > 0 ? i.promo_offers[0] : null;
-    if (cheapest) {
-      const isMeasure = cheapest.unit === "kg" || cheapest.unit === "l" || cheapest.unit === "g" || cheapest.unit === "ml";
-      return computeLineTotalCents({
-        promo_price_cents: cheapest.price_cents,
-        quantity: i.quantity ?? 1,
-        pack_size: isMeasure ? null : cheapest.pack_size,
-      });
-    }
-    if (i.promo_price_cents != null) {
-      const isMeasure = i.unit === "kg" || i.unit === "l" || i.unit === "g" || i.unit === "ml";
-      return computeLineTotalCents({
-        promo_price_cents: i.promo_price_cents,
-        quantity: i.quantity ?? 1,
-        pack_size: isMeasure ? null : i.promo_pack_size,
-      });
+    if (isGeneralList) {
+      const cheapest = i.promo_offers && i.promo_offers.length > 0 ? i.promo_offers[0] : null;
+      if (cheapest) {
+        const isMeasure = cheapest.unit === "kg" || cheapest.unit === "l" || cheapest.unit === "g" || cheapest.unit === "ml";
+        return computeLineTotalCents({
+          promo_price_cents: cheapest.price_cents,
+          quantity: i.quantity ?? 1,
+          pack_size: isMeasure ? null : cheapest.pack_size,
+        });
+      }
+      if (i.promo_price_cents != null) {
+        const isMeasure = i.unit === "kg" || i.unit === "l" || i.unit === "g" || i.unit === "ml";
+        return computeLineTotalCents({
+          promo_price_cents: i.promo_price_cents,
+          quantity: i.quantity ?? 1,
+          pack_size: isMeasure ? null : i.promo_pack_size,
+        });
+      }
     }
     if (i.price_cents != null) return i.price_cents;
     return null;
@@ -720,14 +817,16 @@ export default function ShoppingPage() {
   const headerTotal = hasAnyActual ? actualTotal : expectedTotal;
 
   const storeRanking = useMemo(
-    () => rankStoresByDeals(items.filter((i) => !i.is_excess).map((i) => ({ ...i, pack_size: i.promo_pack_size }))),
-    [items],
+    () => isGeneralList
+      ? rankStoresByDeals(items.filter((i) => !i.is_excess).map((i) => ({ ...i, pack_size: i.promo_pack_size })))
+      : { ranked: [], promoItemCount: 0, bestPossibleTotal: 0 },
+    [isGeneralList, items],
   );
 
   const topStore = storeRanking.ranked[0];
 
   const refreshPromos = async () => {
-    if (!activeTrip || items.length === 0) return;
+    if (!isGeneralList || !activeTrip || items.length === 0) return;
     setRefreshingPromos(true);
     try {
       await triggerPromoLookup(items.filter((i) => !i.is_excess).map((i) => i.id));
@@ -743,9 +842,65 @@ export default function ShoppingPage() {
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Shopping</h1>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Shopping</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Manage your household grocery and custom shopping lists</p>
+        </div>
         <Button variant="outline" size="sm" onClick={() => setPastOpen(true)}>
           <History className="h-4 w-4 mr-2" /> Past trips
+        </Button>
+      </div>
+
+      {/* List Selection Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {activeTrips.map((trip) => {
+          const isGeneral = isGeneralShoppingList(trip, activeTrips);
+          const isSelected = trip.id === activeTrip?.id;
+          return (
+            <button
+              key={trip.id}
+              type="button"
+              onClick={() => setSelectedTripId(trip.id)}
+              className={cn(
+                "flex items-center gap-2 px-3.5 py-1.5 rounded-full text-sm font-medium transition-all duration-150 border whitespace-nowrap shadow-xs",
+                isSelected
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-background hover:bg-muted/70 text-muted-foreground hover:text-foreground border-border/80"
+              )}
+            >
+              {isGeneral ? (
+                <ShoppingBag className="h-3.5 w-3.5" />
+              ) : (
+                <Tag className="h-3.5 w-3.5 opacity-70" />
+              )}
+              <span>{isGeneral && trip.name.toLowerCase() === "shopping" ? "General" : trip.name}</span>
+              {isSelected && totalItems > 0 && (
+                <span
+                  className={cn(
+                    "ml-1 text-[11px] px-1.5 py-0.2 rounded-full font-semibold",
+                    isSelected
+                      ? "bg-primary-foreground/20 text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {totalChecked}/{totalItems}
+                </span>
+              )}
+            </button>
+          );
+        })}
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-full px-3 h-8 text-xs gap-1.5 border-dashed text-muted-foreground hover:text-foreground shrink-0 shadow-xs"
+          onClick={() => {
+            setNewListName("");
+            setNewListDialogOpen(true);
+          }}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span>New list</span>
         </Button>
       </div>
 
@@ -771,17 +926,36 @@ export default function ShoppingPage() {
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadReceipt(f); e.target.value = ""; }} />
               <input ref={receiptInputRef} type="file" accept="image/*" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) parseReceipt(f); e.target.value = ""; }} />
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-40 justify-center"
-                disabled={refreshingPromos || items.length === 0}
-                onClick={refreshPromos}
-                title="Re-check znamcenite.bg for discounts on every item"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
-                Refresh promos
-              </Button>
+
+              {/* Refresh promos is ONLY shown on the general list */}
+              {isGeneralList && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-40 justify-center"
+                  disabled={refreshingPromos || items.length === 0}
+                  onClick={refreshPromos}
+                  title="Re-check znamcenite.bg for discounts on every item"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
+                  Refresh promos
+                </Button>
+              )}
+
+              {/* Delete list is ONLY available on custom lists */}
+              {!isGeneralList && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-40 justify-center text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                  onClick={() => setConfirmDeleteListOpen(true)}
+                  title="Delete this shopping list"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete list
+                </Button>
+              )}
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="w-40 justify-center" disabled={!activeTrip}>
@@ -810,12 +984,13 @@ export default function ShoppingPage() {
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
+
               <Button
                 size="sm"
                 className="w-40 justify-center"
                 onClick={() => {
                   setCompleteForm({
-                    store: "",
+                    store: !isGeneralList && activeTrip ? activeTrip.name : "",
                     account_id: accounts[0]?.id ?? "",
                     amount: actualTotal > 0 ? (actualTotal / 100).toFixed(2) : "",
                     record_transaction: true,
@@ -971,7 +1146,7 @@ export default function ShoppingPage() {
                           </span>
                         ) : null}
                       </div>
-                      {it.promo_stores && it.promo_stores.length > 0 && (
+                      {isGeneralList && it.promo_stores && it.promo_stores.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1 mt-1">
                           {it.promo_stores.map((store) => (
                             <Badge
@@ -1086,8 +1261,8 @@ export default function ShoppingPage() {
         </div>
       )}
 
-      {/* Promo footnote */}
-      {storeRanking.promoItemCount > 0 ? (
+      {/* Promo footnote - only on the general shopping list */}
+      {isGeneralList && (storeRanking.promoItemCount > 0 ? (
         <div className="flex flex-wrap items-center gap-2 text-sm border rounded-md px-3 py-2 bg-muted/30">
           <ShoppingBag className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
           <span className="text-foreground">
@@ -1102,9 +1277,9 @@ export default function ShoppingPage() {
       ) : items.length > 0 ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
           <ShoppingBag className="h-3.5 w-3.5" />
-          No promotions matched yet. Tap "Refresh promos" to check znamcenite.bg.
+          No promotions matched yet. Tap &ldquo;Refresh promos&rdquo; to check znamcenite.bg.
         </div>
-      ) : null}
+      ) : null)}
 
       {/* Delete confirm */}
       <AlertDialog open={!!pendingDeleteId} onOpenChange={(v) => !v && setPendingDeleteId(null)}>
@@ -1258,9 +1433,91 @@ export default function ShoppingPage() {
       <ItemEditDialog
         item={editingItem}
         categories={categories}
+        isGeneralList={isGeneralList}
         onClose={() => setEditingItem(null)}
         onSave={(patch) => updateItem.mutate(patch)}
       />
+
+      {/* Create New Shopping List Dialog */}
+      <Dialog open={newListDialogOpen} onOpenChange={setNewListDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New Shopping List</DialogTitle>
+            <DialogDescription>
+              Create a dedicated list for specific stores or projects (e.g. Costco, Pharmacy, IKEA).
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const trimmed = newListName.trim();
+              if (!trimmed || !user) return;
+              createCustomList.mutate({
+                userId: user.id,
+                name: trimmed,
+                isDefault: false,
+              });
+            }}
+            className="space-y-4 pt-2"
+          >
+            <div>
+              <Input
+                placeholder="List name (e.g., Costco, IKEA, Pharmacy)"
+                value={newListName}
+                onChange={(e) => setNewListName(e.target.value)}
+                autoFocus
+                maxLength={50}
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setNewListDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={!newListName.trim() || createCustomList.isPending}
+              >
+                {createCustomList.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating…
+                  </>
+                ) : (
+                  "Create List"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Shopping List Confirmation Dialog */}
+      <AlertDialog open={confirmDeleteListOpen} onOpenChange={setConfirmDeleteListOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete shopping list?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{activeTrip?.name}&rdquo; and all items on it? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (!activeTrip || isGeneralList) return;
+                deleteCurrentList.mutate(activeTrip.id);
+              }}
+            >
+              Delete List
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Receipt result preview */}
       <Dialog open={!!receiptResult} onOpenChange={(v) => !v && setReceiptResult(null)}>
@@ -1457,10 +1714,11 @@ function TripNameEditor({ value, onSave }: { value: string; onSave: (v: string) 
 }
 
 function ItemEditDialog({
-  item, categories, onClose, onSave,
+  item, categories, isGeneralList = false, onClose, onSave,
 }: {
   item: Item | null;
   categories: Category[];
+  isGeneralList?: boolean;
   onClose: () => void;
   onSave: (patch: Partial<Item> & { id: string; _prevCategoryId?: string | null; _translation?: string | null }) => void;
 }) {
@@ -1472,9 +1730,9 @@ function ItemEditDialog({
   const [categoryId, setCategoryId] = useState<string>("");
   const [translation, setTranslation] = useState("");
 
-  // Live estimate from the cheapest matched deal (recomputed as qty changes).
+  // Live estimate from the cheapest matched deal (recomputed as qty changes) - ONLY on general list.
   const estimatedExpectedCents = useMemo(() => {
-    if (!item || !item.promo_offers || item.promo_offers.length === 0) return null;
+    if (!isGeneralList || !item || !item.promo_offers || item.promo_offers.length === 0) return null;
     const cheapest = item.promo_offers[0];
     const isMeasure = cheapest.unit === "kg" || cheapest.unit === "l" || cheapest.unit === "g" || cheapest.unit === "ml";
     return computeLineTotalCents({
@@ -1482,7 +1740,7 @@ function ItemEditDialog({
       quantity: parseFloat(qty) || item.quantity || 1,
       pack_size: isMeasure ? null : cheapest.pack_size,
     });
-  }, [item, qty]);
+  }, [isGeneralList, item, qty]);
 
   useEffect(() => {
     if (item) {
@@ -1552,7 +1810,7 @@ function ItemEditDialog({
               Add the other-language name to teach the app — both sides share the same category in suggestions.
             </p>
           </div>
-          {item.promo_offers && item.promo_offers.length > 0 && (
+          {isGeneralList && item.promo_offers && item.promo_offers.length > 0 && (
             <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
               <p className="text-xs font-medium text-muted-foreground">
                 Matched deals · cheapest first

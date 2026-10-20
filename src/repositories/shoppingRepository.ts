@@ -12,7 +12,19 @@ export const shoppingRepository = {
       .from("shopping_trips")
       .select("*")
       .eq("status", "active")
+      .order("created_at", { ascending: true })
+      .limit(1)
       .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  getActiveTrips: async (_userId?: string) => {
+    const { data, error } = await supabase
+      .from("shopping_trips")
+      .select("*")
+      .eq("status", "active")
+      .order("created_at", { ascending: true });
     if (error) throw error;
     return data;
   },
@@ -39,14 +51,37 @@ export const shoppingRepository = {
     return data;
   },
 
-  createTrip: async (userId: string, name: string) => {
-    const { data, error } = await supabase
-      .from("shopping_trips")
-      .insert({ user_id: userId, name })
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  createTrip: async (userId: string, name: string, isDefault = false) => {
+    try {
+      const { data, error } = await supabase
+        .from("shopping_trips")
+        .insert({ user_id: userId, name, is_default: isDefault } as any)
+        .select()
+        .single();
+      if (!error && data) return data;
+      if (error && error.message?.includes("is_default")) {
+        const { data: fbData, error: fbError } = await supabase
+          .from("shopping_trips")
+          .insert({ user_id: userId, name } as any)
+          .select()
+          .single();
+        if (fbError) throw fbError;
+        return fbData;
+      }
+      if (error) throw error;
+      return data;
+    } catch (e: any) {
+      if (e?.message?.includes("is_default")) {
+        const { data: fbData, error: fbError } = await supabase
+          .from("shopping_trips")
+          .insert({ user_id: userId, name } as any)
+          .select()
+          .single();
+        if (fbError) throw fbError;
+        return fbData;
+      }
+      throw e;
+    }
   },
 
   updateTrip: async (id: string, payload: any) => {
@@ -179,6 +214,7 @@ export const shoppingRepository = {
     if (error) throw error;
   },
   deleteTrip: async (id: string) => {
+    await supabase.from("shopping_items").delete().eq("trip_id", id);
     const { error } = await supabase.from("shopping_trips").delete().eq("id", id);
     if (error) throw error;
   },

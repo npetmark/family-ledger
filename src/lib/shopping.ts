@@ -108,25 +108,37 @@ export function parseShoppingEntry(raw: string): ParsedShoppingEntry {
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
+/** Look up the household the user belongs to (required on household-scoped inserts). */
+async function getHouseholdId(userId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from("household_members")
+    .select("household_id")
+    .eq("user_id", userId)
+    .limit(1)
+    .single();
+  if (error) throw error;
+  return data.household_id;
+}
+
 /**
- * Ensure the user has an active shopping trip, returning its id.
- * Auto-creates one named "Shopping — <today>" when none exists.
+ * Ensure the user has an active General shopping list, returning its id.
+ * Custom lists are never targeted. Auto-creates the General list when none exists.
  */
 export async function ensureActiveTrip(userId: string): Promise<string> {
-  const { data: existing, error } = await supabase
+  const { data: activeTrips, error } = await supabase
     .from("shopping_trips")
-    .select("id")
+    .select("id, is_default, created_at")
     .eq("status", "active")
-    .order("started_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: true });
   if (error) throw error;
-  if (existing) return existing.id;
+  const general = (activeTrips ?? []).find((t) => isGeneralShoppingList(t, activeTrips ?? []));
+  if (general) return general.id;
 
   const name = `Shopping — ${format(new Date(), "EEE d MMM")}`;
+  const householdId = await getHouseholdId(userId);
   const { data: created, error: cErr } = await supabase
     .from("shopping_trips")
-    .insert({ user_id: userId, name })
+    .insert({ user_id: userId, household_id: householdId, name, is_default: true })
     .select("id")
     .single();
   if (cErr) throw cErr;
@@ -190,6 +202,7 @@ export async function addShoppingItem(opts: {
   } else {
     await supabase.from("shopping_item_dictionary").insert({
       user_id: opts.userId,
+      household_id: await getHouseholdId(opts.userId),
       normalized_name: norm,
       display_name: display,
       language: lang,
@@ -338,3 +351,51 @@ export function scheduleUndoableDelete(opts: UndoableDeleteOptions): () => void 
     clearTimeout(timer);
   };
 }
+
+export interface ShoppingTripRef {
+  id?: string;
+  is_default?: boolean;
+  name?: string;
+  created_at?: string;
+}
+
+/**
+ * Determines whether a given shopping trip is the permanent General shopping list.
+ * A trip is the general list if:
+ * 1. Its `is_default` flag is true, OR
+ * 2. If no active trip has `is_default` set, the earliest active trip in the list is the default.
+ */
+export function isGeneralShoppingList(
+  trip: ShoppingTripRef | null | undefined,
+  allTrips: ShoppingTripRef[] = [],
+): boolean {
+  if (!trip || !trip.id) return false;
+  if (trip.is_default) return true;
+  const anyHasDefault = allTrips.some((t) => t.is_default);
+  if (!anyHasDefault && allTrips.length > 0) {
+    return allTrips[0]?.id === trip.id;
+  }
+  return false;
+}
+
+/**
+ * Custom lists can be deleted; the general list cannot be deleted.
+ */
+export function canDeleteShoppingList(
+  trip: ShoppingTripRef | null | undefined,
+  allTrips: ShoppingTripRef[] = [],
+): boolean {
+  if (!trip || !trip.id) return false;
+  return !isGeneralShoppingList(trip, allTrips);
+}
+
+/**
+ * Discount promo extraction and store deals are only applicable to the General shopping list.
+ */
+export function arePromosEnabledForList(
+  trip: ShoppingTripRef | null | undefined,
+  allTrips: ShoppingTripRef[] = [],
+): boolean {
+  return isGeneralShoppingList(trip, allTrips);
+}
+

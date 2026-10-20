@@ -17,6 +17,14 @@ export function useActiveShoppingTrip(userId: string | undefined) {
   });
 }
 
+export function useActiveShoppingTrips(userId: string | undefined) {
+  return useQuery({
+    queryKey: ["active-trips", userId],
+    queryFn: () => shoppingRepository.getActiveTrips(userId),
+    enabled: !!userId,
+  });
+}
+
 export function useShoppingItems(tripId: string | undefined) {
   return useQuery({
     queryKey: ["shopping-items", tripId],
@@ -94,12 +102,29 @@ export function useCreateShoppingTrip(options?: { onSuccess?: (data: any) => voi
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ userId, name }: { userId: string; name: string }) => {
-      return await shoppingRepository.createTrip(userId, name);
+    mutationFn: async ({ userId, name, isDefault }: { userId: string; name: string; isDefault?: boolean }) => {
+      return await shoppingRepository.createTrip(userId, name, isDefault ?? false);
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["active-trips"] });
       queryClient.invalidateQueries({ queryKey: ["active-trip"] });
       options?.onSuccess?.(data);
+    },
+    onError: options?.onError,
+  });
+}
+
+export function useDeleteShoppingTrip(options?: { onSuccess?: () => void; onError?: (error: Error) => void }) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: shoppingRepository.deleteTrip,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["active-trips"] });
+      queryClient.invalidateQueries({ queryKey: ["active-trip"] });
+      queryClient.invalidateQueries({ queryKey: ["shopping-items"] });
+      queryClient.invalidateQueries({ queryKey: ["past-trips"] });
+      options?.onSuccess?.();
     },
     onError: options?.onError,
   });
@@ -113,6 +138,7 @@ export function useUpdateShoppingTrip(options?: { onSuccess?: () => void; onErro
       await shoppingRepository.updateTrip(id, payload);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["active-trips"] });
       queryClient.invalidateQueries({ queryKey: ["active-trip"] });
       queryClient.invalidateQueries({ queryKey: ["past-trips"] });
       options?.onSuccess?.();

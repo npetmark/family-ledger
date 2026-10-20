@@ -637,6 +637,7 @@ export type Database = {
           created_at: string
           household_id: string
           id: string
+          is_default: boolean
           name: string
           notes: string | null
           receipt_path: string | null
@@ -651,6 +652,7 @@ export type Database = {
           created_at?: string
           household_id: string
           id?: string
+          is_default?: boolean
           name: string
           notes?: string | null
           receipt_path?: string | null
@@ -665,6 +667,7 @@ export type Database = {
           created_at?: string
           household_id?: string
           id?: string
+          is_default?: boolean
           name?: string
           notes?: string | null
           receipt_path?: string | null
