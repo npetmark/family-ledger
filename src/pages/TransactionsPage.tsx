@@ -23,11 +23,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { AccountSelectItems } from "@/components/AccountSelectItems";
-import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Pencil, Banknote, Users, User, Trash2 } from "lucide-react";
+import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Pencil, Banknote, Users, User, Trash2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, addDays, addYears } from "date-fns";
 import { getFundSubcategoryId } from "@/lib/fund-accounts";
 import { scheduleUndoableDelete } from "@/lib/shopping";
+import { matchesTransactionSearch } from "@/lib/transactionFilter";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -94,6 +95,7 @@ export default function TransactionsPage() {
   const [customOpen, setCustomOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [accountFilter, setAccountFilter] = useState<AccountFilterValue>({ mode: "all-visible" });
+  const [searchQuery, setSearchQuery] = useState("");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
 
@@ -228,9 +230,16 @@ export default function TransactionsPage() {
   };
 
   const filteredAccountIds = getFilteredAccountIds(accounts, accountFilter);
-  const filteredTransactions = filteredAccountIds
-    ? transactions.filter((t) => filteredAccountIds.includes(t.account_id))
+  const accountFilteredTransactions = filteredAccountIds
+    ? transactions.filter((t) => filteredAccountIds.includes(t.account_id) || (t.transfer_to_account_id && filteredAccountIds.includes(t.transfer_to_account_id)))
     : transactions;
+
+  const filteredTransactions = useMemo(() => {
+    if (!searchQuery.trim()) return accountFilteredTransactions;
+    return accountFilteredTransactions.filter((t) =>
+      matchesTransactionSearch(t, searchQuery, accounts)
+    );
+  }, [accountFilteredTransactions, searchQuery, accounts]);
 
   const totalIncome = filteredTransactions.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0);
   const totalExpenses = filteredTransactions.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0);
@@ -249,30 +258,59 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Time filter presets */}
-      <div className="flex gap-2 flex-wrap items-center">
-        {(["day", "week", "month", "year"] as const).map((preset) => (
+      {/* Time filter presets, account filter & search */}
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+        <div className="flex gap-2 flex-wrap items-center">
+          {(["day", "week", "month", "year"] as const).map((preset) => (
+            <Button
+              key={preset}
+              variant={activePreset === preset ? "default" : "outline"}
+              size="sm"
+              className="capitalize"
+              onClick={() => selectPreset(preset)}
+            >
+              {preset}
+            </Button>
+          ))}
           <Button
-            key={preset}
-            variant={activePreset === preset ? "default" : "outline"}
+            variant={activePreset === "custom" ? "default" : "outline"}
             size="sm"
-            className="capitalize"
-            onClick={() => selectPreset(preset)}
+            onClick={() => selectPreset("custom")}
           >
-            {preset}
+            {activePreset === "custom"
+              ? `${format(dateFilter.from, "MMM d")} – ${format(dateFilter.to, "MMM d")}`
+              : "Custom"}
           </Button>
-        ))}
-        <Button
-          variant={activePreset === "custom" ? "default" : "outline"}
-          size="sm"
-          onClick={() => selectPreset("custom")}
-        >
-          {activePreset === "custom"
-            ? `${format(dateFilter.from, "MMM d")} – ${format(dateFilter.to, "MMM d")}`
-            : "Custom"}
-        </Button>
 
-        <AccountFilter accounts={writableAccounts} value={accountFilter} onChange={setAccountFilter} />
+          <AccountFilter
+            accounts={accounts}
+            value={accountFilter}
+            onChange={setAccountFilter}
+            currentUserId={user?.id}
+            householdMembers={householdInfo?.members}
+          />
+        </div>
+
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search keyword, amount, date..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8 pr-8 h-8 text-xs sm:text-sm"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {activePreset !== "custom" && (
@@ -592,8 +630,13 @@ export default function TransactionsPage() {
           return (
             <Card>
               <CardContent className="pt-6">
-                <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-                  No transactions in this period
+                <div className="flex flex-col items-center justify-center h-32 text-sm text-muted-foreground gap-1.5">
+                  <span>{searchQuery.trim() ? "No transactions matching your search in this period" : "No transactions in this period"}</span>
+                  {searchQuery.trim() && (
+                    <Button variant="outline" size="sm" onClick={() => setSearchQuery("")} className="text-xs h-7">
+                      Clear search
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -632,6 +675,11 @@ export default function TransactionsPage() {
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 flex-wrap">
                   <span className="truncate flex items-center gap-1.5">
                     {(t as any).accounts?.name}
+                    {t.transaction_type === "transfer" && t.transfer_to_account_id && (
+                      <span className="text-muted-foreground">
+                        → {accounts.find((a: any) => a.id === t.transfer_to_account_id)?.name || "Account"}
+                      </span>
+                    )}
                     {account && (
                       isJoint ? (
                         <Badge variant="secondary" className="h-4 px-1 text-[9px] opacity-70"><Users className="h-2 w-2 mr-1"/> Shared</Badge>

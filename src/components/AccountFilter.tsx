@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { Filter, Check } from "lucide-react";
+import { HouseholdMemberOption, getAccountOwnerName } from "./AccountSelectItems";
 
 export type AccountFilterMode = "all-visible" | "custom";
 
@@ -12,15 +13,21 @@ export interface AccountFilterValue {
   customAccountIds?: string[];
 }
 
+export interface AccountFilterItem {
+  id: string;
+  name: string;
+  icon: string;
+  is_visible: boolean;
+  owner_user_id?: string | null;
+  sort_order?: number;
+}
+
 interface AccountFilterProps {
-  accounts: Array<{
-    id: string;
-    name: string;
-    icon: string;
-    is_visible: boolean;
-  }>;
+  accounts: AccountFilterItem[];
   value: AccountFilterValue;
   onChange: (value: AccountFilterValue) => void;
+  currentUserId?: string;
+  householdMembers?: HouseholdMemberOption[];
 }
 
 export function getFilteredAccountIds(
@@ -37,7 +44,13 @@ export function getFilteredAccountIds(
   }
 }
 
-export function AccountFilter({ accounts, value, onChange }: AccountFilterProps) {
+export function AccountFilter({
+  accounts,
+  value,
+  onChange,
+  currentUserId,
+  householdMembers,
+}: AccountFilterProps) {
   const [open, setOpen] = useState(false);
 
   const visibleAccounts = accounts.filter((a) => a.is_visible);
@@ -46,13 +59,55 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
     ? visibleAccounts.length
     : (value.customAccountIds?.length || 0);
 
+  const singleSelectedAccount = useMemo(() => {
+    if (!isAllVisible && selectedCount === 1) {
+      return accounts.find((a) => value.customAccountIds?.includes(a.id));
+    }
+    return null;
+  }, [isAllVisible, selectedCount, accounts, value.customAccountIds]);
+
+  const singleAccountLabel = useMemo(() => {
+    if (!singleSelectedAccount) return null;
+    const ownerName = getAccountOwnerName(
+      singleSelectedAccount.owner_user_id,
+      currentUserId,
+      householdMembers
+    );
+    return ownerName
+      ? `${singleSelectedAccount.name} (${ownerName})`
+      : singleSelectedAccount.name;
+  }, [singleSelectedAccount, currentUserId, householdMembers]);
+
   const label = isAllVisible
     ? "All accounts"
     : selectedCount === 0
       ? "No accounts"
-      : selectedCount === accounts.length
+      : singleAccountLabel || (selectedCount === accounts.length
         ? "All accounts"
-        : `${selectedCount} account${selectedCount !== 1 ? "s" : ""}`;
+        : `${selectedCount} account${selectedCount !== 1 ? "s" : ""}`);
+
+  const sortedAccounts = useMemo(() => {
+    return [...accounts].sort((a, b) => {
+      // 1. Visible first
+      if (a.is_visible !== b.is_visible) {
+        return a.is_visible ? -1 : 1;
+      }
+      // 2. Current user accounts
+      const aMine = a.owner_user_id === currentUserId;
+      const bMine = b.owner_user_id === currentUserId;
+      if (aMine && !bMine) return -1;
+      if (!aMine && bMine) return 1;
+
+      // 3. Shared accounts
+      const aShared = a.owner_user_id === null;
+      const bShared = b.owner_user_id === null;
+      if (aShared && !bShared) return -1;
+      if (!aShared && bShared) return 1;
+
+      // 4. Sort order
+      return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    });
+  }, [accounts, currentUserId]);
 
   const toggleAccount = (accountId: string) => {
     const currentIds = value.mode === "all-visible"
@@ -93,12 +148,12 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-1.5">
-          <Filter className="h-3.5 w-3.5" />
-          <span className="text-xs">{label}</span>
+        <Button variant="outline" size="sm" className="h-8 gap-1.5 max-w-[200px]">
+          <Filter className="h-3.5 w-3.5 shrink-0" />
+          <span className="text-xs truncate">{label}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-60 p-0" align="end">
+      <PopoverContent className="w-64 p-0" align="end">
         <div className="p-2 border-b border-border flex items-center gap-1">
           <button
             type="button"
@@ -122,10 +177,11 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
             Clear
           </button>
         </div>
-        <div className="max-h-[240px] overflow-y-auto">
+        <div className="max-h-[260px] overflow-y-auto">
           <div className="p-1.5 space-y-0.5">
-            {[...accounts].sort((a, b) => (a.is_visible === b.is_visible ? 0 : a.is_visible ? -1 : 1)).map((a) => {
+            {sortedAccounts.map((a) => {
               const checked = isAccountSelected(a.id);
+              const ownerName = getAccountOwnerName(a.owner_user_id, currentUserId, householdMembers);
               return (
                 <label
                   key={a.id}
@@ -136,7 +192,14 @@ export function AccountFilter({ accounts, value, onChange }: AccountFilterProps)
                     onCheckedChange={() => toggleAccount(a.id)}
                   />
                   <DynamicIcon name={a.icon} className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm truncate">{a.name}</span>
+                  <span className="text-sm truncate flex-1 min-w-0">
+                    {a.name}
+                    {ownerName ? (
+                      <span className="text-xs text-muted-foreground ml-1 font-normal truncate">
+                        ({ownerName})
+                      </span>
+                    ) : null}
+                  </span>
                   {!a.is_visible && (
                     <span className="text-[10px] text-muted-foreground ml-auto shrink-0">(hidden)</span>
                   )}

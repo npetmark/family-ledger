@@ -32,19 +32,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    
+    const body = await req.json();
+    const { message, image, history, user_id, user_name } = body;
 
-    // Get user's accounts and subcategories for context
-    const [accountsRes, subcatsRes] = await Promise.all([
-      supabaseClient.from("accounts").select("id, name, account_type").order("sort_order"),
+    const callerUserId = (claimsData?.claims?.sub as string) || user_id;
+
+    // Get user's accounts, subcategories, and profiles for context
+    const [accountsRes, subcatsRes, profilesRes] = await Promise.all([
+      supabaseClient.from("accounts").select("id, name, account_type, owner_user_id").order("sort_order"),
       supabaseClient.from("subcategories").select("id, name, icon, main_category_id, main_categories(name)").eq("is_active", true).order("sort_order"),
+      supabaseClient.from("profiles").select("id, first_name, last_name, display_name"),
     ]);
 
     const accounts = accountsRes.data || [];
     const subcategories = subcatsRes.data || [];
+    const profiles = profilesRes.data || [];
 
-    const body = await req.json();
-    const { message, image, history } = body;
+    const callerProfile = profiles.find((p: any) => p.id === callerUserId);
+    const callerName = callerProfile?.first_name || callerProfile?.display_name || user_name || "Current User";
 
     if (!message && !image) {
       return new Response(JSON.stringify({ error: "Message or image is required" }), {
@@ -63,37 +68,57 @@ Deno.serve(async (req) => {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
-    const accountsList = accounts.map((a: any) => `- "${a.name}" (id: ${a.id}, type: ${a.account_type})`).join("\n");
+    const accountsList = accounts.map((a: any) => {
+      let ownership = "Shared household account (accessible by all household members)";
+      if (a.owner_user_id === callerUserId) {
+        ownership = `CURRENT USER's personal account (owned by ${callerName})`;
+      } else if (a.owner_user_id) {
+        const ownerProf = profiles.find((p: any) => p.id === a.owner_user_id);
+        const ownerName = ownerProf?.first_name || ownerProf?.display_name || "another household member";
+        ownership = `personal account owned by ${ownerName}`;
+      }
+      return `- "${a.name}" (id: ${a.id}, type: ${a.account_type}, ownership: ${ownership})`;
+    }).join("\n");
+
     const categoriesList = subcategories.map((s: any) => `- "${s.name}" under "${s.main_categories?.name}" (id: ${s.id})`).join("\n");
 
     const systemPrompt = `You are a financial assistant for a personal finance app. You can:
 1. Parse transactions from text or receipt/notification screenshots
 2. Create/update budget plans
 
-Available accounts:
+The person you are assisting is: ${callerName} (user_id: ${callerUserId}).
+
+Available accounts in the household:
 ${accountsList}
 
 Available subcategories (with main category):
 ${categoriesList}
 
+## Account Matching Rules (CRITICAL):
+- When the user refers to an account by bank or name (e.g., "my UniCredit account", "UniCredit", "from UniCredit", "my bank", "cash", "Revolut", "DSK") or uploads an image (receipt, push notification, banking screenshot):
+  1. If the current user (${callerName}) has a personal account matching that bank or name, ALWAYS select that account!
+  2. If ${callerName} does not have a personal account matching that bank/name, select a shared household account matching that bank/name.
+  3. When an account name (such as "UniCredit") is shared by multiple members (for example, both ${callerName} and another member have an account named "UniCredit"), you MUST select ${callerName}'s account. DO NOT ask for clarification between ${callerName}'s account and another member's account!
+  4. Only select another person's account if the user explicitly mentions that person's name (e.g. "from Maria's UniCredit" or "transfer to Maria's account").
+  5. When parsing images (receipts, transaction push notifications, bank app screenshots), attribute the transaction to ${callerName}'s matching account (or a shared account). NEVER ask for clarification between ${callerName}'s account and another member's account sharing the same bank/name.
+  6. ONLY set "needs_clarification" to true for the account if no account or bank is mentioned or identifiable in the message or image at all, or if ${callerName} has multiple personal accounts of the same type and it is genuinely ambiguous.
+
 ## Transaction Parsing
 For each transaction found, extract:
 - transaction_type: "expense", "income", or "transfer"
-- amount: number in cents (e.g. 35.23 EUR = 3523)
-- account_id: best matching account UUID from the list above
+- amount: number in cents (e.g. 35.23 EUR = 3523, 4.99 = 499)
+- account_id: best matching account UUID from the list above according to the Account Matching Rules
 - subcategory_id: best matching subcategory UUID from the list (null for transfers)
 - transfer_to_account_id: destination account UUID (only for transfers, otherwise null)
 - note: a brief descriptive note
 - date: ISO date string (YYYY-MM-DD), default to today if not specified
 
 Rules:
-- Match accounts by name similarity (e.g. "UniCredit" → the bank account, "cash" → cash account)
-- Match categories by semantic meaning (e.g. "groceries" → the groceries/food subcategory, "salary" → income subcategory)
+- Match categories by semantic meaning (e.g. "groceries" → groceries/food subcategory, "coffee" / "starbucks" → cafes/restaurants subcategory, "salary" → income subcategory)
 - If multiple transactions are found (e.g. from a screenshot with multiple notifications), return ALL of them
 - Amounts should be in cents (multiply by 100)
 - Today's date is ${new Date().toISOString().split("T")[0]}
-- IMPORTANT: If the user did NOT specify which account the transaction is from (for expenses/income) or the source/destination accounts (for transfers), do NOT guess. Instead, set "needs_clarification" to true and ask the user in the "message" field which account to use.
-- Similarly if amount is missing, ask for it.
+- If amount is missing, ask for it with "needs_clarification": true.
 - Only set "needs_clarification" to false when you have all required info.
 
 ## Budget Management
@@ -201,15 +226,45 @@ If unclear whether user wants a transaction or budget, ask for clarification.`;
 
     // Validate transactions
     if (parsed.action === "transaction" && parsed.transactions && Array.isArray(parsed.transactions)) {
-      parsed.transactions = parsed.transactions.map((t: any) => ({
-        transaction_type: ["expense", "income", "transfer"].includes(t.transaction_type) ? t.transaction_type : "expense",
-        amount: typeof t.amount === "number" && t.amount > 0 ? Math.round(t.amount) : 0,
-        account_id: accounts.some((a: any) => a.id === t.account_id) ? t.account_id : accounts[0]?.id || null,
-        subcategory_id: subcategories.some((s: any) => s.id === t.subcategory_id) ? t.subcategory_id : null,
-        transfer_to_account_id: t.transaction_type === "transfer" && accounts.some((a: any) => a.id === t.transfer_to_account_id) ? t.transfer_to_account_id : null,
-        note: typeof t.note === "string" ? t.note.slice(0, 500) : "",
-        date: t.date || new Date().toISOString().split("T")[0],
-      }));
+      parsed.transactions = parsed.transactions.map((t: any) => {
+        let accountId = t.account_id;
+
+        // If the AI selected an account owned by another member, check if caller has an account with the same name
+        const selectedAccount = accounts.find((a: any) => a.id === accountId);
+        if (selectedAccount && selectedAccount.owner_user_id !== null && selectedAccount.owner_user_id !== callerUserId) {
+          // Check if user explicitly mentioned the other owner's name in message/text
+          const otherOwnerProf = profiles.find((p: any) => p.id === selectedAccount.owner_user_id);
+          const otherOwnerName = otherOwnerProf?.first_name?.toLowerCase();
+          const userMsgText = (message || "").toLowerCase();
+          const explicitlyMentioned = otherOwnerName && userMsgText.includes(otherOwnerName);
+
+          if (!explicitlyMentioned) {
+            // Find caller's account with the same or similar name
+            const callerMatching = accounts.find(
+              (a: any) => a.owner_user_id === callerUserId && a.name.toLowerCase() === selectedAccount.name.toLowerCase()
+            );
+            if (callerMatching) {
+              accountId = callerMatching.id;
+            }
+          }
+        }
+
+        const fallbackAccount = accounts.find((a: any) => a.owner_user_id === callerUserId)
+          || accounts.find((a: any) => a.owner_user_id === null)
+          || accounts[0];
+
+        const validAccountId = accounts.some((a: any) => a.id === accountId) ? accountId : fallbackAccount?.id || null;
+
+        return {
+          transaction_type: ["expense", "income", "transfer"].includes(t.transaction_type) ? t.transaction_type : "expense",
+          amount: typeof t.amount === "number" && t.amount > 0 ? Math.round(t.amount) : 0,
+          account_id: validAccountId,
+          subcategory_id: subcategories.some((s: any) => s.id === t.subcategory_id) ? t.subcategory_id : null,
+          transfer_to_account_id: t.transaction_type === "transfer" && accounts.some((a: any) => a.id === t.transfer_to_account_id) ? t.transfer_to_account_id : null,
+          note: typeof t.note === "string" ? t.note.slice(0, 500) : "",
+          date: t.date || new Date().toISOString().split("T")[0],
+        };
+      });
       parsed.transactions = parsed.transactions.filter((t: any) => t.amount > 0 && t.account_id);
     }
 

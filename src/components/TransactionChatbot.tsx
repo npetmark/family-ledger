@@ -7,6 +7,7 @@ import { useActiveSubcategories, useMainCategories } from "@/hooks/queries/useCa
 import { useSaveBudgets } from "@/hooks/queries/useBudgets";
 import { budgetRepository } from "@/repositories/budgetRepository";
 import { useAuth } from "@/hooks/useAuth";
+import { getFirstName } from "@/hooks/queries/useProfile";
 import { formatCurrency } from "@/lib/financial";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -71,8 +72,17 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
 
   const parseMutation = useMutation({
     mutationFn: async ({ message, image, history }: { message?: string; image?: string; history?: { role: string; content: string }[] }) => {
+      const callerMember = householdInfo?.members?.find((m: any) => m.user_id === user?.id);
+      const callerName = getFirstName(callerMember?.profile) || user?.user_metadata?.first_name || user?.user_metadata?.display_name || user?.email || "User";
+
       const { data, error } = await supabase.functions.invoke("parse-transaction", {
-        body: { message, image, history },
+        body: {
+          message,
+          image,
+          history,
+          user_id: user?.id,
+          user_name: callerName,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
