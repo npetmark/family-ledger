@@ -36,6 +36,30 @@ export function getAccountOwnerName(
   return firstName || undefined;
 }
 
+export function getAccountOwnerDisplay(
+  ownerUserId: string | null | undefined,
+  householdMembers?: HouseholdMemberOption[]
+): string | undefined {
+  if (ownerUserId === undefined) return undefined;
+  if (ownerUserId === null) return "Shared";
+  const member = householdMembers?.find((m) => m.user_id === ownerUserId);
+  const firstName = getFirstName(member?.profile);
+  return firstName || "Personal";
+}
+
+export function formatAccountNameWithOwner(
+  account: { name?: string | null; owner_user_id?: string | null } | null | undefined,
+  householdMembers?: HouseholdMemberOption[]
+): string {
+  if (!account || !account.name) return "";
+  const ownerLabel = getAccountOwnerDisplay(account.owner_user_id, householdMembers);
+  if (!ownerLabel) return account.name;
+  if (account.name.toLowerCase().includes(`(${ownerLabel.toLowerCase()})`)) {
+    return account.name;
+  }
+  return `${account.name} (${ownerLabel})`;
+}
+
 export function getCategorizedAccounts({
   accounts,
   currentUserId,
@@ -61,7 +85,11 @@ export function getCategorizedAccounts({
       if (a.owner_user_id === currentUserId && b.owner_user_id === null) return -1;
       if (a.owner_user_id === null && b.owner_user_id === currentUserId) return 1;
       return (a.sort_order ?? 0) - (b.sort_order ?? 0);
-    });
+    })
+    .map((a) => ({
+      ...a,
+      ownerName: getAccountOwnerDisplay(a.owner_user_id, householdMembers),
+    }));
 
   if (!isTransfer) {
     return { ownedAccounts, otherAccounts: [] };
@@ -73,7 +101,7 @@ export function getCategorizedAccounts({
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     .map((a) => ({
       ...a,
-      ownerName: getAccountOwnerName(a.owner_user_id, currentUserId, householdMembers),
+      ownerName: getAccountOwnerDisplay(a.owner_user_id, householdMembers) || getAccountOwnerName(a.owner_user_id, currentUserId, householdMembers),
     }));
 
   return { ownedAccounts, otherAccounts };
@@ -114,7 +142,7 @@ export function AccountSelectItems({
               <SelectItem key={a.id} value={a.id}>
                 <div className="flex items-center gap-2">
                   <DynamicIcon name={a.icon || "wallet"} className="h-4 w-4" />
-                  <span>{a.name}</span>
+                  <span>{formatAccountNameWithOwner(a, householdMembers)}</span>
                 </div>
               </SelectItem>
             ))}
@@ -129,10 +157,7 @@ export function AccountSelectItems({
             <SelectItem key={a.id} value={a.id}>
               <div className="flex items-center gap-2">
                 <DynamicIcon name={a.icon || "wallet"} className="h-4 w-4" />
-                <span>
-                  {a.name}
-                  {a.ownerName ? ` (${a.ownerName})` : ""}
-                </span>
+                <span>{formatAccountNameWithOwner(a, householdMembers)}</span>
               </div>
             </SelectItem>
           ))}
@@ -147,7 +172,7 @@ export function AccountSelectItems({
         <SelectItem key={a.id} value={a.id}>
           <div className="flex items-center gap-2">
             <DynamicIcon name={a.icon || "wallet"} className="h-4 w-4" />
-            <span>{a.name}</span>
+            <span>{formatAccountNameWithOwner(a, householdMembers)}</span>
           </div>
         </SelectItem>
       ))}

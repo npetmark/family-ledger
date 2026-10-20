@@ -4,7 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { Filter, Check } from "lucide-react";
-import { HouseholdMemberOption, getAccountOwnerName } from "./AccountSelectItems";
+import { HouseholdMemberOption, formatAccountNameWithOwner } from "./AccountSelectItems";
 
 export type AccountFilterMode = "all-visible" | "custom";
 
@@ -68,15 +68,8 @@ export function AccountFilter({
 
   const singleAccountLabel = useMemo(() => {
     if (!singleSelectedAccount) return null;
-    const ownerName = getAccountOwnerName(
-      singleSelectedAccount.owner_user_id,
-      currentUserId,
-      householdMembers
-    );
-    return ownerName
-      ? `${singleSelectedAccount.name} (${ownerName})`
-      : singleSelectedAccount.name;
-  }, [singleSelectedAccount, currentUserId, householdMembers]);
+    return formatAccountNameWithOwner(singleSelectedAccount, householdMembers);
+  }, [singleSelectedAccount, householdMembers]);
 
   const label = isAllVisible
     ? "All accounts"
@@ -181,7 +174,6 @@ export function AccountFilter({
           <div className="p-1.5 space-y-0.5">
             {sortedAccounts.map((a) => {
               const checked = isAccountSelected(a.id);
-              const ownerName = getAccountOwnerName(a.owner_user_id, currentUserId, householdMembers);
               return (
                 <label
                   key={a.id}
@@ -193,12 +185,7 @@ export function AccountFilter({
                   />
                   <DynamicIcon name={a.icon} className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="text-sm truncate flex-1 min-w-0">
-                    {a.name}
-                    {ownerName ? (
-                      <span className="text-xs text-muted-foreground ml-1 font-normal truncate">
-                        ({ownerName})
-                      </span>
-                    ) : null}
+                    {formatAccountNameWithOwner(a, householdMembers)}
                   </span>
                   {!a.is_visible && (
                     <span className="text-[10px] text-muted-foreground ml-auto shrink-0">(hidden)</span>

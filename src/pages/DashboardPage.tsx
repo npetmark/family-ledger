@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAccounts, useAccountBalances } from "@/hooks/queries/useAccounts";
 import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { getFirstName } from "@/hooks/queries/useProfile";
+import { formatAccountNameWithOwner } from "@/components/AccountSelectItems";
 import { useMainCategories } from "@/hooks/queries/useCategories";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, getMonthYear } from "@/lib/financial";
@@ -314,10 +315,8 @@ export default function DashboardPage() {
                 <div className="space-y-3">
                   {displayedAccounts.map((accountBalance) => {
                     const fullAccount = accounts.find((a) => a.id === accountBalance.id);
-                    const isJoint = fullAccount?.owner_user_id === null;
-                    const ownerMember = householdInfo?.members?.find((m: any) => m.user_id === fullAccount?.owner_user_id);
-                    const ownerName = getFirstName(ownerMember?.profile) || "Unknown";
-                    
+                    const displayName = formatAccountNameWithOwner(fullAccount || accountBalance, householdInfo?.members);
+
                     return (
                     <div key={accountBalance.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                       <div className="flex items-center gap-3">
@@ -325,15 +324,8 @@ export default function DashboardPage() {
                           <DynamicIcon name={accountBalance.icon} className="h-4 w-4 text-primary" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium flex items-center gap-2">
-                            {accountBalance.name}
-                            {fullAccount && (
-                              isJoint ? (
-                                <Badge variant="secondary" className="h-4 px-1 text-[9px] opacity-70"><Users className="h-2 w-2 mr-1"/> Shared</Badge>
-                              ) : (
-                                <Badge variant="outline" className="h-4 px-1 text-[9px] opacity-50"><User className="h-2 w-2 mr-1"/> {ownerName}</Badge>
-                              )
-                            )}
+                          <p className="text-sm font-medium">
+                            {displayName}
                           </p>
                           <p className="text-xs text-muted-foreground capitalize">{accountBalance.account_type}</p>
                         </div>

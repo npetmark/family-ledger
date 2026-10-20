@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { getCategorizedAccounts, getAccountOwnerName } from "@/components/AccountSelectItems";
+import {
+  getCategorizedAccounts,
+  getAccountOwnerName,
+  getAccountOwnerDisplay,
+  formatAccountNameWithOwner,
+} from "@/components/AccountSelectItems";
 
 describe("AccountSelectItems logic", () => {
   const currentUserId = "user-1";
@@ -28,6 +33,20 @@ describe("AccountSelectItems logic", () => {
     expect(getAccountOwnerName(currentUserId, currentUserId, householdMembers)).toBeUndefined();
     expect(getAccountOwnerName(null, currentUserId, householdMembers)).toBeUndefined();
     expect(getAccountOwnerName("unknown-user", currentUserId, householdMembers)).toBeUndefined();
+  });
+
+  it("resolves owner display for all types of accounts", () => {
+    expect(getAccountOwnerDisplay(currentUserId, householdMembers)).toBe("Ivan");
+    expect(getAccountOwnerDisplay(partnerUserId, householdMembers)).toBe("Maria");
+    expect(getAccountOwnerDisplay(null, householdMembers)).toBe("Shared");
+    expect(getAccountOwnerDisplay(undefined, householdMembers)).toBeUndefined();
+  });
+
+  it("formats account name with owner in brackets", () => {
+    expect(formatAccountNameWithOwner({ name: "UniCredit", owner_user_id: currentUserId }, householdMembers)).toBe("UniCredit (Ivan)");
+    expect(formatAccountNameWithOwner({ name: "UniCredit", owner_user_id: partnerUserId }, householdMembers)).toBe("UniCredit (Maria)");
+    expect(formatAccountNameWithOwner({ name: "Cash", owner_user_id: null }, householdMembers)).toBe("Cash (Shared)");
+    expect(formatAccountNameWithOwner({ name: "UniCredit (Ivan)", owner_user_id: currentUserId }, householdMembers)).toBe("UniCredit (Ivan)");
   });
 
   it("filters to only owned and shared accounts when isTransfer is false", () => {

@@ -7,6 +7,7 @@ import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 import { DynamicIcon } from "@/components/DynamicIcon";
+import { AccountSelectItems, formatAccountNameWithOwner } from "@/components/AccountSelectItems";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -136,9 +137,14 @@ export default function RecurringPage() {
                     </div>
                     <div>
                       <p className="font-medium">{r.subcategories?.name || r.note || "Recurring"}</p>
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex gap-2 mt-1 items-center">
                         <Badge variant="secondary" className="text-xs capitalize">{r.frequency}</Badge>
-                        <span className="text-xs text-muted-foreground">{r.accounts?.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatAccountNameWithOwner(
+                            accounts.find((a: any) => a.id === r.account_id) || { name: r.accounts?.name },
+                            householdInfo?.members
+                          )}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -221,7 +227,11 @@ export default function RecurringPage() {
               <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                 <SelectContent>
-                  {writableAccounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  <AccountSelectItems
+                    accounts={accounts}
+                    currentUserId={user?.id}
+                    householdMembers={householdInfo?.members}
+                  />
                 </SelectContent>
               </Select>
             </div>

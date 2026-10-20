@@ -22,7 +22,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DynamicIcon } from "@/components/DynamicIcon";
-import { AccountSelectItems } from "@/components/AccountSelectItems";
+import { AccountSelectItems, formatAccountNameWithOwner } from "@/components/AccountSelectItems";
 import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Pencil, Banknote, Users, User, Trash2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, addDays, addYears } from "date-fns";
@@ -237,9 +237,9 @@ export default function TransactionsPage() {
   const filteredTransactions = useMemo(() => {
     if (!searchQuery.trim()) return accountFilteredTransactions;
     return accountFilteredTransactions.filter((t) =>
-      matchesTransactionSearch(t, searchQuery, accounts)
+      matchesTransactionSearch(t, searchQuery, accounts, householdInfo?.members)
     );
-  }, [accountFilteredTransactions, searchQuery, accounts]);
+  }, [accountFilteredTransactions, searchQuery, accounts, householdInfo?.members]);
 
   const totalIncome = filteredTransactions.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0);
   const totalExpenses = filteredTransactions.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0);
@@ -645,9 +645,9 @@ export default function TransactionsPage() {
 
         const renderTransaction = (t: typeof transactions[0], groupColor: string) => {
           const account = accounts.find((a: any) => a.id === t.account_id);
-          const isJoint = account?.owner_user_id === null;
-          const ownerMember = householdInfo?.members?.find((m: any) => m.user_id === account?.owner_user_id);
-          const ownerName = getFirstName(ownerMember?.profile) || "Unknown";
+          const destAccount = accounts.find((a: any) => a.id === t.transfer_to_account_id);
+          const accountDisplayName = formatAccountNameWithOwner(account || { name: (t as any).accounts?.name, owner_user_id: account?.owner_user_id }, householdInfo?.members);
+          const destDisplayName = destAccount ? formatAccountNameWithOwner(destAccount, householdInfo?.members) : null;
 
           return (
           <div
@@ -674,18 +674,11 @@ export default function TransactionsPage() {
                 </p>
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 flex-wrap">
                   <span className="truncate flex items-center gap-1.5">
-                    {(t as any).accounts?.name}
-                    {t.transaction_type === "transfer" && t.transfer_to_account_id && (
+                    {accountDisplayName}
+                    {t.transaction_type === "transfer" && destDisplayName && (
                       <span className="text-muted-foreground">
-                        → {accounts.find((a: any) => a.id === t.transfer_to_account_id)?.name || "Account"}
+                        → {destDisplayName}
                       </span>
-                    )}
-                    {account && (
-                      isJoint ? (
-                        <Badge variant="secondary" className="h-4 px-1 text-[9px] opacity-70"><Users className="h-2 w-2 mr-1"/> Shared</Badge>
-                      ) : (
-                        <Badge variant="outline" className="h-4 px-1 text-[9px] opacity-50"><User className="h-2 w-2 mr-1"/> {ownerName}</Badge>
-                      )
                     )}
                   </span>
                   <span>·</span>

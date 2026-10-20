@@ -1,7 +1,9 @@
 import { format } from "date-fns";
+import { formatAccountNameWithOwner, HouseholdMemberOption } from "@/components/AccountSelectItems";
 
 export interface TransactionSearchItem {
   id?: string;
+  account_id?: string;
   note?: string | null;
   amount: number;
   date: string;
@@ -18,7 +20,8 @@ export interface TransactionSearchItem {
 export function matchesTransactionSearch(
   t: TransactionSearchItem,
   query: string,
-  accounts: Array<{ id: string; name: string }> = []
+  accounts: Array<{ id: string; name: string; owner_user_id?: string | null }> = [],
+  householdMembers?: HouseholdMemberOption[]
 ): boolean {
   if (!query) return true;
   const q = query.trim().toLowerCase();
@@ -30,9 +33,20 @@ export function matchesTransactionSearch(
   if (t.subcategories?.main_categories?.name && t.subcategories.main_categories.name.toLowerCase().includes(q)) return true;
   if (t.accounts?.name && t.accounts.name.toLowerCase().includes(q)) return true;
 
+  // Check account formatted with owner
+  const sourceAcc = accounts.find((a) => a.id === t.account_id || (t.accounts?.name && a.name === t.accounts.name));
+  if (sourceAcc) {
+    const formatted = formatAccountNameWithOwner(sourceAcc, householdMembers);
+    if (formatted.toLowerCase().includes(q)) return true;
+  }
+
   if (t.transfer_to_account_id) {
     const dest = accounts.find((a) => a.id === t.transfer_to_account_id);
     if (dest?.name && dest.name.toLowerCase().includes(q)) return true;
+    if (dest) {
+      const formatted = formatAccountNameWithOwner(dest, householdMembers);
+      if (formatted.toLowerCase().includes(q)) return true;
+    }
   }
 
   // Transaction type (English & Bulgarian)

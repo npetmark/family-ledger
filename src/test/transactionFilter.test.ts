@@ -65,6 +65,16 @@ describe("matchesTransactionSearch", () => {
       expect(matchesTransactionSearch(transferTx, "savings", mockAccounts)).toBe(true);
     });
 
+    it("matches account owner name in keywords", () => {
+      const accountsWithOwner = [
+        { id: "acc-unicredit", name: "UniCredit", owner_user_id: "user-nikolay" },
+      ];
+      const members = [
+        { user_id: "user-nikolay", profile: { first_name: "Nikolay" } },
+      ];
+      expect(matchesTransactionSearch(sampleTx, "nikolay", accountsWithOwner, members)).toBe(true);
+    });
+
     it("matches transaction type in English and Bulgarian", () => {
       expect(matchesTransactionSearch(sampleTx, "expense")).toBe(true);
       expect(matchesTransactionSearch(sampleTx, "разход")).toBe(true);

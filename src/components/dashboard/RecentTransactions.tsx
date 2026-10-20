@@ -18,7 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DynamicIcon } from "@/components/DynamicIcon";
-import { AccountSelectItems } from "@/components/AccountSelectItems";
+import { AccountSelectItems, formatAccountNameWithOwner } from "@/components/AccountSelectItems";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowUpRight, ArrowDownRight, ArrowLeftRight,
@@ -178,9 +178,9 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                 const mainCatColor = t.subcategories?.main_categories?.color;
 
                 const account = accounts.find((a: any) => a.id === t.account_id);
-                const isJoint = account?.owner_user_id === null;
-                const ownerMember = householdInfo?.members?.find((m: any) => m.user_id === account?.owner_user_id);
-                const ownerName = getFirstName(ownerMember?.profile) || "Unknown";
+                const destAccount = accounts.find((a: any) => a.id === t.transfer_to_account_id);
+                const accountDisplayName = formatAccountNameWithOwner(account || { name: accountName, owner_user_id: account?.owner_user_id }, householdInfo?.members);
+                const destDisplayName = destAccount ? formatAccountNameWithOwner(destAccount, householdInfo?.members) : null;
 
                 return (
                   <button
@@ -227,13 +227,9 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                           <span className="truncate flex items-center gap-1.5">
-                            {accountName}
-                            {account && (
-                              isJoint ? (
-                                <Badge variant="secondary" className="h-4 px-1 text-[9px] opacity-70"><Users className="h-2 w-2 mr-1"/> Shared</Badge>
-                              ) : (
-                                <Badge variant="outline" className="h-4 px-1 text-[9px] opacity-50"><User className="h-2 w-2 mr-1"/> {ownerName}</Badge>
-                              )
+                            {accountDisplayName}
+                            {t.transaction_type === "transfer" && destDisplayName && (
+                              <span className="text-muted-foreground">→ {destDisplayName}</span>
                             )}
                           </span>
                           {t.note && categoryName && (

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAccounts, useAccountBalances, useSaveAccount, useDeleteAccount } from "@/hooks/queries/useAccounts";
 import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { getFirstName } from "@/hooks/queries/useProfile";
+import { formatAccountNameWithOwner } from "@/components/AccountSelectItems";
 import { Badge } from "@/components/ui/badge";
 import { Users, User, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -197,7 +198,7 @@ export default function AccountsPage() {
                       <DynamicIcon name={account.icon} className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="font-medium">{account.name}</p>
+                      <p className="font-medium">{formatAccountNameWithOwner(account, householdInfo?.members)}</p>
                       <p className="text-xs text-muted-foreground capitalize">{account.account_type} · {(account as any).currency || "EUR"}</p>
                     </div>
                   </div>
