@@ -1,5 +1,5 @@
 // Match shopping items against znamcenite.bg promotions via their public JSON API.
-// Caches the full feed for 6h; uses Lovable AI to both translate EN->BG and
+// Caches the full feed for 6h; uses Gemini AI to both translate EN->BG and
 // classify each query into the znamcenite category/subcategory slugs so that
 // we only consider promos in the right subcategory (e.g. "chicken fillet"
 // matches raw chicken but not chicken meatballs).
@@ -131,7 +131,7 @@ async function fetchAllPromos(): Promise<Promo[]> {
   for (let page = 1; page <= MAX_PAGES; page++) {
     const url = `${API_URL}?page=${page}&pageSize=${PAGE_SIZE}`;
     const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 LovableShopBot/1.0", "Accept": "application/json" },
+      headers: { "User-Agent": "Mozilla/5.0 FamilyLedgerBot/1.0", "Accept": "application/json" },
     });
     if (!res.ok) throw new Error(`promotions API ${page} -> ${res.status}`);
     const data = await res.json();
@@ -159,7 +159,7 @@ async function fetchAllPromos(): Promise<Promo[]> {
 async function fetchCategoryTree(): Promise<CategoryTree> {
   try {
     const res = await fetch(CATEGORIES_URL, {
-      headers: { "User-Agent": "Mozilla/5.0 LovableShopBot/1.0", "Accept": "application/json" },
+      headers: { "User-Agent": "Mozilla/5.0 FamilyLedgerBot/1.0", "Accept": "application/json" },
     });
     if (!res.ok) return [];
     const data = await res.json();

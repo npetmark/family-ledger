@@ -1628,7 +1628,7 @@ export default function ShoppingPage() {
               </div>
               <Input
                 autoFocus
-                placeholder="Search your list…"
+                placeholder={t("transactions.searchPlaceholder")}
                 value={matchQuery}
                 onChange={(e) => setMatchQuery(e.target.value)}
               />

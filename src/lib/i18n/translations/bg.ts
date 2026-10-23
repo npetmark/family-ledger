@@ -95,7 +95,7 @@ export const bg: TranslationDictionary = {
     subtitle: "Преглед, филтриране и проследяване на цялата активност.",
     addTransaction: "Добави трансакция",
     editTransaction: "Редактиране на трансакция",
-    searchPlaceholder: "Търсене по ключова дума, сума, дата...",
+    searchPlaceholder: "Търсене",
     allTypes: "Всички типове",
     allAccounts: "Всички сметки",
     allCategories: "Всички категории",

@@ -95,7 +95,7 @@ export const en: TranslationDictionary = {
     subtitle: "View, filter, and track all household activity.",
     addTransaction: "Add Transaction",
     editTransaction: "Edit Transaction",
-    searchPlaceholder: "Search keyword, amount, date...",
+    searchPlaceholder: "Search",
     allTypes: "All Types",
     allAccounts: "All accounts",
     allCategories: "All Categories",

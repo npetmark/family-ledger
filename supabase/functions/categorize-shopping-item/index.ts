@@ -4,7 +4,7 @@
 // Request:  { name: string, categories: [{ id, name }] }
 // Response: { english_name: string, quantity: string | null, category_id: string | null, category_name: string | null }
 //
-// Uses Lovable AI Gateway with google/gemini-3-flash-preview.
+// Uses Google Gemini API.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

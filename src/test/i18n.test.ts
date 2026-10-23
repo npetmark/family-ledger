@@ -22,6 +22,60 @@ describe("i18n system tests", () => {
       expect(translateCategory("Salary", "bg")).toBe("Заплата");
     });
 
+    it("translates comprehensive Bulgarian subcategories to English", () => {
+      // Food & Groceries
+      expect(translateCategory("Храна", "en")).toBe("Food");
+      expect(translateCategory("Хранителни стоки", "en")).toBe("Groceries");
+      expect(translateCategory("Супермаркет", "en")).toBe("Supermarket");
+      expect(translateCategory("Кафе", "en")).toBe("Coffee");
+
+      // Home & Utilities
+      expect(translateCategory("Ток", "en")).toBe("Electricity");
+      expect(translateCategory("Вода", "en")).toBe("Water");
+      expect(translateCategory("Парно", "en")).toBe("Heating");
+      expect(translateCategory("Интернет", "en")).toBe("Internet");
+      expect(translateCategory("Телефон", "en")).toBe("Phone");
+      expect(translateCategory("Вход", "en")).toBe("Building Fee");
+      expect(translateCategory("Ремонт", "en")).toBe("Renovation");
+
+      // Transport
+      expect(translateCategory("Кола", "en")).toBe("Car");
+      expect(translateCategory("Гориво", "en")).toBe("Fuel");
+      expect(translateCategory("Бензин", "en")).toBe("Petrol");
+      expect(translateCategory("Автосервиз", "en")).toBe("Auto Repair");
+      expect(translateCategory("Паркинг", "en")).toBe("Parking");
+
+      // Health & Care
+      expect(translateCategory("Аптека", "en")).toBe("Pharmacy");
+      expect(translateCategory("Лекарства", "en")).toBe("Medications");
+      expect(translateCategory("Зъболекар", "en")).toBe("Dentist");
+
+      // Shopping & Leisure
+      expect(translateCategory("Дрехи", "en")).toBe("Clothing");
+      expect(translateCategory("Обувки", "en")).toBe("Shoes");
+      expect(translateCategory("Подаръци", "en")).toBe("Gifts");
+      expect(translateCategory("Кино", "en")).toBe("Cinema");
+      expect(translateCategory("Спорт", "en")).toBe("Sports");
+      expect(translateCategory("Почивка", "en")).toBe("Vacation");
+      expect(translateCategory("Пътувания", "en")).toBe("Travel");
+
+      // Family & Kids
+      expect(translateCategory("Деца", "en")).toBe("Kids");
+      expect(translateCategory("Училище", "en")).toBe("School");
+      expect(translateCategory("Детска градина", "en")).toBe("Kindergarten");
+
+      // Finance & Tax
+      expect(translateCategory("Данъци", "en")).toBe("Taxes");
+      expect(translateCategory("Кредити", "en")).toBe("Loans");
+      expect(translateCategory("Банкови такси", "en")).toBe("Bank Fees");
+      expect(translateCategory("Крипто", "en")).toBe("Crypto");
+
+      // Income & Other
+      expect(translateCategory("Бонус", "en")).toBe("Bonus");
+      expect(translateCategory("Допълнителни доходи", "en")).toBe("Extra Income");
+      expect(translateCategory("Други разходи", "en")).toBe("Other Expenses");
+    });
+
     it("translates system shopping categories", () => {
       expect(translateCategory("Produce", "bg")).toBe("Плодове и зеленчуци");
       expect(translateCategory("Bakery", "bg")).toBe("Хляб и тестени");

@@ -1,77 +1,65 @@
-# Welcome to your Lovable project
+# Family Ledger
 
-## Project info
+A private, modern personal & household finance management progressive web application. Track expenses, manage accounts and budgets, plan shopping trips with bilingual auto-categorization and supermarket promo matching, and analyze family spending.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Tech Stack
 
-## How can I edit this code?
+- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, Lucide Icons, Recharts
+- **Backend & Database**: Supabase (PostgreSQL with Row Level Security, Edge Functions)
+- **Internationalization (i18n)**: English (UK) & Bulgarian (bg-BG) support with automatic date and category translations
+- **AI Integrations**: Google Gemini API via Supabase Edge Functions for receipt parsing, shopping categorization, and spending analysis
 
-There are several ways of editing your application.
+## Getting Started
 
-**Use Lovable**
+### Prerequisites
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- Node.js (v20 or higher recommended)
+- npm
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### Local Development
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Install dependencies
+npm install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the development server
 npm run dev
+
+# Run test suite
+npm test
+
+# Run linter
+npm run lint
+
+# Build for production
+npm run build
 ```
 
-**Edit a file directly in GitHub**
+## Deployment
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Frontend
 
-**Use GitHub Codespaces**
+The frontend is configured to build and deploy automatically to GitHub Pages via GitHub Actions upon push to the `main` branch.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Backend (Supabase)
 
-## What technologies are used for this project?
+To link and deploy Supabase migrations and Edge Functions:
 
-This project is built with:
+```sh
+# 1. Link project
+supabase link --project-ref YOUR_PROJECT_ID
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+# 2. Push database schema migrations
+supabase db push
 
-## How can I deploy this project?
+# 3. Deploy Edge Functions
+supabase functions deploy
+```
 
-This project is configured to run fully self-hosted via GitHub Pages (for the frontend) and Supabase (for the backend and AI capabilities). 
+### AI Configuration
 
-Deployment of the frontend is fully automated via GitHub Actions whenever changes are pushed to the `main` branch. 
+To enable AI features (receipt scanning, shopping item auto-categorization, spending analysis), set your Google Gemini API key in your Supabase Edge Function secrets:
 
-To deploy the backend, run the following using the Supabase CLI:
-1. `supabase link --project-ref YOUR_PROJECT_ID`
-2. `supabase db push` (to migrate your database schema)
-3. `supabase functions deploy` (to deploy the edge functions)
-
-## Setting up AI Functionality
-
-This app uses Google Gemini for features like scanning receipts and analyzing spending. You must add your Gemini API Key directly into your Supabase Edge Function Secrets:
-`supabase secrets set GEMINI_API_KEY=your_google_api_key_here`
+```sh
+supabase secrets set GEMINI_API_KEY=your_google_api_key_here
+```
