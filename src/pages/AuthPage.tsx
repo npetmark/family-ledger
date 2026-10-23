@@ -6,9 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Loader2, Wallet } from "lucide-react";
+import { Loader2, Wallet, Globe } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function AuthPage() {
+  const { t, language, setLanguage } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
@@ -32,7 +35,7 @@ export default function AuthPage() {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Check your email to confirm your account before signing in.");
+      toast.success(language === "bg" ? "Проверете имейла си за потвърждение преди вход." : "Check your email to confirm your account before signing in.");
       setIsSignUp(false);
     }
     setLoading(false);
@@ -53,15 +56,28 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 relative">
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 px-2.5 text-xs gap-1.5"
+          onClick={() => setLanguage(language === "en" ? "bg" : "en")}
+        >
+          <Globe className="h-3.5 w-3.5" />
+          <span>{language === "en" ? "Български" : "English"}</span>
+        </Button>
+        <ThemeToggle />
+      </div>
+
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-2">
           <div className="mx-auto w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2">
             <Wallet className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-semibold">Family Finance</CardTitle>
+          <CardTitle className="text-2xl font-semibold">{t("nav.familyFinance")}</CardTitle>
           <CardDescription>
-            {isSignUp ? "Create a new account" : "Private financial management for your family"}
+            {isSignUp ? t("auth.createAccountDesc") : t("auth.privateFinancialManagement")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -81,7 +97,7 @@ export default function AuthPage() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
               </svg>
             )}
-            Continue with Google
+            {t("auth.continueWithGoogle")}
           </Button>
 
           <div className="relative">
@@ -89,33 +105,33 @@ export default function AuthPage() {
               <Separator className="w-full" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">or</span>
+              <span className="bg-card px-2 text-muted-foreground">{t("common.or")}</span>
             </div>
           </div>
 
           <form onSubmit={isSignUp ? handleSignUp : handleSignIn} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="auth-email">Email</Label>
+              <Label htmlFor="auth-email">{t("auth.email")}</Label>
               <Input id="auth-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="auth-password">Password</Label>
+              <Label htmlFor="auth-password">{t("auth.password")}</Label>
               <Input id="auth-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSignUp ? "Sign Up" : "Sign In"}
+              {isSignUp ? t("auth.signUp") : t("auth.signIn")}
             </Button>
           </form>
 
           <p className="text-center text-sm text-muted-foreground">
-            {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
+            {isSignUp ? t("auth.alreadyHaveAccount") : t("auth.dontHaveAccount")}{" "}
             <button
               type="button"
               className="text-primary underline-offset-4 hover:underline"
               onClick={() => setIsSignUp(!isSignUp)}
             >
-              {isSignUp ? "Sign in" : "Sign up"}
+              {isSignUp ? t("auth.signIn") : t("auth.signUp")}
             </button>
           </p>
         </CardContent>

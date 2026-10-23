@@ -9,9 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { Loader2, LogOut } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
+  const { t } = useLanguage();
   const { data: profile, isLoading } = useProfile();
   const updateProfile = useUpdateProfile();
 
@@ -37,25 +39,25 @@ export default function ProfilePage() {
     e.preventDefault();
     const first = firstName.trim();
     if (!first) {
-      toast.error("First name cannot be empty");
+      toast.error(t("common.error"));
       return;
     }
     try {
       await updateProfile.mutateAsync({ first_name: first, last_name: lastName.trim() });
-      toast.success("Profile updated");
+      toast.success(t("common.success"));
     } catch (err: any) {
-      toast.error(err.message ?? "Failed to update profile");
+      toast.error(err.message ?? t("common.error"));
     }
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters");
+      toast.error(t("auth.passwordTooShort"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match");
+      toast.error(t("auth.passwordsDoNotMatch"));
       return;
     }
     setSavingPassword(true);
@@ -64,7 +66,7 @@ export default function ProfilePage() {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Password updated");
+      toast.success(t("common.success"));
       setNewPassword("");
       setConfirmPassword("");
     }
@@ -86,8 +88,8 @@ export default function ProfilePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Personal Details</CardTitle>
-          <CardDescription>This name is shown to other household members and on personal accounts.</CardDescription>
+          <CardTitle>{t("profile.personalDetails")}</CardTitle>
+          <CardDescription>{t("profile.personalDetailsDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -96,7 +98,7 @@ export default function ProfilePage() {
             <form onSubmit={handleSaveDetails} className="space-y-4 max-w-md">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="profile-first-name">First name</Label>
+                  <Label htmlFor="profile-first-name">{t("profile.firstName")}</Label>
                   <Input
                     id="profile-first-name"
                     value={firstName}
@@ -107,7 +109,7 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="profile-last-name">Last name</Label>
+                  <Label htmlFor="profile-last-name">{t("profile.lastName")}</Label>
                   <Input
                     id="profile-last-name"
                     value={lastName}
@@ -118,7 +120,7 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="profile-email">Email</Label>
+                <Label htmlFor="profile-email">{t("profile.email")}</Label>
                 <Input id="profile-email" value={user?.email ?? ""} disabled />
               </div>
               <Button
@@ -127,7 +129,7 @@ export default function ProfilePage() {
                 disabled={!nameChanged || !firstName.trim() || updateProfile.isPending}
               >
                 {updateProfile.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Save changes
+                {t("profile.saveChanges")}
               </Button>
             </form>
           )}
@@ -136,13 +138,13 @@ export default function ProfilePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Change Password</CardTitle>
-          <CardDescription>Update the password you use to sign in.</CardDescription>
+          <CardTitle>{t("profile.changePassword")}</CardTitle>
+          <CardDescription>{t("profile.changePasswordDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
             <div className="space-y-2">
-              <Label htmlFor="profile-new-password">New password</Label>
+              <Label htmlFor="profile-new-password">{t("profile.newPassword")}</Label>
               <Input
                 id="profile-new-password"
                 type="password"
@@ -152,7 +154,7 @@ export default function ProfilePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="profile-confirm-password">Confirm new password</Label>
+              <Label htmlFor="profile-confirm-password">{t("profile.confirmNewPassword")}</Label>
               <Input
                 id="profile-confirm-password"
                 type="password"
@@ -168,7 +170,7 @@ export default function ProfilePage() {
               disabled={!newPassword || !confirmPassword || savingPassword}
             >
               {savingPassword && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Update password
+              {t("profile.updatePassword")}
             </Button>
           </form>
         </CardContent>
@@ -177,12 +179,12 @@ export default function ProfilePage() {
       <Card>
         <CardContent className="pt-6 flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-medium">Sign out</p>
-            <p className="text-xs text-muted-foreground">End your session on this device.</p>
+            <p className="text-sm font-medium">{t("profile.signOut")}</p>
+            <p className="text-xs text-muted-foreground">{t("profile.endSession")}</p>
           </div>
           <Button id="profile-sign-out" variant="destructive" onClick={signOut}>
             <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
+            {t("profile.signOut")}
           </Button>
         </CardContent>
       </Card>

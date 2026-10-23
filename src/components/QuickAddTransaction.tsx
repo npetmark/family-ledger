@@ -5,7 +5,7 @@ import { useAccounts } from "@/hooks/queries/useAccounts";
 import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useAuth } from "@/hooks/useAuth";
-import { parseCurrencyToCents } from "@/lib/financial";
+import { parseCurrencyToCents, getMainCategoryOrder } from "@/lib/financial";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,10 +23,12 @@ import { DynamicIcon } from "@/components/DynamicIcon";
 import { TransactionChatbot } from "@/components/TransactionChatbot";
 import { AccountSelectItems } from "@/components/AccountSelectItems";
 import { addShoppingItem, parseShoppingEntry } from "@/lib/shopping";
+import { useLanguage } from "@/lib/i18n";
 
 export function QuickAddTransaction() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { t, translateCategory, formatDate } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -187,7 +189,7 @@ export function QuickAddTransaction() {
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm(); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New Transaction</DialogTitle>
+            <DialogTitle>{t("quickAdd.title")}</DialogTitle>
           </DialogHeader>
           <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); createMutation.mutate(form); }}>
             <div className="grid grid-cols-3 gap-2">
@@ -197,6 +199,11 @@ export function QuickAddTransaction() {
                   expense: isActive ? "bg-expense text-expense-foreground hover:bg-expense/90" : "border-expense/40 text-expense hover:bg-expense/10",
                   income: isActive ? "bg-income text-income-foreground hover:bg-income/90" : "border-income/40 text-income hover:bg-income/10",
                   transfer: isActive ? "bg-transfer text-transfer-foreground hover:bg-transfer/90" : "border-transfer/40 text-transfer hover:bg-transfer/10",
+                };
+                const labelMap = {
+                  expense: t("quickAdd.expense"),
+                  income: t("quickAdd.income"),
+                  transfer: t("quickAdd.transfer"),
                 };
                 return (
                   <Button
@@ -217,22 +224,22 @@ export function QuickAddTransaction() {
                       }));
                     }}
                   >
-                    {type}
+                    {labelMap[type]}
                   </Button>
                 );
               })}
             </div>
             <div className="space-y-2">
-              <Label>Amount</Label>
+              <Label>{t("quickAdd.amount")}</Label>
               <Input type="number" step="0.01" min="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required placeholder="0.00" />
             </div>
             <div className="space-y-2">
-              <Label>Date</Label>
+              <Label>{t("quickAdd.date")}</Label>
               <Popover open={dateOpen} onOpenChange={setDateOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
                     <CalendarIcon className="h-4 w-4 mr-2" />
-                    {format(form.date, "PPP")}
+                    {formatDate(form.date, "PPP")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -241,7 +248,7 @@ export function QuickAddTransaction() {
               </Popover>
             </div>
             <div className="space-y-2">
-              <Label>{form.transaction_type === "transfer" ? "From Account" : "Account"}</Label>
+              <Label>{form.transaction_type === "transfer" ? t("transactions.fromAccount") : t("quickAdd.account")}</Label>
               <Select
                 value={form.account_id}
                 onValueChange={(v) => {
@@ -252,7 +259,7 @@ export function QuickAddTransaction() {
                   }));
                 }}
               >
-                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("quickAdd.selectAccount")} /></SelectTrigger>
                 <SelectContent position="popper" side="bottom" sideOffset={4} className="max-h-60 overflow-y-auto">
                   <AccountSelectItems
                     accounts={accounts}
@@ -266,7 +273,7 @@ export function QuickAddTransaction() {
             </div>
             {form.transaction_type === "transfer" ? (
               <div className="space-y-2">
-                <Label>Transfer To</Label>
+                <Label>{t("transactions.toAccount")}</Label>
                 <Select
                   value={form.transfer_to_account_id}
                   onValueChange={(v) => {
@@ -277,7 +284,7 @@ export function QuickAddTransaction() {
                     }));
                   }}
                 >
-                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("quickAdd.selectAccount")} /></SelectTrigger>
                   <SelectContent position="popper" side="bottom" sideOffset={4} className="max-h-60 overflow-y-auto">
                     <AccountSelectItems
                       accounts={accounts}
@@ -291,14 +298,14 @@ export function QuickAddTransaction() {
               </div>
             ) : (
               <div className="space-y-2">
-                <Label>Category</Label>
+                <Label>{t("quickAdd.category")}</Label>
                 <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-between">
                       <span className={form.subcategory_id ? "text-foreground" : "text-muted-foreground"}>
                         {form.subcategory_id
-                          ? subcategories.find((s: any) => s.id === form.subcategory_id)?.name || "Select category"
-                          : "Select category"}
+                          ? translateCategory(subcategories.find((s: any) => s.id === form.subcategory_id)?.name) || t("quickAdd.selectCategory")
+                          : t("quickAdd.selectCategory")}
                       </span>
                       <ChevronRight className="h-4 w-4 opacity-50" />
                     </Button>
@@ -306,20 +313,15 @@ export function QuickAddTransaction() {
                   <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" sideOffset={4} onOpenAutoFocus={(e) => e.preventDefault()}>
                     <div className="max-h-64 overflow-y-auto overscroll-contain touch-pan-y p-1" onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()}>
                       {(() => {
-                        const categoryOrder = ["Нужди", "Желания", "Инвестиции", "Приходи"];
                         const grouped: Record<string, any[]> = {};
                         subcategories.forEach((s: any) => {
                           const mainName = s.main_categories?.name || "Other";
                           if (!grouped[mainName]) grouped[mainName] = [];
                           grouped[mainName].push(s);
                         });
-                        const sortedEntries = categoryOrder
-                          .filter((name) => grouped[name])
-                          .map((name) => [name, grouped[name]] as const);
-                        // Add any remaining categories not in the order
-                        Object.entries(grouped).forEach(([name, subs]) => {
-                          if (!categoryOrder.includes(name)) sortedEntries.push([name, subs]);
-                        });
+                        const sortedEntries = Object.entries(grouped).sort(
+                          ([a], [b]) => getMainCategoryOrder(a) - getMainCategoryOrder(b)
+                        );
                          return sortedEntries.map(([mainName, subs]) => {
                           const mainCat = Object.values(grouped).length > 0
                             ? subcategories.find((s: any) => s.main_categories?.name === mainName)?.main_categories
@@ -329,7 +331,7 @@ export function QuickAddTransaction() {
                             <CollapsibleTrigger className="flex w-full items-center justify-between px-2 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-accent rounded-sm">
                               <span className="flex items-center gap-1.5">
                                 {mainCat?.color && <div className="w-2 h-2 rounded-full" style={{ backgroundColor: `hsl(${mainCat.color})` }} />}
-                                {mainName}
+                                {translateCategory(mainName)}
                               </span>
                               <ChevronRight className="h-3 w-3 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
                             </CollapsibleTrigger>
@@ -347,7 +349,7 @@ export function QuickAddTransaction() {
                                   }}
                                 >
                                   <DynamicIcon name={s.icon} className="h-3.5 w-3.5 text-muted-foreground" />
-                                  {s.name}
+                                  {translateCategory(s.name)}
                                 </button>
                               ))}
                             </CollapsibleContent>
@@ -361,7 +363,7 @@ export function QuickAddTransaction() {
               </div>
             )}
             <div className="space-y-2">
-              <Label>Note (optional)</Label>
+              <Label>{t("quickAdd.notes")}</Label>
               <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={2} />
             </div>
             <Button type="submit" className={`w-full ${
@@ -369,7 +371,7 @@ export function QuickAddTransaction() {
               form.transaction_type === "transfer" ? "bg-transfer hover:bg-transfer/90 text-transfer-foreground" :
               "bg-expense hover:bg-expense/90 text-expense-foreground"
             }`} disabled={createMutation.isPending}>
-              Add Transaction
+              {t("quickAdd.save")}
             </Button>
           </form>
         </DialogContent>

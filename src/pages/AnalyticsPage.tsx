@@ -19,6 +19,7 @@ import {
 import { TrendingUp, TrendingDown, Minus, Sparkles, Loader2, AlertTriangle, CheckCircle, Info, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, eachDayOfInterval, eachMonthOfInterval, differenceInDays, getDaysInMonth } from "date-fns";
+import { useLanguage } from "@/lib/i18n";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const AVAILABLE_YEARS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i);
@@ -43,9 +44,12 @@ function getPresetRange(preset: FilterPreset, year?: number, month?: number): { 
   }
 }
 
-function SubcategoryRow({ sub, topTransactions }: {
+function SubcategoryRow({ sub, topTransactions, translateCategory, formatDate, t }: {
   sub: { name: string; value: number; icon: string; color: string; mainCat: string };
   topTransactions: { note: string; amount: number; date: string }[];
+  translateCategory: (name?: string | null) => string;
+  formatDate: (date: Date | string | number, formatPattern?: string) => string;
+  t: (path: string) => string;
 }) {
   const [showPopover, setShowPopover] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,21 +76,21 @@ function SubcategoryRow({ sub, topTransactions }: {
             <DynamicIcon name={sub.icon} className="h-3.5 w-3.5" style={{ color: `hsl(${sub.color})` }} />
           </div>
           <div>
-            <span className="text-sm">{sub.name}</span>
-            <span className="text-xs text-muted-foreground ml-1.5">({sub.mainCat})</span>
+            <span className="text-sm">{translateCategory(sub.name)}</span>
+            <span className="text-xs text-muted-foreground ml-1.5">({translateCategory(sub.mainCat)})</span>
           </div>
         </div>
         <span className="text-sm font-mono-numbers font-medium">{formatCurrency(sub.value)}</span>
       </div>
       {showPopover && topTransactions.length > 0 && (
         <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-lg p-3 shadow-lg min-w-[220px] max-w-[280px]">
-          <p className="text-xs font-medium text-muted-foreground mb-2">Top {topTransactions.length} transactions</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">{t("analytics.topTransactions")} ({topTransactions.length})</p>
           <div className="space-y-1.5">
             {topTransactions.map((tx, i) => (
               <div key={i} className="flex items-center justify-between gap-3 text-sm">
                 <span className="truncate text-foreground">{tx.note}</span>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="font-mono-numbers text-xs text-muted-foreground">{format(new Date(tx.date), "MMM d")}</span>
+                  <span className="font-mono-numbers text-xs text-muted-foreground">{formatDate(new Date(tx.date), "MMM d")}</span>
                   <span className="font-mono-numbers font-medium">{formatCurrency(tx.amount)}</span>
                 </div>
               </div>
@@ -100,6 +104,7 @@ function SubcategoryRow({ sub, topTransactions }: {
 
 export default function AnalyticsPage() {
   const { user } = useAuth();
+  const { t, formatDate, translateCategory, language } = useLanguage();
   const [activePreset, setActivePreset] = useState<FilterPreset>("month");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -315,7 +320,7 @@ export default function AnalyticsPage() {
           return d.getMonth() === m && d.getFullYear() === y;
         });
         return {
-          label: format(monthDate, "MMM"),
+          label: formatDate(monthDate, "MMM"),
           income: monthTxns.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0),
           expenses: monthTxns.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0),
         };
@@ -326,13 +331,13 @@ export default function AnalyticsPage() {
         const dayStr = format(day, "yyyy-MM-dd");
         const dayTxns = filteredYearTransactions.filter((t) => t.date === dayStr);
         return {
-          label: format(day, activePreset === "week" ? "EEE d" : "d MMM"),
+          label: formatDate(day, activePreset === "week" ? "EEE d" : "d MMM"),
           income: dayTxns.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0),
           expenses: dayTxns.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0),
         };
       });
     }
-  }, [filteredYearTransactions, activePreset, dateFilter]);
+  }, [filteredYearTransactions, activePreset, dateFilter, formatDate]);
 
   const categoryTrendData = useMemo(() => {
     if (activePreset === "year") {
@@ -343,7 +348,7 @@ export default function AnalyticsPage() {
           const d = new Date(t.date);
           return d.getMonth() === m && d.getFullYear() === y;
         });
-        const entry: Record<string, any> = { label: format(monthDate, "MMM") };
+        const entry: Record<string, any> = { label: formatDate(monthDate, "MMM") };
         mainCategories.forEach((c) => {
           entry[c.name] = monthTxns.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0);
         });
@@ -353,14 +358,14 @@ export default function AnalyticsPage() {
       return eachDayOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((day) => {
         const dayStr = format(day, "yyyy-MM-dd");
         const dayTxns = allCategoryItems.filter((t) => t.date === dayStr);
-        const entry: Record<string, any> = { label: format(day, activePreset === "week" ? "EEE d" : "d MMM") };
+        const entry: Record<string, any> = { label: formatDate(day, activePreset === "week" ? "EEE d" : "d MMM") };
         mainCategories.forEach((c) => {
           entry[c.name] = dayTxns.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0);
         });
         return entry;
       });
     }
-  }, [allExpenses, mainCategories, activePreset, dateFilter]);
+  }, [allExpenses, mainCategories, activePreset, dateFilter, formatDate]);
 
 
 
@@ -521,7 +526,7 @@ export default function AnalyticsPage() {
     const d = payload[0];
     return (
       <div className="bg-popover border border-border rounded-lg p-3 shadow-lg text-sm">
-        <p className="font-medium">{d.name}</p>
+        <p className="font-medium">{translateCategory(d.name)}</p>
         <p className="font-mono-numbers">{formatCurrency(d.value)}</p>
       </div>
     );
@@ -531,8 +536,8 @@ export default function AnalyticsPage() {
     <div className="space-y-6 max-w-7xl w-full overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
-          <p className="text-sm text-muted-foreground mt-1">Spending analysis and trends</p>
+          <h1 className="text-2xl font-semibold text-foreground">{t("analytics.title")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("analytics.spendingAnalysisTrends")}</p>
         </div>
         <Button
           variant="outline"
@@ -541,7 +546,7 @@ export default function AnalyticsPage() {
           className="w-full sm:w-auto"
         >
           {aiMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
-          AI Analysis
+          {t("analytics.aiAnalysis")}
         </Button>
       </div>
 
@@ -549,11 +554,11 @@ export default function AnalyticsPage() {
       <div className="flex gap-2 flex-wrap items-center">
         {(["week", "month", "year"] as const).map((preset) => (
           <Button key={preset} variant={activePreset === preset ? "default" : "outline"} size="sm" className="capitalize" onClick={() => selectPreset(preset)}>
-            {preset}
+            {t(`transactions.${preset}`)}
           </Button>
         ))}
         <Button variant={activePreset === "custom" ? "default" : "outline"} size="sm" onClick={() => selectPreset("custom")}>
-          {activePreset === "custom" ? `${format(dateFilter.from, "MMM d")} – ${format(dateFilter.to, "MMM d")}` : "Custom"}
+          {activePreset === "custom" ? `${formatDate(dateFilter.from, "MMM d")} – ${formatDate(dateFilter.to, "MMM d")}` : t("transactions.custom")}
         </Button>
         {activePreset === "month" && (
           <>
@@ -561,7 +566,7 @@ export default function AnalyticsPage() {
               <SelectTrigger className="w-[130px] h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {MONTH_NAMES.map((m, i) => (
-                  <SelectItem key={i} value={String(i)}>{m}</SelectItem>
+                  <SelectItem key={i} value={String(i)}>{formatDate(new Date(2026, i, 1), "MMMM")}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -588,13 +593,13 @@ export default function AnalyticsPage() {
       {/* Custom range dialog */}
       <Dialog open={customOpen} onOpenChange={setCustomOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Select Date Range</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t("transactions.selectDateRange")}</DialogTitle></DialogHeader>
           <div className="flex items-center justify-between gap-2 px-2">
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCalendarMonth(prev => subMonths(prev, 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="text-sm font-medium">
-              {format(calendarMonth, "MMMM yyyy")} – {format(addMonths(calendarMonth, 1), "MMMM yyyy")}
+              {formatDate(calendarMonth, "MMMM yyyy")} – {formatDate(addMonths(calendarMonth, 1), "MMMM yyyy")}
             </span>
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCalendarMonth(prev => addMonths(prev, 1))}>
               <ChevronRight className="h-4 w-4" />
@@ -614,8 +619,8 @@ export default function AnalyticsPage() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCustomOpen(false)}>Cancel</Button>
-            <Button onClick={confirmCustomRange} disabled={!customRange.from || !customRange.to}>Confirm</Button>
+            <Button variant="outline" onClick={() => setCustomOpen(false)}>{t("common.cancel")}</Button>
+            <Button onClick={confirmCustomRange} disabled={!customRange.from || !customRange.to}>{t("common.confirm")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -624,19 +629,19 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total Income</p>
+            <p className="text-sm text-muted-foreground">{t("analytics.totalIncome")}</p>
             <p className="text-2xl font-semibold font-mono-numbers mt-1 text-income">{formatCurrency(totalIncome)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total Expenses</p>
+            <p className="text-sm text-muted-foreground">{t("analytics.totalExpenses")}</p>
             <p className="text-2xl font-semibold font-mono-numbers mt-1 text-expense">{formatCurrency(totalExpenses)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Net Savings</p>
+            <p className="text-sm text-muted-foreground">{t("analytics.netSavings")}</p>
             <p className={`text-2xl font-semibold font-mono-numbers mt-1 ${netSavings >= 0 ? "text-income" : "text-expense"}`}>
               {formatCurrency(netSavings)}
             </p>
@@ -644,7 +649,7 @@ export default function AnalyticsPage() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Remaining Balance</p>
+            <p className="text-sm text-muted-foreground">{t("analytics.remainingBalance")}</p>
             <p className={`text-2xl font-semibold font-mono-numbers mt-1 ${remainingBalance >= 0 ? "text-income" : "text-expense"}`}>
               {formatCurrency(remainingBalance)}
             </p>
@@ -652,13 +657,13 @@ export default function AnalyticsPage() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">{averageMode === "daily" ? "Daily" : "Monthly"} Avg Expense</p>
+            <p className="text-sm text-muted-foreground">{averageMode === "daily" ? t("analytics.dailyAvgExpense") : t("analytics.monthlyAvgExpense")}</p>
             <p className="text-2xl font-semibold font-mono-numbers mt-1 text-expense">{formatCurrency(avgExpense)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">{averageMode === "daily" ? "Daily" : "Monthly"} Avg Income</p>
+            <p className="text-sm text-muted-foreground">{averageMode === "daily" ? t("analytics.dailyAvgIncome") : t("analytics.monthlyAvgIncome")}</p>
             <p className="text-2xl font-semibold font-mono-numbers mt-1 text-income">{formatCurrency(avgIncome)}</p>
           </CardContent>
         </Card>
@@ -670,7 +675,7 @@ export default function AnalyticsPage() {
           <CardHeader>
             <CardTitle className="text-base font-medium flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              AI Spending Analysis — {selectedYear}
+              {t("analytics.aiSpendingAnalysis")} — {selectedYear}
             </CardTitle>
             <CardDescription>{aiMutation.data.summary}</CardDescription>
           </CardHeader>
@@ -681,16 +686,16 @@ export default function AnalyticsPage() {
 
             {aiMutation.data.trends?.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium mb-3">Trends</h4>
+                <h4 className="text-sm font-medium mb-3">{t("analytics.trendsHeading")}</h4>
                 <div className="grid gap-2">
-                  {aiMutation.data.trends.map((t: any, i: number) => (
+                  {aiMutation.data.trends.map((tItem: any, i: number) => (
                     <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-background/60">
-                      {t.type === "positive" ? <TrendingUp className="h-4 w-4 text-income mt-0.5 shrink-0" /> :
-                       t.type === "negative" ? <TrendingDown className="h-4 w-4 text-expense mt-0.5 shrink-0" /> :
+                      {tItem.type === "positive" ? <TrendingUp className="h-4 w-4 text-income mt-0.5 shrink-0" /> :
+                       tItem.type === "negative" ? <TrendingDown className="h-4 w-4 text-expense mt-0.5 shrink-0" /> :
                        <Minus className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />}
                       <div>
-                        <p className="text-sm font-medium">{t.title}</p>
-                        <p className="text-xs text-muted-foreground">{t.description}</p>
+                        <p className="text-sm font-medium">{tItem.title}</p>
+                        <p className="text-xs text-muted-foreground">{tItem.description}</p>
                       </div>
                     </div>
                   ))}
@@ -700,7 +705,7 @@ export default function AnalyticsPage() {
 
             {aiMutation.data.suggestions?.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium mb-3">Suggestions</h4>
+                <h4 className="text-sm font-medium mb-3">{t("analytics.suggestionsHeading")}</h4>
                 <div className="grid gap-2">
                   {aiMutation.data.suggestions.map((s: any, i: number) => (
                     <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-background/60">
@@ -722,9 +727,9 @@ export default function AnalyticsPage() {
 
       <Tabs defaultValue="trends">
         <TabsList className="w-full sm:w-auto flex">
-          <TabsTrigger value="trends" className="flex-1 sm:flex-none text-xs sm:text-sm">Income vs Expenses</TabsTrigger>
-          <TabsTrigger value="categories" className="flex-1 sm:flex-none text-xs sm:text-sm">By Category</TabsTrigger>
-          <TabsTrigger value="breakdown" className="flex-1 sm:flex-none text-xs sm:text-sm">Breakdown</TabsTrigger>
+          <TabsTrigger value="trends" className="flex-1 sm:flex-none text-xs sm:text-sm">{t("analytics.incomeVsExpenses")}</TabsTrigger>
+          <TabsTrigger value="categories" className="flex-1 sm:flex-none text-xs sm:text-sm">{t("analytics.byCategory")}</TabsTrigger>
+          <TabsTrigger value="breakdown" className="flex-1 sm:flex-none text-xs sm:text-sm">{t("analytics.breakdown")}</TabsTrigger>
         </TabsList>
 
         {/* Income vs Expenses Line Chart */}
@@ -732,7 +737,9 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-medium">
-                {activePreset === "year" ? "Monthly" : "Daily"} Income vs Expenses
+                {activePreset === "year"
+                  ? (language === "bg" ? "Месечни приходи спрямо разходи" : "Monthly Income vs Expenses")
+                  : (language === "bg" ? "Дневни приходи спрямо разходи" : "Daily Income vs Expenses")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -744,8 +751,8 @@ export default function AnalyticsPage() {
                     <YAxis tickFormatter={(v) => `€${(v / 100).toFixed(0)}`} className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
                     <Tooltip content={customTooltip} />
                     <Legend />
-                    <Line type="monotone" dataKey="income" name="Income" stroke="hsl(145, 50%, 42%)" strokeWidth={2} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="expenses" name="Expenses" stroke="hsl(0, 60%, 52%)" strokeWidth={2} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="income" name={t("transactions.income")} stroke="hsl(145, 50%, 42%)" strokeWidth={2} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="expenses" name={t("transactions.expense")} stroke="hsl(0, 60%, 52%)" strokeWidth={2} dot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -758,7 +765,9 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-medium">
-                {activePreset === "year" ? "Monthly" : "Daily"} by Category
+                {activePreset === "year"
+                  ? (language === "bg" ? "Месечно по категории" : "Monthly by Category")
+                  : (language === "bg" ? "Дневно по категории" : "Daily by Category")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -771,7 +780,7 @@ export default function AnalyticsPage() {
                     <Tooltip content={customTooltip} />
                     <Legend />
                     {mainCategories.map((c, i) => (
-                      <Bar key={c.id} dataKey={c.name} stackId="a" fill={`hsl(${c.color})`} radius={i === mainCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                      <Bar key={c.id} dataKey={c.name} name={translateCategory(c.name)} stackId="a" fill={`hsl(${c.color})`} radius={i === mainCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
@@ -786,7 +795,7 @@ export default function AnalyticsPage() {
             {/* Main category pie */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base font-medium">By Main Category</CardTitle>
+                <CardTitle className="text-base font-medium">{t("analytics.byMainCategory")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {mainCatPieData.length > 0 ? (
@@ -825,7 +834,7 @@ export default function AnalyticsPage() {
                         <div key={i} className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                            <span className="text-sm">{cat.name}</span>
+                            <span className="text-sm">{translateCategory(cat.name)}</span>
                           </div>
                           <span className="text-sm font-mono-numbers font-medium">{formatCurrency(cat.value)}</span>
                         </div>
@@ -833,7 +842,7 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-[250px] text-sm text-muted-foreground">No expenses this year</div>
+                  <div className="flex items-center justify-center h-[250px] text-sm text-muted-foreground">{t("analytics.noExpensesThisYear")}</div>
                 )}
               </CardContent>
             </Card>
@@ -841,7 +850,7 @@ export default function AnalyticsPage() {
             {/* Subcategory pie */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base font-medium">By Subcategory</CardTitle>
+                <CardTitle className="text-base font-medium">{t("analytics.bySubcategory")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {subcategoryPieData.length > 0 ? (
@@ -881,12 +890,15 @@ export default function AnalyticsPage() {
                           key={i}
                           sub={sub}
                           topTransactions={topTransactionsBySubcategory[sub.subId] || []}
+                          translateCategory={translateCategory}
+                          formatDate={formatDate}
+                          t={t}
                         />
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-[250px] text-sm text-muted-foreground">No expenses this year</div>
+                  <div className="flex items-center justify-center h-[250px] text-sm text-muted-foreground">{t("analytics.noExpensesThisYear")}</div>
                 )}
               </CardContent>
             </Card>
@@ -896,10 +908,12 @@ export default function AnalyticsPage() {
           <Card className="mt-6">
             <CardHeader>
               <CardTitle className="text-base font-medium">
-                {averageMode === "daily" ? "Daily average" : "Monthly average"} by category
+                {averageMode === "daily" ? t("analytics.dailyAvgByCategory") : t("analytics.monthlyAvgByCategory")}
               </CardTitle>
               <CardDescription>
-                Averaged over {averageMode === "daily" ? periodCount : Math.round(periodCount * 10) / 10} {averageMode === "daily" ? (periodCount === 1 ? "day" : "days") : (periodCount === 1 ? "month" : "months")} in the selected period
+                {language === "bg"
+                  ? `Осреднено за ${averageMode === "daily" ? periodCount : Math.round(periodCount * 10) / 10} ${averageMode === "daily" ? (periodCount === 1 ? "ден" : "дни") : (periodCount === 1 ? "месец" : "месеца")} в избрания период`
+                  : `Averaged over ${averageMode === "daily" ? periodCount : Math.round(periodCount * 10) / 10} ${averageMode === "daily" ? (periodCount === 1 ? "day" : "days") : (periodCount === 1 ? "month" : "months")} in the selected period`}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -910,11 +924,11 @@ export default function AnalyticsPage() {
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: `hsl(${cat.color})` }} />
-                          <span className="text-sm font-medium truncate">{cat.name}</span>
+                          <span className="text-sm font-medium truncate">{translateCategory(cat.name)}</span>
                         </div>
                         <span className="text-sm font-mono-numbers font-semibold whitespace-nowrap flex-shrink-0">
                           {formatCurrency(cat.avg)}
-                          <span className="text-xs text-muted-foreground ml-1">/{averageMode === "daily" ? "day" : "mo"}</span>
+                          <span className="text-xs text-muted-foreground ml-1">/{averageMode === "daily" ? (language === "bg" ? "ден" : "day") : (language === "bg" ? "мес" : "mo")}</span>
                         </span>
                       </div>
                       <div className="space-y-1.5 pl-4 border-l border-border">
@@ -924,7 +938,7 @@ export default function AnalyticsPage() {
                               <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style={{ background: `hsl(${sub.color} / 0.15)` }}>
                                 <DynamicIcon name={sub.icon} className="h-3 w-3" style={{ color: `hsl(${sub.color})` }} />
                               </div>
-                              <span className="text-sm text-muted-foreground truncate">{sub.name}</span>
+                              <span className="text-sm text-muted-foreground truncate">{translateCategory(sub.name)}</span>
                             </div>
                             <span className="text-sm font-mono-numbers whitespace-nowrap flex-shrink-0">{formatCurrency(sub.avg)}</span>
                           </div>
@@ -934,7 +948,7 @@ export default function AnalyticsPage() {
                   ))}
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-[120px] text-sm text-muted-foreground">No data for this period</div>
+                <div className="flex items-center justify-center h-[120px] text-sm text-muted-foreground">{t("analytics.noDataForPeriod")}</div>
               )}
             </CardContent>
           </Card>

@@ -15,23 +15,25 @@ import {
 import { LayoutDashboard, ArrowLeftRight, Wallet, Target, Repeat, BarChart3, ShoppingCart, Settings, ChevronRight } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useProfile, getDisplayLabel, getFirstName, getInitials } from "@/hooks/queries/useProfile";
-
-const navItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Transactions", url: "/transactions", icon: ArrowLeftRight },
-  { title: "Analytics", url: "/analytics", icon: BarChart3 },
-  { title: "Accounts", url: "/accounts", icon: Wallet },
-  { title: "Budgets", url: "/budgets", icon: Target },
-  { title: "Recurring", url: "/recurring", icon: Repeat },
-  { title: "Shopping", url: "/shopping", icon: ShoppingCart },
-  { title: "Settings", url: "/settings", icon: Settings },
-];
+import { useLanguage } from "@/lib/i18n";
 
 export function AppSidebar() {
   const { user } = useAuth();
   const { isMobile, setOpenMobile } = useSidebar();
   const { data: profile } = useProfile();
+  const { t } = useLanguage();
   const label = getDisplayLabel(profile, user?.email);
+
+  const navItems = [
+    { title: t("nav.dashboard"), url: "/", icon: LayoutDashboard },
+    { title: t("nav.transactions"), url: "/transactions", icon: ArrowLeftRight },
+    { title: t("nav.analytics"), url: "/analytics", icon: BarChart3 },
+    { title: t("nav.accounts"), url: "/accounts", icon: Wallet },
+    { title: t("nav.budgets"), url: "/budgets", icon: Target },
+    { title: t("nav.recurring"), url: "/recurring", icon: Repeat },
+    { title: t("nav.shopping"), url: "/shopping", icon: ShoppingCart },
+    { title: t("nav.settings"), url: "/settings", icon: Settings },
+  ];
 
   return (
     <Sidebar>
@@ -41,12 +43,12 @@ export function AppSidebar() {
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
               <Wallet className="h-4 w-4 text-primary" />
             </div>
-            Family Finance
+            {t("nav.familyFinance")}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}

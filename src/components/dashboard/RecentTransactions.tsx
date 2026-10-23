@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { useLanguage } from "@/lib/i18n";
 // fund-accounts import removed - not needed for simple edit
 
 interface RecentTransactionsProps {
@@ -41,6 +42,7 @@ interface RecentTransactionsProps {
 export function RecentTransactions({ transactions, accounts }: RecentTransactionsProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t, formatDate, translateCategory } = useLanguage();
   const { data: householdInfo } = useHouseholdMembers(user?.id);
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
@@ -167,40 +169,40 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-medium">Recent Transactions</CardTitle>
+          <CardTitle className="text-base font-medium">{t("dashboard.recentTransactions")}</CardTitle>
         </CardHeader>
         <CardContent>
           {recentTransactions.length > 0 ? (
             <div className="space-y-1">
-              {recentTransactions.map((t) => {
-                const accountName = getAccountName(t.account_id);
-                const categoryName = t.subcategories?.name;
-                const mainCatColor = t.subcategories?.main_categories?.color;
+              {recentTransactions.map((tItem) => {
+                const accountName = getAccountName(tItem.account_id);
+                const categoryName = tItem.subcategories?.name;
+                const mainCatColor = tItem.subcategories?.main_categories?.color;
 
-                const account = accounts.find((a: any) => a.id === t.account_id);
-                const destAccount = accounts.find((a: any) => a.id === t.transfer_to_account_id);
+                const account = accounts.find((a: any) => a.id === tItem.account_id);
+                const destAccount = accounts.find((a: any) => a.id === tItem.transfer_to_account_id);
                 const accountDisplayName = formatAccountNameWithOwner(account || { name: accountName, owner_user_id: account?.owner_user_id }, householdInfo?.members);
                 const destDisplayName = destAccount ? formatAccountNameWithOwner(destAccount, householdInfo?.members) : null;
 
                 return (
                   <button
-                    key={t.id}
-                    onClick={() => openEdit(t)}
+                    key={tItem.id}
+                    onClick={() => openEdit(tItem)}
                     className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors w-full text-left"
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div
                         className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                          t.transaction_type === "income"
+                          tItem.transaction_type === "income"
                             ? "bg-income/10"
-                            : t.transaction_type === "transfer"
+                            : tItem.transaction_type === "transfer"
                             ? "bg-transfer/10"
                             : "bg-expense/10"
                         }`}
                       >
-                        {t.transaction_type === "income" ? (
+                        {tItem.transaction_type === "income" ? (
                           <ArrowUpRight className="h-4 w-4 text-income" />
-                        ) : t.transaction_type === "transfer" ? (
+                        ) : tItem.transaction_type === "transfer" ? (
                           <ArrowLeftRight className="h-4 w-4 text-transfer" />
                         ) : (
                           <ArrowDownRight className="h-4 w-4 text-expense" />
@@ -216,44 +218,44 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                                   style={{ backgroundColor: `hsl(${mainCatColor})` }}
                                 />
                               )}
-                              <span className="text-sm font-medium truncate">{categoryName}</span>
+                              <span className="text-sm font-medium truncate">{translateCategory(categoryName)}</span>
                             </div>
                           )}
                           {!categoryName && (
                             <span className="text-sm font-medium truncate">
-                              {t.transaction_type === "transfer" ? "Transfer" : t.note || "Transaction"}
+                              {tItem.transaction_type === "transfer" ? t("transactions.transfer") : tItem.note || t("transactions.title")}
                             </span>
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                           <span className="truncate flex items-center gap-1.5">
                             {accountDisplayName}
-                            {t.transaction_type === "transfer" && destDisplayName && (
+                            {tItem.transaction_type === "transfer" && destDisplayName && (
                               <span className="text-muted-foreground">→ {destDisplayName}</span>
                             )}
                           </span>
-                          {t.note && categoryName && (
+                          {tItem.note && categoryName && (
                             <>
                               <span>·</span>
-                              <span className="truncate">{t.note}</span>
+                              <span className="truncate">{tItem.note}</span>
                             </>
                           )}
                           <span>·</span>
-                          <span className="flex-shrink-0">{format(new Date(t.date), "MMM d")}</span>
+                          <span className="flex-shrink-0">{formatDate(new Date(tItem.date), "MMM d")}</span>
                         </div>
                       </div>
                     </div>
                     <span
                       className={`font-mono-numbers text-sm font-medium whitespace-nowrap flex-shrink-0 ml-2 ${
-                        t.transaction_type === "income"
+                        tItem.transaction_type === "income"
                           ? "text-income"
-                          : t.transaction_type === "transfer"
+                          : tItem.transaction_type === "transfer"
                           ? "text-transfer"
                           : "text-expense"
                       }`}
                     >
-                      {t.transaction_type === "income" ? "+" : t.transaction_type === "expense" ? "-" : ""}
-                      {formatCurrency(t.amount)}
+                      {tItem.transaction_type === "income" ? "+" : tItem.transaction_type === "expense" ? "-" : ""}
+                      {formatCurrency(tItem.amount)}
                     </span>
                   </button>
                 );
@@ -261,7 +263,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
             </div>
           ) : (
             <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
-              No transactions this month yet
+              {t("dashboard.noRecentTransactions")}
             </div>
           )}
           {recentTransactions.length > 0 && (
@@ -270,7 +272,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
               className="w-full mt-2 text-xs text-muted-foreground hover:text-foreground"
               onClick={() => navigate("/transactions")}
             >
-              Show more
+              {t("common.showMore")}
             </Button>
           )}
         </CardContent>
@@ -280,11 +282,11 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
       <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) setEditingTx(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Transaction</DialogTitle>
+            <DialogTitle>{t("transactions.editTransaction")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Type</Label>
+              <Label>{t("accounts.accountType")}</Label>
               <Select
                 value={form.transaction_type}
                 onValueChange={(v) => {
@@ -301,14 +303,14 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="expense">Expense</SelectItem>
-                  <SelectItem value="income">Income</SelectItem>
-                  <SelectItem value="transfer">Transfer</SelectItem>
+                  <SelectItem value="expense">{t("transactions.expense")}</SelectItem>
+                  <SelectItem value="income">{t("transactions.income")}</SelectItem>
+                  <SelectItem value="transfer">{t("transactions.transfer")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Amount</Label>
+              <Label>{t("common.amount")}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -317,12 +319,12 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
               />
             </div>
             <div>
-              <Label>Date</Label>
+              <Label>{t("common.date")}</Label>
               <Popover open={dateOpen} onOpenChange={setDateOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(form.date, "PPP")}
+                    {formatDate(form.date, "PPP")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -335,7 +337,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
               </Popover>
             </div>
             <div>
-              <Label>{form.transaction_type === "transfer" ? "From Account" : "Account"}</Label>
+              <Label>{form.transaction_type === "transfer" ? t("transactions.fromAccount") : t("common.account")}</Label>
               <Select
                 value={form.account_id}
                 onValueChange={(v) => {
@@ -360,7 +362,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
             </div>
             {form.transaction_type === "transfer" && (
               <div>
-                <Label>To Account</Label>
+                <Label>{t("transactions.toAccount")}</Label>
                 <Select
                   value={form.transfer_to_account_id}
                   onValueChange={(v) => {
@@ -386,17 +388,17 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
             )}
             {form.transaction_type !== "transfer" && (
               <div>
-                <Label>Category</Label>
+                <Label>{t("common.category")}</Label>
                 <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                       {selectedSubcategory ? (
                         <div className="flex items-center gap-2">
                           <DynamicIcon name={selectedSubcategory.icon} className="h-4 w-4" />
-                          {selectedSubcategory.name}
+                          {translateCategory(selectedSubcategory.name)}
                         </div>
                       ) : (
-                        "Select category"
+                        t("quickAdd.selectCategory")
                       )}
                     </Button>
                   </PopoverTrigger>
@@ -414,7 +416,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                               className="w-2 h-2 rounded-full"
                               style={{ backgroundColor: `hsl(${group.color})` }}
                             />
-                            {group.name}
+                            {translateCategory(group.name)}
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <div className="ml-4">
@@ -430,7 +432,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                                   }}
                                 >
                                   <DynamicIcon name={sub.icon} className="h-4 w-4" />
-                                  {sub.name}
+                                  {translateCategory(sub.name)}
                                 </button>
                               ))}
                             </div>
@@ -443,7 +445,7 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
               </div>
             )}
             <div>
-              <Label>Note</Label>
+              <Label>{t("common.notes")}</Label>
               <Textarea
                 value={form.note}
                 onChange={(e) => setForm({ ...form, note: e.target.value })}
@@ -459,12 +461,12 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
               onClick={() => { setEditOpen(false); setDeleteOpen(true); }}
             >
               <Trash2 className="h-4 w-4 mr-1" />
-              Delete
+              {t("common.delete")}
             </Button>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setEditOpen(false)}>{t("common.cancel")}</Button>
               <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Saving..." : "Save"}
+                {updateMutation.isPending ? t("common.loading") : t("common.save")}
               </Button>
             </div>
           </DialogFooter>
@@ -475,18 +477,18 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+            <AlertDialogTitle>{t("transactions.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              You'll have 5 seconds to undo after confirming.
+              {t("transactions.undoWarning")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={performDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -4,12 +4,13 @@ import { useAccounts } from "@/hooks/queries/useAccounts";
 import { useBudgetsWithCategories } from "@/hooks/queries/useBudgets";
 import { useTransactions } from "@/hooks/queries/useTransactions";
 import { useAuth } from "@/hooks/useAuth";
-import { formatCurrency, getMonthYear } from "@/lib/financial";
+import { formatCurrency, getMonthYear, isIncomeCategory, getMainCategoryOrder } from "@/lib/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { ChevronRight } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
 
 function getBurndownColor(pct: number, alertThreshold: number, isInvestment = false): string {
   if (isInvestment) {
@@ -35,6 +36,7 @@ function getBurndownTextColor(pct: number, alertThreshold: number, isInvestment 
 
 export function BudgetBurndown() {
   const { user } = useAuth();
+  const { t, translateCategory } = useLanguage();
   const monthYear = getMonthYear();
 
   const { data: accounts = [] } = useAccounts(user?.id);
@@ -51,7 +53,6 @@ export function BudgetBurndown() {
 
   const { data: transactions = [] } = useTransactions(user?.id, dateFilter);
 
-  const INCOME_CATEGORY = "Приходи";
 
   // Filter by visible accounts only
   const visibleAccountIds = new Set(accounts.filter((a) => a.is_visible).map((a) => a.id));
@@ -94,7 +95,7 @@ export function BudgetBurndown() {
     if (!sub) return;
     if (budgetedSubIds.has(t.subcategory_id)) return;
     const mainName = sub.main_categories?.name || "";
-    if (mainName === INCOME_CATEGORY) return;
+    if (isIncomeCategory(mainName)) return;
     const existing = unbudgetedMap.get(t.subcategory_id);
     if (existing) {
       existing.spent += t.amount;
@@ -120,7 +121,6 @@ export function BudgetBurndown() {
   const allItems = [...budgetItems, ...Array.from(unbudgetedMap.values())];
 
   // Group by main category
-  const mainCategoryOrder = ["Нужди", "Желания", "Инвестиции"];
   const grouped: Record<string, typeof allItems> = {};
   allItems.forEach((item) => {
     if (!grouped[item.mainCategory]) grouped[item.mainCategory] = [];
@@ -138,8 +138,8 @@ export function BudgetBurndown() {
 
   const investmentNames = ["Инвестиции", "Investments"];
 
-  const sortedCategories = mainCategoryOrder
-    .filter((name) => grouped[name])
+  const sortedCategories = Object.keys(grouped)
+    .sort((a, b) => getMainCategoryOrder(a) - getMainCategoryOrder(b))
     .map((name) => {
       const items = grouped[name];
       const totalBudget = items.reduce((s, b) => s + b.budget, 0);
@@ -149,17 +149,6 @@ export function BudgetBurndown() {
       return { name, items, totalBudget, totalSpent, remaining: totalBudget - totalSpent, pct, isInvestment };
     });
 
-  // Add any remaining categories not in the predefined order
-  Object.entries(grouped).forEach(([name, items]) => {
-    if (!mainCategoryOrder.includes(name)) {
-      const totalBudget = items.reduce((s, b) => s + b.budget, 0);
-      const totalSpent = items.reduce((s, b) => s + b.spent, 0);
-      const pct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
-      const isInvestment = investmentNames.includes(name);
-      sortedCategories.push({ name, items, totalBudget, totalSpent, remaining: totalBudget - totalSpent, pct, isInvestment });
-    }
-  });
-
   const totalBudget = allItems.reduce((s, b) => s + b.budget, 0);
   const totalSpent = allItems.reduce((s, b) => s + b.spent, 0);
   const totalPct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
@@ -168,11 +157,11 @@ export function BudgetBurndown() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base font-medium">Budget Burndown</CardTitle>
+          <CardTitle className="text-base font-medium">{t("dashboard.budgetBurndown")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
-            No budgets set for this month
+            {t("dashboard.noBudgetsSet")}
           </div>
         </CardContent>
       </Card>
@@ -182,9 +171,9 @@ export function BudgetBurndown() {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-medium">Budget Burndown</CardTitle>
+        <CardTitle className="text-base font-medium">{t("dashboard.budgetBurndown")}</CardTitle>
         <div className="flex items-center justify-between mt-2">
-          <span className="text-sm text-muted-foreground">Overall</span>
+          <span className="text-sm text-muted-foreground">{t("common.total")}</span>
           <div className="text-sm">
             <span className={`font-mono-numbers font-medium ${getBurndownTextColor(totalPct, 90)}`}>
               {formatCurrency(totalSpent)}
@@ -199,8 +188,8 @@ export function BudgetBurndown() {
         <div className="flex justify-between text-xs text-muted-foreground mt-1">
           <span>
             {totalBudget - totalSpent >= 0
-              ? `${formatCurrency(totalBudget - totalSpent)} remaining`
-              : `${formatCurrency(Math.abs(totalBudget - totalSpent))} over budget`}
+              ? `${formatCurrency(totalBudget - totalSpent)} ${t("dashboard.remaining")}`
+              : `${formatCurrency(Math.abs(totalBudget - totalSpent))} ${t("budgets.overBudget")}`}
           </span>
           <span>{Math.round(totalPct)}%</span>
         </div>
@@ -214,13 +203,15 @@ export function BudgetBurndown() {
               ? cat.items.reduce((s, i) => s + i.alertThreshold, 0) / cat.items.length
               : 90;
 
+            const displayName = translateCategory(cat.name);
+
             return (
               <Collapsible key={cat.name}>
                 <div className="space-y-1">
                   <CollapsibleTrigger className="flex w-full items-center justify-between group cursor-pointer">
                     <div className="flex items-center gap-2">
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" />
-                      <span className="text-sm font-medium">{cat.name}</span>
+                      <span className="text-sm font-medium">{displayName}</span>
                     </div>
                     <div className="text-xs text-right">
                       <span className={`font-mono-numbers font-medium ${getBurndownTextColor(cat.pct, avgThreshold, cat.isInvestment)}`}>
@@ -236,8 +227,8 @@ export function BudgetBurndown() {
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>
                       {cat.remaining >= 0
-                        ? `${formatCurrency(cat.remaining)} remaining`
-                        : `${formatCurrency(Math.abs(cat.remaining))} over budget`}
+                        ? `${formatCurrency(cat.remaining)} ${t("dashboard.remaining")}`
+                        : `${formatCurrency(Math.abs(cat.remaining))} ${t("budgets.overBudget")}`}
                     </span>
                     <span>{Math.round(cat.pct)}%</span>
                   </div>
@@ -246,14 +237,15 @@ export function BudgetBurndown() {
                   <div className="ml-5 mt-2 space-y-3 border-l border-border pl-3">
                     {cat.items.map((item) => {
                       const itemClampedPct = Math.min(item.pct, 100);
+                      const subName = translateCategory(item.name);
                       if (item.unbudgeted) {
                         return (
                           <div key={item.id} className="space-y-1 opacity-80">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <DynamicIcon name={item.icon} className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span className="text-sm">{item.name}</span>
-                                <span className="text-[10px] uppercase tracking-wide text-warning font-medium">Unbudgeted</span>
+                                <span className="text-sm">{subName}</span>
+                                <span className="text-[10px] uppercase tracking-wide text-warning font-medium">{t("budgets.unbudgeted")}</span>
                               </div>
                               <div className="text-xs text-right">
                                 <span className="font-mono-numbers font-medium text-warning">
@@ -270,7 +262,7 @@ export function BudgetBurndown() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <DynamicIcon name={item.icon} className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="text-sm">{item.name}</span>
+                              <span className="text-sm">{subName}</span>
                             </div>
                             <div className="text-xs text-right">
                               <span className={`font-mono-numbers font-medium ${getBurndownTextColor(item.pct, item.alertThreshold, cat.isInvestment)}`}>
@@ -286,8 +278,8 @@ export function BudgetBurndown() {
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>
                               {item.remaining >= 0
-                                ? `${formatCurrency(item.remaining)} remaining`
-                                : `${formatCurrency(Math.abs(item.remaining))} over budget`}
+                                ? `${formatCurrency(item.remaining)} ${t("dashboard.remaining")}`
+                                : `${formatCurrency(Math.abs(item.remaining))} ${t("budgets.overBudget")}`}
                             </span>
                             <span>{Math.round(item.pct)}%</span>
                           </div>

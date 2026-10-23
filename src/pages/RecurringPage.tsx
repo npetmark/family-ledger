@@ -21,11 +21,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Pencil, Trash2, Repeat, CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { useLanguage } from "@/lib/i18n";
 
-const frequencies = ["daily", "weekly", "monthly", "yearly"];
+const frequencies = ["daily", "weekly", "monthly", "yearly"] as const;
 
 export default function RecurringPage() {
   const { user } = useAuth();
+  const { t, formatDate, translateCategory } = useLanguage();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
@@ -60,7 +62,7 @@ export default function RecurringPage() {
       setOpen(false);
       setEditing(null);
       resetForm();
-      toast.success(editing ? "Updated" : "Created");
+      toast.success(editing ? t("common.success") : t("common.success"));
     },
     onError: (e) => toast.error(e.message),
   });
@@ -86,7 +88,7 @@ export default function RecurringPage() {
 
   const deleteMutation = useDeleteRecurringTransaction({
     onSuccess: () => {
-      toast.success("Deleted");
+      toast.success(t("common.success"));
     },
     onError: (e) => toast.error(e.message),
   });
@@ -111,11 +113,11 @@ export default function RecurringPage() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Recurring Transactions</h1>
-          <p className="text-sm text-muted-foreground mt-1">Automated repeating entries</p>
+          <h1 className="text-2xl font-semibold">{t("recurring.title")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("recurring.automatedRepeating")}</p>
         </div>
         <Button onClick={() => { setEditing(null); resetForm(); setOpen(true); }}>
-          <Plus className="h-4 w-4 mr-2" /> Add Recurring
+          <Plus className="h-4 w-4 mr-2" /> {t("recurring.addRecurring")}
         </Button>
       </div>
 
@@ -136,9 +138,9 @@ export default function RecurringPage() {
                       )}
                     </div>
                     <div>
-                      <p className="font-medium">{r.subcategories?.name || r.note || "Recurring"}</p>
+                      <p className="font-medium">{r.subcategories?.name ? translateCategory(r.subcategories.name) : (r.note || t("recurring.title"))}</p>
                       <div className="flex gap-2 mt-1 items-center">
-                        <Badge variant="secondary" className="text-xs capitalize">{r.frequency}</Badge>
+                        <Badge variant="secondary" className="text-xs capitalize">{t(`recurring.${r.frequency}` as any)}</Badge>
                         <span className="text-xs text-muted-foreground">
                           {formatAccountNameWithOwner(
                             accounts.find((a: any) => a.id === r.account_id) || { name: r.accounts?.name },
@@ -154,7 +156,7 @@ export default function RecurringPage() {
                         {r.transaction_type === "income" ? "+" : "-"}{formatCurrency(r.amount)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Next: {new Date(r.next_due_date).toLocaleDateString()}
+                        {t("recurring.next")}: {formatDate(new Date(r.next_due_date), "PP")}
                       </p>
                     </div>
                     <div className="flex gap-1">
@@ -175,7 +177,7 @@ export default function RecurringPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-              No recurring transactions yet
+              {t("recurring.noRecurringYet")}
             </div>
           </CardContent>
         </Card>
@@ -185,36 +187,36 @@ export default function RecurringPage() {
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditing(null); resetForm(); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit Recurring" : "New Recurring Transaction"}</DialogTitle>
+            <DialogTitle>{editing ? t("recurring.editRecurring") : t("recurring.newRecurring")}</DialogTitle>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleSave}>
             <div className="grid grid-cols-2 gap-2">
               {(["expense", "income"] as const).map((type) => (
                 <Button key={type} type="button" variant={form.transaction_type === type ? "default" : "outline"} size="sm" className="capitalize" onClick={() => setForm({ ...form, transaction_type: type })}>
-                  {type}
+                  {type === "expense" ? t("transactions.expense") : t("transactions.income")}
                 </Button>
               ))}
             </div>
             <div className="space-y-2">
-              <Label>Amount</Label>
+              <Label>{t("common.amount")}</Label>
               <Input type="number" step="0.01" min="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required placeholder="0.00" />
             </div>
             <div className="space-y-2">
-              <Label>Frequency</Label>
+              <Label>{t("recurring.frequency")}</Label>
               <Select value={form.frequency} onValueChange={(v) => setForm({ ...form, frequency: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {frequencies.map((f) => <SelectItem key={f} value={f} className="capitalize">{f}</SelectItem>)}
+                  {frequencies.map((f) => <SelectItem key={f} value={f} className="capitalize">{t(`recurring.${f}` as any)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Next Due Date</Label>
+              <Label>{t("recurring.nextDueDate")}</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
                     <CalendarIcon className="h-4 w-4 mr-2" />
-                    {format(form.next_due_date, "PPP")}
+                    {formatDate(form.next_due_date, "PPP")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -223,9 +225,9 @@ export default function RecurringPage() {
               </Popover>
             </div>
             <div className="space-y-2">
-              <Label>Account</Label>
+              <Label>{t("transactions.account")}</Label>
               <Select value={form.account_id} onValueChange={(v) => setForm({ ...form, account_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("transactions.selectAccount")} /></SelectTrigger>
                 <SelectContent>
                   <AccountSelectItems
                     accounts={accounts}
@@ -236,24 +238,24 @@ export default function RecurringPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Category</Label>
+              <Label>{t("transactions.category")}</Label>
               <Select value={form.subcategory_id} onValueChange={(v) => setForm({ ...form, subcategory_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("transactions.selectCategory")} /></SelectTrigger>
                 <SelectContent>
                   {subcategories.map((s: any) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.main_categories?.name} → {s.name}
+                      {translateCategory(s.main_categories?.name)} → {translateCategory(s.name)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Note (optional)</Label>
+              <Label>{t("transactions.note")} ({t("common.optional")})</Label>
               <Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} rows={2} />
             </div>
             <Button type="submit" className="w-full" disabled={saveMutation.isPending}>
-              {editing ? "Update" : "Create"}
+              {editing ? t("common.save") : t("common.add")}
             </Button>
           </form>
         </DialogContent>

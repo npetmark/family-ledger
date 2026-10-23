@@ -21,6 +21,7 @@ import ShoppingPage from "@/pages/ShoppingPage";
 import SettingsPage from "@/pages/SettingsPage";
 import ProfilePage from "@/pages/ProfilePage";
 import NotFound from "./pages/NotFound";
+import { LanguageProvider } from "@/lib/i18n";
 
 const queryClient = new QueryClient();
 
@@ -79,13 +80,15 @@ const App = () => (
   <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter basename={import.meta.env.BASE_URL}>
-            <AppRoutes />
-          </BrowserRouter>
-        </TooltipProvider>
+        <LanguageProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter basename={import.meta.env.BASE_URL}>
+              <AppRoutes />
+            </BrowserRouter>
+          </TooltipProvider>
+        </LanguageProvider>
       </AuthProvider>
     </QueryClientProvider>
   </ThemeProvider>

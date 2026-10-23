@@ -17,11 +17,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/lib/i18n";
 
 const accountTypes = ["cash", "bank", "investment", "custom"];
 
 export default function AccountsPage() {
   const { user } = useAuth();
+  const { t, translateAccountType } = useLanguage();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({ name: "", icon: "wallet", account_type: "bank", starting_balance: "", is_visible: true, currency: "EUR", owner_user_id: "shared" });
@@ -93,34 +95,34 @@ export default function AccountsPage() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Accounts</h1>
-          <p className="text-sm text-muted-foreground mt-1">Total visible assets: <span className="font-mono-numbers font-medium text-foreground">{formatCurrency(totalAssets)}</span></p>
+          <h1 className="text-2xl font-semibold">{t("accounts.title")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("accounts.totalVisibleAssets")}: <span className="font-mono-numbers font-medium text-foreground">{formatCurrency(totalAssets)}</span></p>
         </div>
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditing(null); resetForm(); } }}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" /> Add Account</Button>
+            <Button><Plus className="h-4 w-4 mr-2" /> {t("accounts.addAccount")}</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editing ? "Edit Account" : "New Account"}</DialogTitle>
+              <DialogTitle>{editing ? t("accounts.editAccount") : t("accounts.newAccount")}</DialogTitle>
             </DialogHeader>
             <form className="space-y-4" onSubmit={handleSave}>
               <div className="space-y-2">
-                <Label>Name</Label>
+                <Label>{t("accounts.accountName")}</Label>
                 <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Type</Label>
+                  <Label>{t("accounts.accountType")}</Label>
                   <Select value={form.account_type} onValueChange={(v) => setForm({ ...form, account_type: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {accountTypes.map((t) => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}
+                      {accountTypes.map((tType) => <SelectItem key={tType} value={tType} className="capitalize">{translateAccountType(tType)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Currency</Label>
+                  <Label>{t("accounts.currency")}</Label>
                   <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -130,7 +132,7 @@ export default function AccountsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Icon</Label>
+                <Label>{t("categories.icon")}</Label>
                 <div className="flex flex-wrap gap-2">
                   {availableIcons.slice(0, 16).map((icon) => (
                     <button
@@ -145,35 +147,35 @@ export default function AccountsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Starting Balance</Label>
+                <Label>{t("accounts.startingBalance")}</Label>
                 <Input type="number" step="0.01" value={form.starting_balance} onChange={(e) => setForm({ ...form, starting_balance: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Ownership</Label>
+                <Label>{t("accounts.ownership")}</Label>
                 <Select value={form.owner_user_id} onValueChange={(v) => setForm({ ...form, owner_user_id: v })} disabled={!isOwner}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select owner" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="shared">Shared (Household)</SelectItem>
+                    <SelectItem value="shared">{t("accounts.sharedHousehold")}</SelectItem>
                     {householdInfo?.members?.map((m: any) => (
                       <SelectItem key={m.user_id} value={m.user_id}>
-                        Personal - {getFirstName(m.profile) || "Unknown"} {m.user_id === user?.id ? "(You)" : ""}
+                        {t("accounts.personal")} - {getFirstName(m.profile) || t("common.unknown")} {m.user_id === user?.id ? "(You)" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {!isOwner && <p className="text-xs text-muted-foreground">Only household owners can change account ownership.</p>}
+                {!isOwner && <p className="text-xs text-muted-foreground">{t("accounts.onlyOwnersChange")}</p>}
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <Label>Visible in totals</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">Include in dashboard net worth</p>
+                  <Label>{t("accounts.visibleInTotals")}</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("accounts.includeInNetWorth")}</p>
                 </div>
                 <Switch checked={form.is_visible} onCheckedChange={(v) => setForm({ ...form, is_visible: v })} />
               </div>
               <Button type="submit" className="w-full" disabled={saveMutation.isPending}>
-                {editing ? "Update" : "Create"} Account
+                {editing ? t("accounts.updateAccount") : t("accounts.createAccount")}
               </Button>
             </form>
           </DialogContent>
@@ -185,7 +187,7 @@ export default function AccountsPage() {
           const balance = computeBalance(account);
           const isJoint = account.owner_user_id === null;
           const ownerMember = householdInfo?.members?.find((m: any) => m.user_id === account.owner_user_id);
-          const ownerName = getFirstName(ownerMember?.profile) || "Unknown";
+          const ownerName = getFirstName(ownerMember?.profile) || t("common.unknown");
           // Household owners can edit any account (e.g. to reassign ownership).
           const canEdit = isJoint || account.owner_user_id === user?.id || isOwner;
           const canDelete = isJoint || account.owner_user_id === user?.id;
@@ -199,7 +201,7 @@ export default function AccountsPage() {
                     </div>
                     <div>
                       <p className="font-medium">{formatAccountNameWithOwner(account, householdInfo?.members)}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{account.account_type} · {(account as any).currency || "EUR"}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{translateAccountType(account.account_type)} · {(account as any).currency || "EUR"}</p>
                     </div>
                   </div>
                   {canEdit && (
@@ -218,10 +220,10 @@ export default function AccountsPage() {
                 <div className="mt-4 flex items-end justify-between">
                   <div>
                     <p className="text-2xl font-semibold font-mono-numbers">{formatCurrency(balance, (account as any).currency || "EUR")}</p>
-                    {!account.is_visible && <p className="text-xs text-muted-foreground mt-1">Hidden from totals</p>}
+                    {!account.is_visible && <p className="text-xs text-muted-foreground mt-1">{t("accounts.hiddenFromTotals")}</p>}
                   </div>
                   {isJoint ? (
-                    <Badge variant="secondary" className="flex items-center gap-1.5 opacity-70"><Users className="h-3 w-3"/> Shared</Badge>
+                    <Badge variant="secondary" className="flex items-center gap-1.5 opacity-70"><Users className="h-3 w-3"/> {t("accounts.shared")}</Badge>
                   ) : (
                     <Badge variant="outline" className="flex items-center gap-1.5 opacity-50"><User className="h-3 w-3"/> {ownerName}</Badge>
                   )}

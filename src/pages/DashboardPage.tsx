@@ -16,11 +16,13 @@ import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useLanguage } from "@/lib/i18n";
 
 // No hardcoded colors - use DB colors from main_categories
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { t, formatDate, translateCategory, translateAccountType } = useLanguage();
   const [showAllAccounts, setShowAllAccounts] = useState(false);
   const { data: householdInfo } = useHouseholdMembers(user?.id);
 
@@ -114,9 +116,9 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 max-w-7xl overflow-x-hidden">
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-foreground">{t("nav.dashboard")}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })} overview
+          {formatDate(new Date(), "MMMM yyyy")} {t("dashboard.overview")}
         </p>
       </div>
 
@@ -129,10 +131,10 @@ export default function DashboardPage() {
                 <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                   <Wallet className="h-4 w-4 text-primary" />
                 </div>
-                <p className="text-xs text-muted-foreground">Total Assets</p>
+                <p className="text-xs text-muted-foreground">{t("dashboard.totalAssets")}</p>
               </div>
               <div className="hidden sm:block">
-                <p className="text-sm text-muted-foreground">Total Assets</p>
+                <p className="text-sm text-muted-foreground">{t("dashboard.totalAssets")}</p>
               </div>
               <div className="hidden sm:flex h-10 w-10 rounded-xl bg-primary/10 items-center justify-center">
                 <Wallet className="h-5 w-5 text-primary" />
@@ -149,10 +151,10 @@ export default function DashboardPage() {
                 <div className="h-8 w-8 rounded-lg bg-income/10 flex items-center justify-center flex-shrink-0">
                   <ArrowUpRight className="h-4 w-4 text-income" />
                 </div>
-                <p className="text-xs text-muted-foreground">Income</p>
+                <p className="text-xs text-muted-foreground">{t("transactions.income")}</p>
               </div>
               <div className="hidden sm:block">
-                <p className="text-sm text-muted-foreground">Monthly Income</p>
+                <p className="text-sm text-muted-foreground">{t("dashboard.monthlyIncome")}</p>
               </div>
               <div className="hidden sm:flex h-10 w-10 rounded-xl bg-income/10 items-center justify-center">
                 <ArrowUpRight className="h-5 w-5 text-income" />
@@ -169,10 +171,10 @@ export default function DashboardPage() {
                 <div className="h-8 w-8 rounded-lg bg-expense/10 flex items-center justify-center flex-shrink-0">
                   <ArrowDownRight className="h-4 w-4 text-expense" />
                 </div>
-                <p className="text-xs text-muted-foreground">Expenses</p>
+                <p className="text-xs text-muted-foreground">{t("transactions.expense")}</p>
               </div>
               <div className="hidden sm:block">
-                <p className="text-sm text-muted-foreground">Monthly Expenses</p>
+                <p className="text-sm text-muted-foreground">{t("dashboard.monthlyExpenses")}</p>
               </div>
               <div className="hidden sm:flex h-10 w-10 rounded-xl bg-expense/10 items-center justify-center">
                 <ArrowDownRight className="h-5 w-5 text-expense" />
@@ -193,10 +195,10 @@ export default function DashboardPage() {
                     <TrendingDown className="h-4 w-4 text-expense" />
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">Savings</p>
+                <p className="text-xs text-muted-foreground">{t("dashboard.netSavings")}</p>
               </div>
               <div className="hidden sm:block">
-                <p className="text-sm text-muted-foreground">Net Savings</p>
+                <p className="text-sm text-muted-foreground">{t("dashboard.netSavings")}</p>
               </div>
               <div className={`hidden sm:flex h-10 w-10 rounded-xl items-center justify-center ${netSavings >= 0 ? "bg-income/10" : "bg-expense/10"}`}>
                 {netSavings >= 0 ? (
@@ -217,7 +219,7 @@ export default function DashboardPage() {
         {/* Spending by Category */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-medium">Spending by Category</CardTitle>
+            <CardTitle className="text-base font-medium">{t("dashboard.spendingByCategory")}</CardTitle>
           </CardHeader>
           <CardContent>
             {categoryBreakdown.length > 0 ? (
@@ -264,7 +266,7 @@ export default function DashboardPage() {
                     <div key={i} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
-                        <span className="text-sm">{cat.name}</span>
+                        <span className="text-sm">{translateCategory(cat.name)}</span>
                       </div>
                       <span className="text-sm font-mono-numbers font-medium">
                         {formatCurrency(cat.value)}
@@ -275,7 +277,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-                No expenses this month yet
+                {t("dashboard.noExpensesThisMonth")}
               </div>
             )}
           </CardContent>
@@ -284,7 +286,7 @@ export default function DashboardPage() {
         {/* Accounts Overview */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base font-medium">Accounts</CardTitle>
+            <CardTitle className="text-base font-medium">{t("dashboard.accountsOverview")}</CardTitle>
           </CardHeader>
           <CardContent>
             {(() => {
@@ -327,7 +329,7 @@ export default function DashboardPage() {
                           <p className="text-sm font-medium">
                             {displayName}
                           </p>
-                          <p className="text-xs text-muted-foreground capitalize">{accountBalance.account_type}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{translateAccountType(accountBalance.account_type)}</p>
                         </div>
                       </div>
                       <span className="font-mono-numbers text-sm font-medium">
@@ -341,16 +343,16 @@ export default function DashboardPage() {
                       className="flex items-center justify-center gap-1 w-full py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {showAllAccounts ? (
-                        <>Show less <ChevronUp className="h-3.5 w-3.5" /></>
+                        <>{t("common.showLess")} <ChevronUp className="h-3.5 w-3.5" /></>
                       ) : (
-                        <>Show {visibleSorted.length - 5} more <ChevronDown className="h-3.5 w-3.5" /></>
+                        <>{t("common.showMore")} <ChevronDown className="h-3.5 w-3.5" /></>
                       )}
                     </button>
                   )}
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-                  No accounts yet. Create one to get started.
+                  {t("dashboard.noAccountsYet")}
                 </div>
               );
             })()}

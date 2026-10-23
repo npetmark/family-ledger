@@ -68,3 +68,39 @@ export function getTransactionTypeColor(type: string): string {
     default: return "text-foreground";
   }
 }
+
+// 50/30/20 Budgeting model targets
+// Needs: 50%, Wants: 20%, Investments: 30%
+export const BUDGET_TARGETS: Record<string, number> = {
+  Нужди: 50,
+  Needs: 50,
+  Желания: 20,
+  Wants: 20,
+  Инвестиции: 30,
+  Investments: 30,
+};
+
+export function getBudgetTarget(categoryName?: string | null): number | undefined {
+  if (!categoryName) return undefined;
+  const trimmed = categoryName.trim();
+  if (BUDGET_TARGETS[trimmed] !== undefined) return BUDGET_TARGETS[trimmed];
+  const lower = trimmed.toLowerCase();
+  const entry = Object.entries(BUDGET_TARGETS).find(([k]) => k.toLowerCase() === lower);
+  return entry ? entry[1] : undefined;
+}
+
+export function isIncomeCategory(categoryName?: string | null): boolean {
+  if (!categoryName) return false;
+  const n = categoryName.trim().toLowerCase();
+  return n === "приходи" || n === "income";
+}
+
+export function getMainCategoryOrder(categoryName?: string | null): number {
+  if (!categoryName) return 999;
+  const n = categoryName.trim().toLowerCase();
+  if (n === "приходи" || n === "income") return 0;
+  if (n === "нужди" || n === "needs") return 1;
+  if (n === "желания" || n === "wants") return 2;
+  if (n === "инвестиции" || n === "investments") return 3;
+  return 999;
+}

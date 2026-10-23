@@ -4,7 +4,10 @@ import {
   parseCurrencyToCents, 
   percentage, 
   getMonthYear,
-  getTransactionTypeColor 
+  getTransactionTypeColor,
+  getBudgetTarget,
+  isIncomeCategory,
+  getMainCategoryOrder
 } from "./financial";
 
 describe("financial.ts characterization tests", () => {
@@ -82,6 +85,59 @@ describe("financial.ts characterization tests", () => {
       expect(getTransactionTypeColor("expense")).toBe("text-expense");
       expect(getTransactionTypeColor("transfer")).toBe("text-transfer");
       expect(getTransactionTypeColor("unknown")).toBe("text-foreground");
+    });
+  });
+
+  describe("getBudgetTarget", () => {
+    it("returns 50/20/30 targets for Bulgarian category names", () => {
+      expect(getBudgetTarget("Нужди")).toBe(50);
+      expect(getBudgetTarget("Желания")).toBe(20);
+      expect(getBudgetTarget("Инвестиции")).toBe(30);
+    });
+
+    it("returns 50/20/30 targets for new user English category names", () => {
+      expect(getBudgetTarget("Needs")).toBe(50);
+      expect(getBudgetTarget("Wants")).toBe(20);
+      expect(getBudgetTarget("Investments")).toBe(30);
+    });
+
+    it("handles case-insensitivity and leading/trailing whitespace", () => {
+      expect(getBudgetTarget(" needs ")).toBe(50);
+      expect(getBudgetTarget("WANTS")).toBe(20);
+      expect(getBudgetTarget("investments")).toBe(30);
+      expect(getBudgetTarget(" нужди ")).toBe(50);
+    });
+
+    it("returns undefined for custom or invalid categories", () => {
+      expect(getBudgetTarget("Groceries")).toBeUndefined();
+      expect(getBudgetTarget("Income")).toBeUndefined();
+      expect(getBudgetTarget("")).toBeUndefined();
+      expect(getBudgetTarget(null)).toBeUndefined();
+    });
+  });
+
+  describe("isIncomeCategory", () => {
+    it("identifies income categories in Bulgarian and English", () => {
+      expect(isIncomeCategory("Приходи")).toBe(true);
+      expect(isIncomeCategory("Income")).toBe(true);
+      expect(isIncomeCategory(" income ")).toBe(true);
+      expect(isIncomeCategory("Needs")).toBe(false);
+      expect(isIncomeCategory("Нужди")).toBe(false);
+      expect(isIncomeCategory(null)).toBe(false);
+    });
+  });
+
+  describe("getMainCategoryOrder", () => {
+    it("orders Income, Needs, Wants, Investments first in both languages", () => {
+      expect(getMainCategoryOrder("Приходи")).toBe(0);
+      expect(getMainCategoryOrder("Income")).toBe(0);
+      expect(getMainCategoryOrder("Нужди")).toBe(1);
+      expect(getMainCategoryOrder("Needs")).toBe(1);
+      expect(getMainCategoryOrder("Желания")).toBe(2);
+      expect(getMainCategoryOrder("Wants")).toBe(2);
+      expect(getMainCategoryOrder("Инвестиции")).toBe(3);
+      expect(getMainCategoryOrder("Investments")).toBe(3);
+      expect(getMainCategoryOrder("Other")).toBe(999);
     });
   });
 });

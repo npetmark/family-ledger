@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { Filter, Check } from "lucide-react";
 import { HouseholdMemberOption, formatAccountNameWithOwner } from "./AccountSelectItems";
+import { useLanguage } from "@/lib/i18n";
 
 export type AccountFilterMode = "all-visible" | "custom";
 
@@ -51,6 +52,7 @@ export function AccountFilter({
   currentUserId,
   householdMembers,
 }: AccountFilterProps) {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
 
   const visibleAccounts = accounts.filter((a) => a.is_visible);
@@ -72,12 +74,12 @@ export function AccountFilter({
   }, [singleSelectedAccount, householdMembers]);
 
   const label = isAllVisible
-    ? "All accounts"
+    ? t("transactions.allAccounts")
     : selectedCount === 0
-      ? "No accounts"
+      ? t("common.none")
       : singleAccountLabel || (selectedCount === accounts.length
-        ? "All accounts"
-        : `${selectedCount} account${selectedCount !== 1 ? "s" : ""}`);
+        ? t("transactions.allAccounts")
+        : `${selectedCount} ${t("transactions.allAccounts").toLowerCase()}`);
 
   const sortedAccounts = useMemo(() => {
     return [...accounts].sort((a, b) => {
@@ -156,10 +158,10 @@ export function AccountFilter({
             {isAllVisible ? (
               <span className="flex items-center gap-1.5">
                 <Check className="h-3 w-3 text-primary" />
-                All accounts selected
+                {t("transactions.allAccountsSelected")}
               </span>
             ) : (
-              "Select all"
+              t("common.selectAll")
             )}
           </button>
           <button
@@ -167,7 +169,7 @@ export function AccountFilter({
             className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 rounded hover:bg-muted/50 transition-colors shrink-0"
             onClick={clearAll}
           >
-            Clear
+            {t("common.clear")}
           </button>
         </div>
         <div className="max-h-[260px] overflow-y-auto">
@@ -188,7 +190,7 @@ export function AccountFilter({
                     {formatAccountNameWithOwner(a, householdMembers)}
                   </span>
                   {!a.is_visible && (
-                    <span className="text-[10px] text-muted-foreground ml-auto shrink-0">(hidden)</span>
+                    <span className="text-[10px] text-muted-foreground ml-auto shrink-0">({t("transactions.hidden")})</span>
                   )}
                 </label>
               );
