@@ -33,6 +33,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useLanguage } from "@/lib/i18n";
 
 type FilterPreset = "day" | "week" | "month" | "year" | "custom";
 
@@ -64,25 +65,26 @@ function shiftAnchor(preset: FilterPreset, anchor: Date, dir: 1 | -1): Date {
   }
 }
 
-function formatAnchorLabel(preset: FilterPreset, anchor: Date): string {
+function formatAnchorLabel(preset: FilterPreset, anchor: Date, formatDate: (d: Date, f?: string) => string): string {
   switch (preset) {
     case "day":
-      return format(anchor, "EEE, d MMM yyyy");
+      return formatDate(anchor, "EEE, d MMM yyyy");
     case "week": {
       const from = startOfWeek(anchor, { weekStartsOn: 1 });
       const to = endOfWeek(anchor, { weekStartsOn: 1 });
-      return `${format(from, "d MMM")} – ${format(to, "d MMM yyyy")}`;
+      return `${formatDate(from, "d MMM")} – ${formatDate(to, "d MMM yyyy")}`;
     }
     case "year":
-      return format(anchor, "yyyy");
+      return formatDate(anchor, "yyyy");
     case "month":
     default:
-      return format(anchor, "MMMM yyyy");
+      return formatDate(anchor, "MMMM yyyy");
   }
 }
 
 export default function TransactionsPage() {
   const { user } = useAuth();
+  const { t, formatDate, translateCategory } = useLanguage();
   const { data: householdInfo } = useHouseholdMembers(user?.id);
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
@@ -250,7 +252,7 @@ export default function TransactionsPage() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Transactions</h1>
+          <h1 className="text-2xl font-semibold">{t("transactions.title")}</h1>
           <div className="flex gap-4 mt-1 text-sm">
             <span className="text-income font-mono-numbers">+{formatCurrency(totalIncome)}</span>
             <span className="text-expense font-mono-numbers">-{formatCurrency(totalExpenses)}</span>
@@ -269,7 +271,7 @@ export default function TransactionsPage() {
               className="capitalize"
               onClick={() => selectPreset(preset)}
             >
-              {preset}
+              {t(`transactions.${preset}`)}
             </Button>
           ))}
           <Button
@@ -278,8 +280,8 @@ export default function TransactionsPage() {
             onClick={() => selectPreset("custom")}
           >
             {activePreset === "custom"
-              ? `${format(dateFilter.from, "MMM d")} – ${format(dateFilter.to, "MMM d")}`
-              : "Custom"}
+              ? `${formatDate(dateFilter.from, "MMM d")} – ${formatDate(dateFilter.to, "MMM d")}`
+              : t("transactions.custom")}
           </Button>
 
           <AccountFilter
@@ -295,7 +297,7 @@ export default function TransactionsPage() {
           <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search keyword, amount, date..."
+            placeholder={t("transactions.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-8 pr-8 h-8 text-xs sm:text-sm"
@@ -305,7 +307,7 @@ export default function TransactionsPage() {
               type="button"
               onClick={() => setSearchQuery("")}
               className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
-              aria-label="Clear search"
+              aria-label={t("transactions.clearSearch")}
             >
               <X className="h-4 w-4" />
             </button>
@@ -319,7 +321,7 @@ export default function TransactionsPage() {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1 text-center text-sm font-medium truncate">
-            {formatAnchorLabel(activePreset, anchorDate)}
+            {formatAnchorLabel(activePreset, anchorDate, formatDate)}
           </div>
           <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => stepPeriod(1)} aria-label="Next period">
             <ChevronRight className="h-4 w-4" />
@@ -332,7 +334,7 @@ export default function TransactionsPage() {
       <Dialog open={customOpen} onOpenChange={setCustomOpen}>
         <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-fit max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Select Date Range</DialogTitle>
+            <DialogTitle>{t("transactions.selectDateRange")}</DialogTitle>
           </DialogHeader>
           <div className="flex items-center justify-between gap-2">
             <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCalendarMonth(prev => subMonths(prev, 1))}>
@@ -340,8 +342,8 @@ export default function TransactionsPage() {
             </Button>
             <span className="text-xs sm:text-sm font-medium text-center truncate">
               {isMobile
-                ? format(calendarMonth, "MMMM yyyy")
-                : `${format(calendarMonth, "MMMM yyyy")} – ${format(addMonths(calendarMonth, 1), "MMMM yyyy")}`}
+                ? formatDate(calendarMonth, "MMMM yyyy")
+                : `${formatDate(calendarMonth, "MMMM yyyy")} – ${formatDate(addMonths(calendarMonth, 1), "MMMM yyyy")}`}
             </span>
             <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setCalendarMonth(prev => addMonths(prev, 1))}>
               <ChevronRight className="h-4 w-4" />
@@ -368,8 +370,8 @@ export default function TransactionsPage() {
             />
           </div>
           <DialogFooter className="flex-row justify-end gap-2">
-            <Button variant="outline" onClick={() => setCustomOpen(false)}>Cancel</Button>
-            <Button onClick={confirmCustomRange} disabled={!customRange.from || !customRange.to}>Confirm</Button>
+            <Button variant="outline" onClick={() => setCustomOpen(false)}>{t("common.cancel")}</Button>
+            <Button onClick={confirmCustomRange} disabled={!customRange.from || !customRange.to}>{t("common.confirm")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -378,11 +380,11 @@ export default function TransactionsPage() {
       <Dialog open={editOpen} onOpenChange={(v) => { setEditOpen(v); if (!v) { setEditingTransaction(null); setForm(emptyForm); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Transaction</DialogTitle>
+            <DialogTitle>{t("transactions.editTransaction")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Type</Label>
+              <Label>{t("accounts.accountType")}</Label>
               <Select
                 value={form.transaction_type}
                 onValueChange={(v) => {
@@ -399,14 +401,14 @@ export default function TransactionsPage() {
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="expense">Expense</SelectItem>
-                  <SelectItem value="income">Income</SelectItem>
-                  <SelectItem value="transfer">Transfer</SelectItem>
+                  <SelectItem value="expense">{t("transactions.expense")}</SelectItem>
+                  <SelectItem value="income">{t("transactions.income")}</SelectItem>
+                  <SelectItem value="transfer">{t("transactions.transfer")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Amount</Label>
+              <Label>{t("common.amount")}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -415,12 +417,12 @@ export default function TransactionsPage() {
               />
             </div>
             <div>
-              <Label>Date</Label>
+              <Label>{t("common.date")}</Label>
               <Popover open={dateOpen} onOpenChange={setDateOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(form.date, "PPP")}
+                    {formatDate(form.date, "PPP")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -433,7 +435,7 @@ export default function TransactionsPage() {
               </Popover>
             </div>
             <div>
-              <Label>{form.transaction_type === "transfer" ? "From Account" : "Account"}</Label>
+              <Label>{form.transaction_type === "transfer" ? t("transactions.fromAccount") : t("common.account")}</Label>
               <Select
                 value={form.account_id}
                 onValueChange={(v) => {
@@ -458,7 +460,7 @@ export default function TransactionsPage() {
             </div>
             {form.transaction_type === "transfer" && (
               <div>
-                <Label>To Account</Label>
+                <Label>{t("transactions.toAccount")}</Label>
                 <Select
                   value={form.transfer_to_account_id}
                   onValueChange={(v) => {
@@ -484,17 +486,17 @@ export default function TransactionsPage() {
             )}
             {form.transaction_type !== "transfer" && (
               <div>
-                <Label>Category</Label>
+                <Label>{t("common.category")}</Label>
                 <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                       {selectedSubcategory ? (
                         <div className="flex items-center gap-2">
                           <DynamicIcon name={selectedSubcategory.icon} className="h-4 w-4" />
-                          {selectedSubcategory.name}
+                          {translateCategory(selectedSubcategory.name)}
                         </div>
                       ) : (
-                        "Select category"
+                        t("quickAdd.selectCategory")
                       )}
                     </Button>
                   </PopoverTrigger>
@@ -512,7 +514,7 @@ export default function TransactionsPage() {
                               className="w-2 h-2 rounded-full"
                               style={{ backgroundColor: `hsl(${group.color})` }}
                             />
-                            {group.name}
+                            {translateCategory(group.name)}
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <div className="ml-4">
@@ -528,7 +530,7 @@ export default function TransactionsPage() {
                                   }}
                                 >
                                   <DynamicIcon name={sub.icon} className="h-4 w-4" />
-                                  {sub.name}
+                                  {translateCategory(sub.name)}
                                 </button>
                               ))}
                             </div>
@@ -541,7 +543,7 @@ export default function TransactionsPage() {
               </div>
             )}
             <div>
-              <Label>Note</Label>
+              <Label>{t("common.notes")}</Label>
               <Textarea
                 value={form.note}
                 onChange={(e) => setForm({ ...form, note: e.target.value })}
@@ -563,14 +565,14 @@ export default function TransactionsPage() {
                 }}
               >
                 <Trash2 className="h-4 w-4 mr-1" />
-                Delete
+                {t("common.delete")}
               </Button>
             )}
             {!editingTransaction && <div />}
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => { setEditOpen(false); setEditingTransaction(null); }}>Cancel</Button>
+              <Button variant="outline" onClick={() => { setEditOpen(false); setEditingTransaction(null); }}>{t("common.cancel")}</Button>
               <Button onClick={() => handleUpdate(form)} disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Saving..." : "Save"}
+                {updateMutation.isPending ? t("common.loading") : t("common.save")}
               </Button>
             </div>
           </DialogFooter>
@@ -588,39 +590,39 @@ export default function TransactionsPage() {
           "Needs": 1, "Нужди": 1,
           "Wants": 2, "Желания": 2,
           "Investments": 3, "Инвестиции": 3,
-          "Transfers": 4,
-          "Uncategorized": 5,
+          "Transfers": 4, "Преводи": 4,
+          "Uncategorized": 5, "Без категория": 5,
         };
 
         const getMainSortOrder = (name: string) => MAIN_CAT_ORDER[name] ?? 99;
 
         const mainGroups: Record<string, MainGroup> = {};
 
-        filteredTransactions.forEach((t) => {
-          const mainCatName = t.subcategories?.main_categories?.name || (t.transaction_type === "income" ? "Income" : t.transaction_type === "transfer" ? "Transfers" : "Uncategorized");
-          const mainCatColor = t.subcategories?.main_categories?.color || (t.transaction_type === "income" ? "145 45% 42%" : "0 0% 50%");
+        filteredTransactions.forEach((tItem) => {
+          const mainCatName = tItem.subcategories?.main_categories?.name || (tItem.transaction_type === "income" ? "Income" : tItem.transaction_type === "transfer" ? "Transfers" : "Uncategorized");
+          const mainCatColor = tItem.subcategories?.main_categories?.color || (tItem.transaction_type === "income" ? "145 45% 42%" : "0 0% 50%");
 
           if (!mainGroups[mainCatName]) {
             mainGroups[mainCatName] = { name: mainCatName, color: mainCatColor, sortOrder: getMainSortOrder(mainCatName), subGroups: {}, ungrouped: [] };
           }
 
-          const subName = t.subcategories?.name;
+          const subName = tItem.subcategories?.name;
           if (subName) {
-            const subId = t.subcategory_id || subName;
+            const subId = tItem.subcategory_id || subName;
             if (!mainGroups[mainCatName].subGroups[subId]) {
               // Find the subcategory's sort_order from the subcategories query
-              const subMeta = subcategories.find((s: any) => s.id === t.subcategory_id);
+              const subMeta = subcategories.find((s: any) => s.id === tItem.subcategory_id);
               mainGroups[mainCatName].subGroups[subId] = {
                 name: subName,
-                icon: t.subcategories?.icon || "circle",
-                color: t.subcategories?.color || mainCatColor,
+                icon: tItem.subcategories?.icon || "circle",
+                color: tItem.subcategories?.color || mainCatColor,
                 sortOrder: subMeta?.sort_order ?? 999,
                 transactions: [],
               };
             }
-            mainGroups[mainCatName].subGroups[subId].transactions.push(t);
+            mainGroups[mainCatName].subGroups[subId].transactions.push(tItem);
           } else {
-            mainGroups[mainCatName].ungrouped.push(t);
+            mainGroups[mainCatName].ungrouped.push(tItem);
           }
         });
 
@@ -631,10 +633,10 @@ export default function TransactionsPage() {
             <Card>
               <CardContent className="pt-6">
                 <div className="flex flex-col items-center justify-center h-32 text-sm text-muted-foreground gap-1.5">
-                  <span>{searchQuery.trim() ? "No transactions matching your search in this period" : "No transactions in this period"}</span>
+                  <span>{searchQuery.trim() ? t("transactions.noTransactionsMatch") : t("transactions.noTransactionsPeriod")}</span>
                   {searchQuery.trim() && (
                     <Button variant="outline" size="sm" onClick={() => setSearchQuery("")} className="text-xs h-7">
-                      Clear search
+                      {t("transactions.clearSearch")}
                     </Button>
                   )}
                 </div>
@@ -643,50 +645,50 @@ export default function TransactionsPage() {
           );
         }
 
-        const renderTransaction = (t: typeof transactions[0], groupColor: string) => {
-          const account = accounts.find((a: any) => a.id === t.account_id);
-          const destAccount = accounts.find((a: any) => a.id === t.transfer_to_account_id);
-          const accountDisplayName = formatAccountNameWithOwner(account || { name: (t as any).accounts?.name, owner_user_id: account?.owner_user_id }, householdInfo?.members);
+        const renderTransaction = (tItem: typeof transactions[0], groupColor: string) => {
+          const account = accounts.find((a: any) => a.id === tItem.account_id);
+          const destAccount = accounts.find((a: any) => a.id === tItem.transfer_to_account_id);
+          const accountDisplayName = formatAccountNameWithOwner(account || { name: (tItem as any).accounts?.name, owner_user_id: account?.owner_user_id }, householdInfo?.members);
           const destDisplayName = destAccount ? formatAccountNameWithOwner(destAccount, householdInfo?.members) : null;
 
           return (
           <div
-            key={t.id}
+            key={tItem.id}
             className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors group cursor-pointer"
-            onClick={() => openEditDialog(t)}
+            onClick={() => openEditDialog(tItem)}
           >
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ background: `hsl(${t.subcategories?.color || groupColor} / 0.12)` }}
+                style={{ background: `hsl(${tItem.subcategories?.color || groupColor} / 0.12)` }}
               >
-                {t.transaction_type === "transfer" ? (
+                {tItem.transaction_type === "transfer" ? (
                   <ArrowLeftRight className="h-4 w-4" style={{ color: `hsl(${groupColor})` }} />
-                ) : t.transaction_type === "income" ? (
+                ) : tItem.transaction_type === "income" ? (
                   <Banknote className="h-4 w-4" style={{ color: `hsl(${groupColor})` }} />
                 ) : (
-                  <DynamicIcon name={t.subcategories?.icon || "circle"} className="h-4 w-4" style={{ color: `hsl(${t.subcategories?.color || groupColor})` }} />
+                  <DynamicIcon name={tItem.subcategories?.icon || "circle"} className="h-4 w-4" style={{ color: `hsl(${tItem.subcategories?.color || groupColor})` }} />
                 )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium break-words">
-                  {t.subcategories?.name || t.note || (t.transaction_type === "transfer" ? "Transfer" : "Transaction")}
+                  {translateCategory(tItem.subcategories?.name) || tItem.note || (tItem.transaction_type === "transfer" ? t("transactions.transfer") : t("transactions.title"))}
                 </p>
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 flex-wrap">
                   <span className="truncate flex items-center gap-1.5">
                     {accountDisplayName}
-                    {t.transaction_type === "transfer" && destDisplayName && (
+                    {tItem.transaction_type === "transfer" && destDisplayName && (
                       <span className="text-muted-foreground">
                         → {destDisplayName}
                       </span>
                     )}
                   </span>
                   <span>·</span>
-                  <span className="flex-shrink-0">{new Date(t.date).toLocaleDateString()}</span>
-                  {t.note && t.subcategories?.name ? (
+                  <span className="flex-shrink-0">{formatDate(new Date(tItem.date), "dd/MM/yyyy")}</span>
+                  {tItem.note && tItem.subcategories?.name ? (
                     <>
                       <span>·</span>
-                      <span className="break-words line-clamp-2">{t.note}</span>
+                      <span className="break-words line-clamp-2">{tItem.note}</span>
                     </>
                   ) : null}
                 </div>
@@ -694,11 +696,11 @@ export default function TransactionsPage() {
             </div>
             <div className="flex items-center gap-2 pl-2">
               <span className={`font-mono-numbers text-sm font-medium whitespace-nowrap flex-shrink-0 ${
-                t.transaction_type === "income" ? "text-income" :
-                t.transaction_type === "transfer" ? "text-transfer" : "text-expense"
+                tItem.transaction_type === "income" ? "text-income" :
+                tItem.transaction_type === "transfer" ? "text-transfer" : "text-expense"
               }`}>
-                {t.transaction_type === "income" ? "+" : t.transaction_type === "expense" ? "-" : ""}
-                {formatCurrency(t.amount)}
+                {tItem.transaction_type === "income" ? "+" : tItem.transaction_type === "expense" ? "-" : ""}
+                {formatCurrency(tItem.amount)}
               </span>
             </div>
           </div>
@@ -707,7 +709,7 @@ export default function TransactionsPage() {
 
         return groups.map((group) => {
           const allTransactions = [...Object.values(group.subGroups).flatMap((sg) => sg.transactions), ...group.ungrouped];
-          const totalAmount = allTransactions.reduce((s, t) => s + t.amount, 0);
+          const totalAmount = allTransactions.reduce((s, tItem) => s + tItem.amount, 0);
 
           const isIncome = group.name === "Income" || group.name === "Приходи";
           return (
@@ -717,7 +719,7 @@ export default function TransactionsPage() {
                   <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors rounded-t-lg">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full" style={{ background: `hsl(${group.color})` }} />
-                      <span className="font-semibold text-sm">{group.name}</span>
+                      <span className="font-semibold text-sm">{translateCategory(group.name)}</span>
                       <span className="text-xs text-muted-foreground">({allTransactions.length})</span>
                     </div>
                     <div className="flex items-center gap-3">
@@ -736,7 +738,7 @@ export default function TransactionsPage() {
                       .map((sg) => {
                         // Sort transactions within subcategory by date desc
                         const sortedTxns = [...sg.transactions].sort((a, b) => b.date.localeCompare(a.date) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-                        const subTotal = sortedTxns.reduce((s, t) => s + t.amount, 0);
+                        const subTotal = sortedTxns.reduce((s, tItem) => s + tItem.amount, 0);
                         if (sortedTxns.length === 1) {
                           return renderTransaction(sortedTxns[0], group.color);
                         }
@@ -752,8 +754,8 @@ export default function TransactionsPage() {
                                     <DynamicIcon name={sg.icon} className="h-4 w-4" style={{ color: `hsl(${sg.color})` }} />
                                   </div>
                                   <div className="text-left min-w-0 flex-1">
-                                    <p className="text-sm font-medium break-words">{sg.name}</p>
-                                    <p className="text-xs text-muted-foreground">{sortedTxns.length} transactions</p>
+                                    <p className="text-sm font-medium break-words">{translateCategory(sg.name)}</p>
+                                    <p className="text-xs text-muted-foreground">{sortedTxns.length} {t("transactions.numTransactions")}</p>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -766,13 +768,13 @@ export default function TransactionsPage() {
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                               <div className="ml-6 border-l border-border/50 pl-2 space-y-0.5">
-                                {sortedTxns.map((t) => renderTransaction(t, group.color))}
+                                {sortedTxns.map((tItem) => renderTransaction(tItem, group.color))}
                               </div>
                             </CollapsibleContent>
                           </Collapsible>
                         );
                       })}
-                      {group.ungrouped.map((t) => renderTransaction(t, group.color))}
+                      {group.ungrouped.map((tItem) => renderTransaction(tItem, group.color))}
                     </div>
                   </CardContent>
                 </CollapsibleContent>
@@ -785,11 +787,11 @@ export default function TransactionsPage() {
       <AlertDialog open={!!pendingDeleteTxId} onOpenChange={(v) => !v && setPendingDeleteTxId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this transaction?</AlertDialogTitle>
-            <AlertDialogDescription>You'll have 5 seconds to undo.</AlertDialogDescription>
+            <AlertDialogTitle>{t("transactions.deleteTransactionPrompt")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("transactions.undoWarning")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 const id = pendingDeleteTxId!;
@@ -798,7 +800,7 @@ export default function TransactionsPage() {
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

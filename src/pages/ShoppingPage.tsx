@@ -59,6 +59,7 @@ import {
 } from "@/lib/shopping";
 import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/lib/i18n";
 
 type Category = {
   id: string; name: string; emoji: string; color: string; sort_order: number;
@@ -103,6 +104,7 @@ type DictEntry = {
 
 export default function ShoppingPage() {
   const { user } = useAuth();
+  const { t, formatDate, translateCategory, language } = useLanguage();
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -843,11 +845,11 @@ export default function ShoppingPage() {
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Shopping</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Manage your household grocery and custom shopping lists</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("shopping.title")}</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">{t("shopping.subtitle")}</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => setPastOpen(true)}>
-          <History className="h-4 w-4 mr-2" /> Past trips
+          <History className="h-4 w-4 mr-2" /> {t("shopping.completedTrips")}
         </Button>
       </div>
 
@@ -873,7 +875,7 @@ export default function ShoppingPage() {
               ) : (
                 <Tag className="h-3.5 w-3.5 opacity-70" />
               )}
-              <span>{isGeneral && trip.name.toLowerCase() === "shopping" ? "General" : trip.name}</span>
+              <span>{isGeneral && trip.name.toLowerCase() === "shopping" ? t("shopping.generalList") : trip.name}</span>
               {isSelected && totalItems > 0 && (
                 <span
                   className={cn(
@@ -900,7 +902,7 @@ export default function ShoppingPage() {
           }}
         >
           <Plus className="h-3.5 w-3.5" />
-          <span>New list</span>
+          <span>{t("shopping.createList")}</span>
         </Button>
       </div>
 
@@ -915,10 +917,10 @@ export default function ShoppingPage() {
                 onSave={(name) => renameTrip.mutate(name)}
               />
               <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
-                <span>{activeTrip ? format(new Date(activeTrip.started_at), "PPP") : ""}</span>
+                <span>{activeTrip ? formatDate(new Date(activeTrip.started_at), "PPP") : ""}</span>
                 <span>·</span>
-                <span>{totalChecked} / {totalItems} checked</span>
-                {headerTotal > 0 && (<><span>·</span><span className="font-mono-numbers" title={hasAnyActual ? "Actual paid so far" : "Expected total"}>{formatCurrency(headerTotal)}{!hasAnyActual && <span className="text-muted-foreground ml-1">expected</span>}</span></>)}
+                <span>{totalChecked} / {totalItems} {language === "bg" ? "отбелязани" : "checked"}</span>
+                {headerTotal > 0 && (<><span>·</span><span className="font-mono-numbers" title={hasAnyActual ? (language === "bg" ? "Реално платени досега" : "Actual paid so far") : (language === "bg" ? "Очаквана сума" : "Expected total")}>{formatCurrency(headerTotal)}{!hasAnyActual && <span className="text-muted-foreground ml-1">{language === "bg" ? "прогнозни" : "expected"}</span>}</span></>)}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -938,7 +940,7 @@ export default function ShoppingPage() {
                   title="Re-check znamcenite.bg for discounts on every item"
                 >
                   <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
-                  Refresh promos
+                  {language === "bg" ? "Обнови промоции" : "Refresh promos"}
                 </Button>
               )}
 
@@ -952,7 +954,7 @@ export default function ShoppingPage() {
                   title="Delete this shopping list"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete list
+                  {t("shopping.deleteList")}
                 </Button>
               )}
 
@@ -960,7 +962,7 @@ export default function ShoppingPage() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="w-40 justify-center" disabled={!activeTrip}>
                     <Receipt className="h-4 w-4 mr-2" />
-                    Receipt
+                    {t("shopping.receipt")}
                     <ChevronDown className="h-4 w-4 ml-2 opacity-60" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -970,16 +972,16 @@ export default function ShoppingPage() {
                     onSelect={() => receiptInputRef.current?.click()}
                   >
                     {parsingReceipt ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ScanLine className="h-4 w-4 mr-2" />}
-                    Parse receipt
+                    {t("shopping.parseReceiptAI")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
                     <Paperclip className="h-4 w-4 mr-2" />
-                    {activeTrip?.receipt_path ? "Replace receipt" : "Attach receipt"}
+                    {activeTrip?.receipt_path ? (language === "bg" ? "Смени бележка" : "Replace receipt") : t("shopping.attachReceipt")}
                   </DropdownMenuItem>
                   {activeTrip?.receipt_path && (
                     <DropdownMenuItem onSelect={() => setViewReceiptOpen(true)}>
                       <Receipt className="h-4 w-4 mr-2" />
-                      View receipt
+                      {language === "bg" ? "Виж бележка" : "View receipt"}
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -1000,7 +1002,7 @@ export default function ShoppingPage() {
                 }}
                 disabled={!totalItems}
               >
-                <Check className="h-4 w-4 mr-2" /> Complete trip
+                <Check className="h-4 w-4 mr-2" /> {t("shopping.completeTrip")}
               </Button>
             </div>
           </div>
@@ -1018,7 +1020,7 @@ export default function ShoppingPage() {
             >
               <Input
                 ref={inputRef}
-                placeholder="Add an item…"
+                placeholder={t("shopping.itemPlaceholder")}
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setShowSuggest(true); }}
                 onFocus={() => setShowSuggest(true)}
@@ -1045,7 +1047,7 @@ export default function ShoppingPage() {
                         <span>{cat?.emoji ?? "🛒"}</span>
                         <span className="truncate">{s.display_name}</span>
                       </span>
-                      <span className="text-xs text-muted-foreground flex-shrink-0">{cat?.name ?? "Other"}</span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">{cat ? translateCategory(cat.name) : t("shopping.otherCategory")}</span>
                     </button>
                   );
                 })}
@@ -1057,13 +1059,13 @@ export default function ShoppingPage() {
           {chipSuggestions.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs text-muted-foreground">Suggested</div>
+                <div className="text-xs text-muted-foreground">{language === "bg" ? "Препоръчани" : "Suggested"}</div>
                 <button
                   type="button"
                   onClick={() => clearSuggestions.mutate()}
                   className="text-xs text-muted-foreground hover:text-destructive transition-colors"
                 >
-                  Clear suggestions
+                  {language === "bg" ? "Изчисти препоръки" : "Clear suggestions"}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1091,7 +1093,7 @@ export default function ShoppingPage() {
       {grouped.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Your list is empty. Add something above.
+            {t("shopping.noItems")}
           </CardContent>
         </Card>
       ) : (
@@ -1116,7 +1118,7 @@ export default function ShoppingPage() {
               >
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <span className="text-lg leading-none">{g.category.emoji}</span>
-                  <span>{g.category.name}</span>
+                  <span>{translateCategory(g.category.name)}</span>
                   <Badge variant="secondary" className="ml-1 text-xs">{g.items.length}</Badge>
                 </div>
                 {collapsed ? (
@@ -1295,11 +1297,11 @@ export default function ShoppingPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Complete confirm — also records a "Пазар" expense transaction */}
+      {/* Complete confirm — also records an expense transaction */}
       <Dialog open={confirmCompleteOpen} onOpenChange={setConfirmCompleteOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Complete this trip?</DialogTitle>
+            <DialogTitle>{t("shopping.completeTrip")}?</DialogTitle>
           </DialogHeader>
           <form
             className="space-y-3"
@@ -1307,7 +1309,7 @@ export default function ShoppingPage() {
               e.preventDefault();
               const cents = parseCurrencyToCents(completeForm.amount);
               if (completeForm.record_transaction && !completeForm.account_id) {
-                toast.error("Pick an account");
+                toast.error(t("transactions.selectAccount"));
                 return;
               }
               completeTrip.mutate({
@@ -1320,13 +1322,13 @@ export default function ShoppingPage() {
             }}
           >
             <p className="text-xs text-muted-foreground">
-              The list will be archived and a new active trip will start.
+              {language === "bg" ? "Списъкът ще бъде архивиран и ще започне ново активно пазаруване." : "The list will be archived and a new active trip will start."}
               {completeForm.record_transaction
-                ? ' A "Пазар" expense will be recorded with the details below.'
-                : " No transaction will be recorded."}
+                ? (language === "bg" ? " Ще бъде записан разход за пазар с данните по-долу." : " A grocery expense will be recorded with the details below.")
+                : (language === "bg" ? " Няма да бъде записана трансакция." : " No transaction will be recorded.")}
             </p>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Shopping Date</label>
+              <label className="text-sm font-medium">{language === "bg" ? "Дата на пазаруване" : "Shopping Date"}</label>
               <Input
                 type="date"
                 value={completeForm.date}
@@ -1336,8 +1338,8 @@ export default function ShoppingPage() {
             </div>
             <div className="flex items-center justify-between rounded-md border p-3">
               <div className="space-y-0.5">
-                <label className="text-sm font-medium">Record as expense</label>
-                <p className="text-xs text-muted-foreground">Add a transaction to your account</p>
+                <label className="text-sm font-medium">{language === "bg" ? "Запиши като разход" : "Record as expense"}</label>
+                <p className="text-xs text-muted-foreground">{language === "bg" ? "Добави трансакция към сметката си" : "Add a transaction to your account"}</p>
               </div>
               <Switch
                 checked={completeForm.record_transaction}
@@ -1347,7 +1349,7 @@ export default function ShoppingPage() {
             {completeForm.record_transaction && (
               <>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Store</label>
+                  <label className="text-sm font-medium">{t("shopping.store")}</label>
                   <Input
                     autoFocus
                     value={completeForm.store}
@@ -1356,12 +1358,12 @@ export default function ShoppingPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Account</label>
+                  <label className="text-sm font-medium">{t("transactions.account")}</label>
                   <Select
                     value={completeForm.account_id}
                     onValueChange={(v) => setCompleteForm((f) => ({ ...f, account_id: v }))}
                   >
-                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t("transactions.selectAccount")} /></SelectTrigger>
                     <SelectContent>
                       {writableAccounts.map((a: any) => (
                         <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
@@ -1370,7 +1372,7 @@ export default function ShoppingPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Amount</label>
+                  <label className="text-sm font-medium">{t("common.amount")}</label>
                   <Input
                     type="number"
                     step="0.01"
@@ -1381,7 +1383,7 @@ export default function ShoppingPage() {
                   />
                   {actualTotal > 0 && (
                     <p className="text-xs text-muted-foreground">
-                      Prefilled from Actual paid ({formatCurrency(actualTotal)})
+                      {language === "bg" ? `Попълнено от платената цена (${formatCurrency(actualTotal)})` : `Prefilled from Actual paid (${formatCurrency(actualTotal)})`}
                     </p>
                   )}
                 </div>
@@ -1389,10 +1391,10 @@ export default function ShoppingPage() {
             )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setConfirmCompleteOpen(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={completeTrip.isPending}>
-                {completeTrip.isPending ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />Completing…</>) : "Complete trip"}
+                {completeTrip.isPending ? (<><Loader2 className="h-4 w-4 mr-2 animate-spin" />{language === "bg" ? "Завършване…" : "Completing…"}</>) : t("shopping.completeTrip")}
               </Button>
             </DialogFooter>
           </form>
@@ -1403,26 +1405,26 @@ export default function ShoppingPage() {
       <Dialog open={viewReceiptOpen} onOpenChange={setViewReceiptOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Receipt</DialogTitle>
+            <DialogTitle>{t("shopping.receipt")}</DialogTitle>
           </DialogHeader>
           {activeReceiptUrl ? (
             <div className="max-h-[70vh] overflow-auto flex items-center justify-center">
               {/* Best-effort: render images inline, link out for PDFs/other types */}
               {/\.pdf(\?|$)/i.test(activeReceiptUrl) ? (
                 <a href={activeReceiptUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                  Open receipt in a new tab
+                  {language === "bg" ? "Отвори бележката в нов прозорец" : "Open receipt in a new tab"}
                 </a>
               ) : (
                 <img src={activeReceiptUrl} alt="Receipt" className="max-w-full h-auto rounded-md" />
               )}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground py-6 text-center">Loading…</p>
+            <p className="text-sm text-muted-foreground py-6 text-center">{t("common.loading")}</p>
           )}
           {activeReceiptUrl && (
             <DialogFooter>
               <a href={activeReceiptUrl} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">
-                Open in new tab
+                {language === "bg" ? "Отвори в нов прозорец" : "Open in new tab"}
               </a>
             </DialogFooter>
           )}
@@ -1442,9 +1444,9 @@ export default function ShoppingPage() {
       <Dialog open={newListDialogOpen} onOpenChange={setNewListDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>New Shopping List</DialogTitle>
+            <DialogTitle>{t("shopping.newTrip")}</DialogTitle>
             <DialogDescription>
-              Create a dedicated list for specific stores or projects (e.g. Costco, Pharmacy, IKEA).
+              {language === "bg" ? "Създайте отделен списък за конкретни магазини или проекти (напр. Лидл, Аптека, Ремонт)." : "Create a dedicated list for specific stores or projects (e.g. Costco, Pharmacy, IKEA)."}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -1462,7 +1464,7 @@ export default function ShoppingPage() {
           >
             <div>
               <Input
-                placeholder="List name (e.g., Costco, IKEA, Pharmacy)"
+                placeholder={language === "bg" ? "Име на списъка (напр. Лидл, Аптека, Ремонт)" : "List name (e.g., Costco, IKEA, Pharmacy)"}
                 value={newListName}
                 onChange={(e) => setNewListName(e.target.value)}
                 autoFocus
@@ -1475,7 +1477,7 @@ export default function ShoppingPage() {
                 variant="outline"
                 onClick={() => setNewListDialogOpen(false)}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 type="submit"
@@ -1484,10 +1486,10 @@ export default function ShoppingPage() {
                 {createCustomList.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating…
+                    {language === "bg" ? "Създаване…" : "Creating…"}
                   </>
                 ) : (
-                  "Create List"
+                  t("shopping.createList")
                 )}
               </Button>
             </DialogFooter>
@@ -1499,13 +1501,15 @@ export default function ShoppingPage() {
       <AlertDialog open={confirmDeleteListOpen} onOpenChange={setConfirmDeleteListOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete shopping list?</AlertDialogTitle>
+            <AlertDialogTitle>{t("shopping.deleteList")}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete &ldquo;{activeTrip?.name}&rdquo; and all items on it? This action cannot be undone.
+              {language === "bg"
+                ? `Сигурни ли сте, че искате да изтриете „${activeTrip?.name}“ и всички артикули в него? Това действие е необратимо.`
+                : `Are you sure you want to delete “${activeTrip?.name}” and all items on it? This action cannot be undone.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
@@ -1513,7 +1517,7 @@ export default function ShoppingPage() {
                 deleteCurrentList.mutate(activeTrip.id);
               }}
             >
-              Delete List
+              {t("shopping.deleteList")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1722,6 +1726,7 @@ function ItemEditDialog({
   onClose: () => void;
   onSave: (patch: Partial<Item> & { id: string; _prevCategoryId?: string | null; _translation?: string | null }) => void;
 }) {
+  const { t, translateCategory, language } = useLanguage();
   const [name, setName] = useState("");
   const [qty, setQty] = useState("1");
   const [unit, setUnit] = useState("");
@@ -1747,9 +1752,6 @@ function ItemEditDialog({
       setName(item.name);
       setQty(String(item.quantity ?? 1));
       setUnit(item.unit ?? "");
-      // Only pre-fill with the user's own manual override. The cheapest-deal
-      // estimate is shown as a placeholder so we never silently persist a
-      // stale value when quantity or deals change.
       setPrice(item.price_cents != null ? (item.price_cents / 100).toFixed(2) : "");
       setActualPrice(item.actual_price_cents != null ? (item.actual_price_cents / 100).toFixed(2) : "");
       setCategoryId(item.category_id ?? "");
@@ -1760,43 +1762,43 @@ function ItemEditDialog({
   if (!item) return null;
   const lang = detectLanguage(name);
   const translationLabel =
-    lang === "bg" ? "English name (optional)" :
-    lang === "en" ? "Bulgarian name (optional)" :
-    "Translation (optional)";
+    lang === "bg" ? (language === "bg" ? "Английско име (незадължително)" : "English name (optional)") :
+    lang === "en" ? (language === "bg" ? "Българско име (незадължително)" : "Bulgarian name (optional)") :
+    (language === "bg" ? "Превод (незадължително)" : "Translation (optional)");
 
   return (
     <Dialog open={!!item} onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit item</DialogTitle>
+          <DialogTitle>{language === "bg" ? "Редактиране на артикул" : "Edit item"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={language === "bg" ? "Име" : "Name"} />
           <div className="grid grid-cols-2 gap-2">
-            <Input value={qty} onChange={(e) => setQty(e.target.value)} placeholder="Quantity" type="number" step="0.01" />
-            <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="Unit (kg, l…)" />
+            <Input value={qty} onChange={(e) => setQty(e.target.value)} placeholder={t("shopping.quantity")} type="number" step="0.01" />
+            <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder={`${t("shopping.unit")} (kg, l…)`} />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Expected price (override)</label>
+              <label className="text-xs text-muted-foreground">{t("shopping.estimatedPrice")}</label>
               <Input
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                placeholder={estimatedExpectedCents != null ? `~${(estimatedExpectedCents / 100).toFixed(2)} from deal` : "Optional"}
+                placeholder={estimatedExpectedCents != null ? `~${(estimatedExpectedCents / 100).toFixed(2)}` : t("common.optional")}
                 type="number"
                 step="0.01"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Actual paid</label>
-              <Input value={actualPrice} onChange={(e) => setActualPrice(e.target.value)} placeholder="Optional" type="number" step="0.01" />
+              <label className="text-xs text-muted-foreground">{t("shopping.actualPrice")}</label>
+              <Input value={actualPrice} onChange={(e) => setActualPrice(e.target.value)} placeholder={t("common.optional")} type="number" step="0.01" />
             </div>
           </div>
           <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder={t("common.category")} /></SelectTrigger>
             <SelectContent>
               {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.emoji} {c.name}</SelectItem>
+                <SelectItem key={c.id} value={c.id}>{c.emoji} {translateCategory(c.name)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -1807,19 +1809,17 @@ function ItemEditDialog({
               placeholder={translationLabel}
             />
             <p className="text-xs text-muted-foreground">
-              Add the other-language name to teach the app — both sides share the same category in suggestions.
+              {language === "bg" ? "Добавете името на другия език, за да обучите приложението — двата езика споделят обща категория в препоръките." : "Add the other-language name to teach the app — both sides share the same category in suggestions."}
             </p>
           </div>
           {isGeneralList && item.promo_offers && item.promo_offers.length > 0 && (
             <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
               <p className="text-xs font-medium text-muted-foreground">
-                Matched deals · cheapest first
+                {language === "bg" ? "Намерени промоции · най-евтините отпред" : "Matched deals · cheapest first"}
               </p>
               <ul className="space-y-1">
                 {item.promo_offers.map((o) => {
                   const qtyNum = parseFloat(qty) || 1;
-                  // Per-weight/volume promos quote a unit price and don't use
-                  // pack rounding — fold pack_size to null so the qty multiplies directly.
                   const isMeasure = o.unit === "kg" || o.unit === "l" || o.unit === "g" || o.unit === "ml";
                   const effectivePack = isMeasure ? null : o.pack_size;
                   const lineTotal = computeLineTotalCents({
@@ -1844,7 +1844,7 @@ function ItemEditDialog({
                         {unitLabel && (
                           <span className="text-muted-foreground">{" "}{unitLabel}</span>
                         )}
-                        <span className="text-muted-foreground"> · total {formatCurrency(lineTotal)}</span>
+                        <span className="text-muted-foreground"> · {language === "bg" ? "общо" : "total"} {formatCurrency(lineTotal)}</span>
                       </span>
                     </li>
                   );
@@ -1856,7 +1856,7 @@ function ItemEditDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{t("common.cancel")}</Button>
           <Button onClick={() => onSave({
             id: item.id,
             name: name.trim() || item.name,
@@ -1868,7 +1868,7 @@ function ItemEditDialog({
             category_id: categoryId || null,
             _prevCategoryId: item.category_id,
             _translation: translation.trim() || null,
-          })}>Save</Button>
+          })}>{t("common.save")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1876,6 +1876,7 @@ function ItemEditDialog({
 }
 
 function PastTripRow({ trip }: { trip: Trip }) {
+  const { formatDate, language } = useLanguage();
   const [open, setOpen] = useState(false);
   const { data: items = [] } = useShoppingItems(open ? trip.id : undefined);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
@@ -1895,7 +1896,7 @@ function PastTripRow({ trip }: { trip: Trip }) {
             <div className="text-left">
               <p className="text-sm font-medium">{trip.name}</p>
               <p className="text-xs text-muted-foreground">
-                {format(new Date(trip.started_at), "PPP")}
+                {formatDate(new Date(trip.started_at), "PPP")}
                 {trip.total_cents ? ` · ${formatCurrency(trip.total_cents)}` : ""}
               </p>
             </div>
@@ -1917,7 +1918,7 @@ function PastTripRow({ trip }: { trip: Trip }) {
             ))}
             {receiptUrl && (
               <a href={receiptUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs text-primary hover:underline mt-2">
-                <Receipt className="h-3.5 w-3.5" /> View receipt
+                <Receipt className="h-3.5 w-3.5" /> {language === "bg" ? "Виж бележка" : "View receipt"}
               </a>
             )}
           </div>

@@ -6,7 +6,7 @@ import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useBudgets, useSaveBudgets, useDeleteBudgets } from "@/hooks/queries/useBudgets";
 import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { useAuth } from "@/hooks/useAuth";
-import { formatCurrency, parseCurrencyToCents, getMonthYear } from "@/lib/financial";
+import { formatCurrency, parseCurrencyToCents, getMonthYear, getBudgetTarget, isIncomeCategory, getMainCategoryOrder } from "@/lib/financial";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,19 +16,13 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Bell, AlertTriangle, Copy, Trash2, History } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
-
-const BUDGET_TARGETS: Record<string, number> = {
-  Нужди: 50,
-  Желания: 20,
-  Инвестиции: 30,
-};
-
-const INCOME_CATEGORY = "Приходи";
+import { useLanguage } from "@/lib/i18n";
 
 
 export default function BudgetsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { t, translateCategory, formatDate } = useLanguage();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [budgetVersion, setBudgetVersion] = useState(0);
   const monthYear = getMonthYear(currentDate);
@@ -120,7 +114,7 @@ export default function BudgetsPage() {
       await saveBudgetsMutation.mutateAsync({ inserts, updates });
     },
     onSuccess: () => {
-      toast.success("Budget copied from previous month");
+      toast.success(t("budgets.copiedSuccess"));
     },
     onError: (e) => toast.error(e.message),
   });
@@ -153,7 +147,7 @@ export default function BudgetsPage() {
   const deleteBudgetsMutation = useDeleteBudgets({
     onSuccess: () => {
       setBudgetVersion((v) => v + 1);
-      toast.success("All budgets cleared for this month");
+      toast.success(t("budgets.clearedSuccess"));
     },
     onError: (e) => toast.error(e.message),
   });
@@ -168,7 +162,7 @@ export default function BudgetsPage() {
 
   // Group by main category
   const grouped = subcategories
-    .filter((sub) => (sub as any).main_categories?.name !== INCOME_CATEGORY)
+    .filter((sub) => !isIncomeCategory((sub as any).main_categories?.name))
     .reduce(
       (acc, sub) => {
         const mainName = (sub as any).main_categories?.name || "Other";
@@ -195,13 +189,13 @@ export default function BudgetsPage() {
   const incomeTotal = visibleTransactions
     .filter((t) => {
       const mainName = (t as any).subcategories?.main_categories?.name;
-      return mainName === INCOME_CATEGORY;
+      return isIncomeCategory(mainName);
     })
     .reduce((s, t) => s + t.amount, 0);
 
   // Totals across all expense subcategories
   const expenseSubIds = subcategories
-    .filter((sub) => (sub as any).main_categories?.name !== INCOME_CATEGORY)
+    .filter((sub) => !isIncomeCategory((sub as any).main_categories?.name))
     .map((sub) => sub.id);
   const totalBudget = expenseSubIds.reduce((s, id) => s + getBudget(id), 0);
   const totalSpent = expenseSubIds.reduce((s, id) => s + getSpent(id), 0);
@@ -210,12 +204,12 @@ export default function BudgetsPage() {
     <div className="space-y-6 max-w-4xl">
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Budgets</h1>
+          <h1 className="text-2xl font-semibold">{t("budgets.title")}</h1>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm font-medium min-w-[100px] text-center">{format(currentDate, "MMM yyyy")}</span>
+            <span className="text-sm font-medium min-w-[100px] text-center">{formatDate(currentDate, "MMM yyyy")}</span>
             <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -230,13 +224,13 @@ export default function BudgetsPage() {
             className="text-xs gap-1.5"
           >
             <Copy className="h-3.5 w-3.5" />
-            Copy from {format(subMonths(currentDate, 1), "MMM")}
+            {t("budgets.copyPrevMonth")}
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
-              if (confirm("Clear all budget values for this month?")) {
+              if (confirm(t("budgets.clearBudgetsConfirm"))) {
                 clearBudgetsMutation.mutate();
               }
             }}
@@ -244,7 +238,7 @@ export default function BudgetsPage() {
             className="text-xs gap-1.5 text-destructive hover:text-destructive"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            Clear
+            {t("budgets.clearBudgets")}
           </Button>
         </div>
       </div>
@@ -253,22 +247,22 @@ export default function BudgetsPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">Total Budget</div>
+            <div className="text-sm font-medium">{t("budgets.totalBudget")}</div>
             <div className="flex items-center gap-4 text-sm">
               <div className="text-right">
-                <div className="text-xs text-muted-foreground">Budget</div>
+                <div className="text-xs text-muted-foreground">{t("budgets.budgeted")}</div>
                 <span className={`font-mono-numbers font-semibold ${totalBudget > incomeTotal && incomeTotal > 0 ? "text-destructive animate-pulse" : ""}`}>
                   {formatCurrency(totalBudget)}
                 </span>
               </div>
               <div className="text-right">
-                <div className="text-xs text-muted-foreground">Spent</div>
+                <div className="text-xs text-muted-foreground">{t("dashboard.spent")}</div>
                 <span className={`font-mono-numbers font-semibold ${totalSpent > totalBudget && totalBudget > 0 ? "text-destructive" : ""}`}>
                   {formatCurrency(totalSpent)}
                 </span>
               </div>
               <div className="text-right">
-                <div className="text-xs text-muted-foreground">Income</div>
+                <div className="text-xs text-muted-foreground">{t("transactions.income")}</div>
                 <span className="font-mono-numbers font-semibold">
                   {formatCurrency(incomeTotal)}
                 </span>
@@ -288,46 +282,43 @@ export default function BudgetsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-              No active categories. Add categories first to set budgets.
+              {t("budgets.noCategoriesYet")}
             </div>
           </CardContent>
         </Card>
       )}
 
       {Object.entries(grouped)
-        .sort(([a], [b]) => {
-          const order = ["Нужди", "Желания", "Инвестиции"];
-          const ai = order.indexOf(a);
-          const bi = order.indexOf(b);
-          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-        })
+        .sort(([a], [b]) => getMainCategoryOrder(a) - getMainCategoryOrder(b))
         .map(([mainName, subs]) => {
           const mainBudgetTotal = subs.reduce((s, sub) => s + getBudget(sub.id), 0);
           const mainSpentTotal = subs.reduce((s, sub) => s + getSpent(sub.id), 0);
           const mainPct = mainBudgetTotal > 0 ? Math.min((mainSpentTotal / mainBudgetTotal) * 100, 100) : 0;
           const isMainOver = mainSpentTotal > mainBudgetTotal && mainBudgetTotal > 0;
-          const targetPct = BUDGET_TARGETS[mainName];
+          const targetPct = getBudgetTarget(mainName);
           // Share of the total plan (independent of income), so the main categories always sum to 100%
           const budgetedPct = totalBudget > 0 ? (mainBudgetTotal / totalBudget) * 100 : 0;
           const targetAmount = targetPct !== undefined ? Math.round((totalBudget * targetPct) / 100) : 0;
           const offTarget = targetPct !== undefined && Math.abs(budgetedPct - targetPct) > 2;
+
+          const displayName = translateCategory(mainName);
 
           return (
             <Card key={mainName}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <CardTitle className="text-base font-medium">{mainName}</CardTitle>
+                    <CardTitle className="text-base font-medium">{displayName}</CardTitle>
                     {targetPct !== undefined && (
                       <>
                         <Badge variant="secondary" className="text-xs font-mono-numbers">
-                          Target {targetPct}% ({formatCurrency(targetAmount)})
+                          {t("budgets.target")} {targetPct}% ({formatCurrency(targetAmount)})
                         </Badge>
                         <Badge
                           variant="outline"
                           className={`text-xs font-mono-numbers ${offTarget ? "text-warning border-warning/40" : ""}`}
                         >
-                          Budgeted {budgetedPct.toFixed(1)}%
+                          {t("budgets.budgeted")} {budgetedPct.toFixed(1)}%
                         </Badge>
                       </>
                     )}
@@ -358,10 +349,10 @@ export default function BudgetsPage() {
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                           <div className="flex items-center gap-2 sm:min-w-[140px]">
                             <DynamicIcon name={sub.icon} className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">{sub.name}</span>
+                            <span className="text-sm">{translateCategory(sub.name)}</span>
                             {isAlerted && <Bell className="h-3 w-3 text-warning" />}
                             {isUnbudgetedSpend && (
-                              <span className="text-[10px] uppercase tracking-wide text-warning font-medium">Unbudgeted</span>
+                              <span className="text-[10px] uppercase tracking-wide text-warning font-medium">{t("budgets.unbudgeted")}</span>
                             )}
                             <span className={`text-xs font-mono-numbers sm:hidden ${isOver ? "text-destructive" : isUnbudgetedSpend ? "text-warning" : ""}`}>
                               {formatCurrency(spent)}

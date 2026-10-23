@@ -14,16 +14,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-
-const BUDGET_TARGETS: Record<string, string> = {
-  "Нужди": "50%",
-  "Желания": "20%",
-  "Инвестиции": "30%",
-};
+import { getBudgetTarget } from "@/lib/financial";
+import { useLanguage } from "@/lib/i18n";
 
 export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { t, translateCategory } = useLanguage();
 
   // Main category dialog
   const [mainOpen, setMainOpen] = useState(false);
@@ -117,11 +114,11 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
       {!isEmbedded && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">Categories</h1>
-            <p className="text-sm text-muted-foreground mt-1">50/30/20 budgeting model</p>
+            <h1 className="text-2xl font-semibold">{t("categories.title")}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t("categories.subtitle")}</p>
           </div>
           <Button onClick={() => { setEditingMain(null); setMainForm({ name: "", color: "215 55% 52%" }); setMainOpen(true); }} className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" /> Add Category
+            <Plus className="h-4 w-4 mr-2" /> {t("categories.addCategory")}
           </Button>
         </div>
       )}
@@ -129,7 +126,7 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
       {isEmbedded && (
         <div className="flex justify-end">
           <Button onClick={() => { setEditingMain(null); setMainForm({ name: "", color: "215 55% 52%" }); setMainOpen(true); }} size="sm">
-            <Plus className="h-4 w-4 mr-2" /> Add Category
+            <Plus className="h-4 w-4 mr-2" /> {t("categories.addCategory")}
           </Button>
         </div>
       )}
@@ -138,6 +135,8 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
         {mainCategories.map((cat) => {
           const subs = subcategories.filter((s) => s.main_category_id === cat.id);
           const colorStyle = { backgroundColor: `hsl(${cat.color} / 0.1)`, color: `hsl(${cat.color})` };
+          const targetPct = getBudgetTarget(cat.name);
+          const displayName = translateCategory(cat.name);
 
           return (
             <Card key={cat.id}>
@@ -145,10 +144,10 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <Badge variant="secondary" style={colorStyle}>
-                      {cat.name}
+                      {displayName}
                     </Badge>
                     <span className="text-xs text-muted-foreground">
-                      {BUDGET_TARGETS[cat.name] ? `${BUDGET_TARGETS[cat.name]} target` : ""}
+                      {targetPct !== undefined ? `${targetPct}% ${t("categories.targetHint")}` : ""}
                     </span>
                   </div>
                   <div className="flex gap-1 flex-wrap">
@@ -159,7 +158,7 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => openAddSub(cat.id)}>
-                      <Plus className="h-3.5 w-3.5 mr-1" /> Subcategory
+                      <Plus className="h-3.5 w-3.5 mr-1" /> {t("categories.addSubcategory")}
                     </Button>
                   </div>
                 </div>
@@ -177,8 +176,8 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
                         <DynamicIcon name={sub.icon} className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{sub.name}</p>
-                        {!sub.is_active && <p className="text-xs text-muted-foreground">Inactive</p>}
+                        <p className="text-sm font-medium truncate">{translateCategory(sub.name)}</p>
+                        {!sub.is_active && <p className="text-xs text-muted-foreground">{t("common.inactive")}</p>}
                       </div>
                       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditSub(sub)}>
@@ -201,19 +200,19 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
       <Dialog open={mainOpen} onOpenChange={(v) => { setMainOpen(v); if (!v) setEditingMain(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingMain ? "Edit Category" : "New Category"}</DialogTitle>
+            <DialogTitle>{editingMain ? t("categories.editCategory") : t("categories.addCategory")}</DialogTitle>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleSaveMain}>
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>{t("categories.categoryName")}</Label>
               <Input value={mainForm.name} onChange={(e) => setMainForm({ ...mainForm, name: e.target.value })} required />
             </div>
             <div className="space-y-2">
-              <Label>Color</Label>
+              <Label>{t("categories.color")}</Label>
               <ColorPicker value={mainForm.color} onChange={(c) => setMainForm({ ...mainForm, color: c })} />
             </div>
             <Button type="submit" className="w-full" disabled={saveMainMutation.isPending}>
-              {editingMain ? "Update" : "Create"}
+              {editingMain ? t("common.save") : t("common.add")}
             </Button>
           </form>
         </DialogContent>
@@ -223,24 +222,28 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
       <Dialog open={subOpen} onOpenChange={(v) => { setSubOpen(v); if (!v) setEditingSub(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingSub ? "Edit Subcategory" : "New Subcategory"}</DialogTitle>
+            <DialogTitle>{editingSub ? t("categories.editSubcategory") : t("categories.addSubcategory")}</DialogTitle>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleSaveSub}>
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>{t("categories.subcategoryName")}</Label>
               <Input value={subForm.name} onChange={(e) => setSubForm({ ...subForm, name: e.target.value })} required />
             </div>
             <div className="space-y-2">
-              <Label>Parent Category</Label>
+              <Label>{t("common.category")}</Label>
               <Select value={subForm.main_category_id} onValueChange={(v) => setSubForm({ ...subForm, main_category_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("quickAdd.selectCategory")} /></SelectTrigger>
                 <SelectContent>
-                  {mainCategories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {mainCategories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {translateCategory(c.name)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Icon</Label>
+              <Label>{t("categories.icon")}</Label>
               <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
                 {availableIcons.map((icon) => (
                   <button
@@ -255,15 +258,15 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Color</Label>
+              <Label>{t("categories.color")}</Label>
               <ColorPicker value={subForm.color} onChange={(c) => setSubForm({ ...subForm, color: c })} />
             </div>
             <div className="flex items-center justify-between">
-              <Label>Active</Label>
+              <Label>{t("common.active")}</Label>
               <Switch checked={subForm.is_active} onCheckedChange={(v) => setSubForm({ ...subForm, is_active: v })} />
             </div>
             <Button type="submit" className="w-full" disabled={saveSubMutation.isPending}>
-              {editingSub ? "Update" : "Create"}
+              {editingSub ? t("common.save") : t("common.add")}
             </Button>
           </form>
         </DialogContent>
