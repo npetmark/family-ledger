@@ -106,11 +106,15 @@ describe("i18n system tests", () => {
     });
 
     it("translates compound subcategories containing personal names or custom text", () => {
+      expect(translateCategory("Облекло", "en")).toBe("Clothing");
+      expect(translateCategory("Облекло - Никола", "en")).toBe("Clothing - Nikola");
+      expect(translateCategory("Облекло за бебе", "en")).toBe("Clothing for Baby");
       expect(translateCategory("Дрехи - Никола", "en")).toBe("Clothing - Nikola");
       expect(translateCategory("Джобни Никола", "en")).toBe("Pocket Money Nikola");
       expect(translateCategory("Училище - Мария", "en")).toBe("School - Maria");
       expect(translateCategory("Детска градина - Борис", "en")).toBe("Kindergarten - Boris");
-      expect(translateCategory("Курсове по плуване", "en")).toBe("Courses po Swimming");
+      expect(translateCategory("Курсове по плуване", "en")).toBe("Courses for Swimming");
+      expect(translateCategory("Поддръжка на кола", "en")).toBe("Maintenance of Car");
     });
 
     it("guarantees NO Cyrillic remains in category names when English is selected", () => {

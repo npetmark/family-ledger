@@ -144,6 +144,12 @@ export interface TranslationDictionary {
     noCategoriesYet: string;
     copiedSuccess: string;
     clearedSuccess: string;
+    editBudgets: string;
+    doneEditing: string;
+    expandAll: string;
+    collapseAll: string;
+    applyLastMonth: string;
+    allOnTrack: string;
   };
   categories: {
     title: string;

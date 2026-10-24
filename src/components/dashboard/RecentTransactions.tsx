@@ -6,7 +6,7 @@ import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { getFirstName } from "@/hooks/queries/useProfile";
 import { useAuth } from "@/hooks/useAuth";
-import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
+import { formatCurrency, parseCurrencyToCents, compareMainCategories, compareSubcategories } from "@/lib/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,7 +79,9 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
     return acc;
   }, {});
 
-  const sortedGroups = Object.entries(grouped).sort(([, a], [, b]) => a.sortOrder - b.sortOrder);
+  const sortedGroups = Object.entries(grouped)
+    .sort(([idA, a], [idB, b]) => compareMainCategories({ name: a.name, sort_order: a.sortOrder, id: idA }, { name: b.name, sort_order: b.sortOrder, id: idB }))
+    .map(([id, g]) => [id, { ...g, items: [...g.items].sort(compareSubcategories) }] as const);
 
   const recentTransactions = transactions.slice(0, 5);
 

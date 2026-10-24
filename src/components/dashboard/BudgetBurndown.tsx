@@ -4,11 +4,12 @@ import { useAccounts } from "@/hooks/queries/useAccounts";
 import { useBudgetsWithCategories } from "@/hooks/queries/useBudgets";
 import { useTransactions } from "@/hooks/queries/useTransactions";
 import { useAuth } from "@/hooks/useAuth";
-import { formatCurrency, getMonthYear, isIncomeCategory, getMainCategoryOrder } from "@/lib/financial";
+import { formatCurrency, getMonthYear, isIncomeCategory, compareMainCategories, compareSubcategories } from "@/lib/financial";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DynamicIcon } from "@/components/DynamicIcon";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronRight } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
 
@@ -78,6 +79,7 @@ export function BudgetBurndown() {
         mainCategory: sub?.main_categories?.name || "",
         mainCategoryId: sub?.main_categories?.id || "",
         mainCategorySortOrder: sub?.main_categories?.sort_order ?? 999,
+        subSortOrder: (sub?.sort_order ?? 999) as number,
         budget: b.amount,
         spent,
         remaining,
@@ -109,6 +111,7 @@ export function BudgetBurndown() {
         mainCategory: mainName,
         mainCategoryId: sub.main_categories?.id || "",
         mainCategorySortOrder: sub.main_categories?.sort_order ?? 999,
+        subSortOrder: sub.sort_order ?? 999,
         budget: 0,
         spent: t.amount,
         remaining: -t.amount,
@@ -127,19 +130,27 @@ export function BudgetBurndown() {
     grouped[item.mainCategory].push(item);
   });
 
-  // Sort subcategories within each group: budgeted first by pct desc, unbudgeted at end by spent desc
+  // Fixed subcategory order within each group: budgeted first, then unbudgeted,
+  // each by sort_order → name (not by % spent, so rows don't jump around)
   Object.values(grouped).forEach((items) =>
     items.sort((a, b) => {
       if (a.unbudgeted !== b.unbudgeted) return a.unbudgeted ? 1 : -1;
-      if (a.unbudgeted) return b.spent - a.spent;
-      return b.pct - a.pct;
+      return compareSubcategories(
+        { name: a.name, sort_order: a.subSortOrder, id: a.subcategoryId },
+        { name: b.name, sort_order: b.subSortOrder, id: b.subcategoryId }
+      );
     })
   );
 
   const investmentNames = ["Инвестиции", "Investments"];
 
   const sortedCategories = Object.keys(grouped)
-    .sort((a, b) => getMainCategoryOrder(a) - getMainCategoryOrder(b))
+    .sort((a, b) =>
+      compareMainCategories(
+        { name: a, sort_order: grouped[a][0]?.mainCategorySortOrder },
+        { name: b, sort_order: grouped[b][0]?.mainCategorySortOrder }
+      )
+    )
     .map((name) => {
       const items = grouped[name];
       const totalBudget = items.reduce((s, b) => s + b.budget, 0);
@@ -169,7 +180,8 @@ export function BudgetBurndown() {
   }
 
   return (
-    <Card>
+    <TooltipProvider delayDuration={150}>
+      <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-medium">{t("dashboard.budgetBurndown")}</CardTitle>
         <div className="flex items-center justify-between mt-2">
@@ -181,10 +193,21 @@ export function BudgetBurndown() {
             <span className="text-muted-foreground"> / {formatCurrency(totalBudget)}</span>
           </div>
         </div>
-        <Progress
-          value={Math.min(totalPct, 100)}
-          className={`h-2 mt-1 ${getBurndownColor(totalPct, 90)}`}
-        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="cursor-pointer py-1">
+              <Progress
+                value={Math.min(totalPct, 100)}
+                className={`h-2 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${getBurndownColor(totalPct, 90)}`}
+              />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <span className="font-mono-numbers text-xs font-medium">
+              {totalPct.toFixed(1)}% ({formatCurrency(totalSpent)} / {formatCurrency(totalBudget)})
+            </span>
+          </TooltipContent>
+        </Tooltip>
         <div className="flex justify-between text-xs text-muted-foreground mt-1">
           <span>
             {totalBudget - totalSpent >= 0
@@ -220,10 +243,21 @@ export function BudgetBurndown() {
                       <span className="text-muted-foreground"> / {formatCurrency(cat.totalBudget)}</span>
                     </div>
                   </CollapsibleTrigger>
-                  <Progress
-                    value={clampedPct}
-                    className={`h-1.5 ${getBurndownColor(cat.pct, avgThreshold, cat.isInvestment)}`}
-                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="cursor-pointer py-1">
+                        <Progress
+                          value={clampedPct}
+                          className={`h-1.5 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${getBurndownColor(cat.pct, avgThreshold, cat.isInvestment)}`}
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <span className="font-mono-numbers text-xs font-medium">
+                        {cat.pct.toFixed(1)}% ({formatCurrency(cat.totalSpent)} / {formatCurrency(cat.totalBudget)})
+                      </span>
+                    </TooltipContent>
+                  </Tooltip>
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>
                       {cat.remaining >= 0
@@ -271,10 +305,21 @@ export function BudgetBurndown() {
                               <span className="text-muted-foreground"> / {formatCurrency(item.budget)}</span>
                             </div>
                           </div>
-                          <Progress
-                            value={itemClampedPct}
-                            className={`h-1.5 ${getBurndownColor(item.pct, item.alertThreshold, cat.isInvestment)}`}
-                          />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="cursor-pointer py-1">
+                                <Progress
+                                  value={itemClampedPct}
+                                  className={`h-1.5 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${getBurndownColor(item.pct, item.alertThreshold, cat.isInvestment)}`}
+                                />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <span className="font-mono-numbers text-xs font-medium">
+                                {item.pct.toFixed(1)}% ({formatCurrency(item.spent)} / {formatCurrency(item.budget)})
+                              </span>
+                            </TooltipContent>
+                          </Tooltip>
                           <div className="flex justify-between text-xs text-muted-foreground">
                             <span>
                               {item.remaining >= 0
@@ -294,5 +339,6 @@ export function BudgetBurndown() {
         </div>
       </CardContent>
     </Card>
+    </TooltipProvider>
   );
 }

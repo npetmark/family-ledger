@@ -22,7 +22,7 @@ export const transactionRepository = {
     for (let page = 0; ; page++) {
       const { data, error } = await supabase
         .from("transactions")
-        .select("*, subcategories(name, icon, color, main_categories(name, color)), accounts!transactions_account_id_fkey(name, icon)")
+        .select("*, subcategories(name, icon, color, sort_order, main_categories(id, name, color, sort_order)), accounts!transactions_account_id_fkey(name, icon)")
         .gte("date", fromStr)
         .lte("date", toStr)
         .order("date", { ascending: false })

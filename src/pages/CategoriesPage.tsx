@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { getBudgetTarget } from "@/lib/financial";
+import { getBudgetTarget, compareMainCategories, compareSubcategories } from "@/lib/financial";
 import { useLanguage } from "@/lib/i18n";
 
 export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
@@ -71,7 +71,7 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
       user_id: user!.id,
       name: mainForm.name,
       color: mainForm.color,
-      ...(editingMain ? {} : { sort_order: mainCategories.length })
+      ...(editingMain ? {} : { sort_order: Math.max(-1, ...mainCategories.map((c) => c.sort_order ?? 0)) + 1 })
     };
     saveMainMutation.mutate({ id: editingMain?.id, payload });
   };
@@ -86,7 +86,7 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
       main_category_id: subForm.main_category_id,
       is_active: subForm.is_active,
       color: subForm.color,
-      ...(editingSub ? {} : { sort_order: subs.length })
+      ...(editingSub ? {} : { sort_order: Math.max(-1, ...subs.map((s) => s.sort_order ?? 0)) + 1 })
     };
     saveSubMutation.mutate({ id: editingSub?.id, payload });
   };
@@ -132,8 +132,8 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
       )}
 
       <div className="space-y-6">
-        {mainCategories.map((cat) => {
-          const subs = subcategories.filter((s) => s.main_category_id === cat.id);
+        {[...mainCategories].sort(compareMainCategories).map((cat) => {
+          const subs = subcategories.filter((s) => s.main_category_id === cat.id).sort(compareSubcategories);
           const colorStyle = { backgroundColor: `hsl(${cat.color} / 0.1)`, color: `hsl(${cat.color})` };
           const targetPct = getBudgetTarget(cat.name);
           const displayName = translateCategory(cat.name);

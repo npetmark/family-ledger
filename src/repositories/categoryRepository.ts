@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const categoryRepository = {
   getMainCategories: async () => {
-    const { data, error } = await supabase.from("main_categories").select("*").order("sort_order");
+    const { data, error } = await supabase.from("main_categories").select("*").order("sort_order").order("name").order("id");
     if (error) throw error;
     return data;
   },
@@ -25,7 +25,7 @@ export const categoryRepository = {
   },
 
   getSubcategories: async () => {
-    const { data, error } = await supabase.from("subcategories").select("*").order("sort_order");
+    const { data, error } = await supabase.from("subcategories").select("*").order("sort_order").order("name").order("id");
     if (error) throw error;
     return data;
   },
@@ -45,7 +45,9 @@ export const categoryRepository = {
       .from("subcategories")
       .select("*, main_categories(id, name, color, sort_order)")
       .eq("is_active", true)
-      .order("sort_order");
+      .order("sort_order")
+      .order("name")
+      .order("id");
     if (error) throw error;
     return data;
   },

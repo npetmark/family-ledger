@@ -5,7 +5,7 @@ import { useAccounts } from "@/hooks/queries/useAccounts";
 import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useAuth } from "@/hooks/useAuth";
-import { parseCurrencyToCents, getMainCategoryOrder } from "@/lib/financial";
+import { parseCurrencyToCents, compareMainCategories, compareSubcategories } from "@/lib/financial";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -319,9 +319,11 @@ export function QuickAddTransaction() {
                           if (!grouped[mainName]) grouped[mainName] = [];
                           grouped[mainName].push(s);
                         });
-                        const sortedEntries = Object.entries(grouped).sort(
-                          ([a], [b]) => getMainCategoryOrder(a) - getMainCategoryOrder(b)
-                        );
+                        const mainMeta = (name: string) =>
+                          subcategories.find((s: any) => s.main_categories?.name === name)?.main_categories;
+                        const sortedEntries = Object.entries(grouped)
+                          .sort(([a], [b]) => compareMainCategories({ name: a, ...mainMeta(a) }, { name: b, ...mainMeta(b) }))
+                          .map(([name, subs]) => [name, [...subs].sort(compareSubcategories)] as [string, any[]]);
                          return sortedEntries.map(([mainName, subs]) => {
                           const mainCat = Object.values(grouped).length > 0
                             ? subcategories.find((s: any) => s.main_categories?.name === mainName)?.main_categories

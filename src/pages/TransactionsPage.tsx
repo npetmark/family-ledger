@@ -9,7 +9,7 @@ import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { getFirstName } from "@/hooks/queries/useProfile";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
+import { formatCurrency, parseCurrencyToCents, getMainCategoryOrder, compareMainCategories, compareSubcategories } from "@/lib/financial";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -134,7 +134,9 @@ export default function TransactionsPage() {
     return acc;
   }, {});
 
-  const sortedGroups = Object.entries(grouped).sort(([, a], [, b]) => a.sortOrder - b.sortOrder);
+  const sortedGroups = Object.entries(grouped)
+    .sort(([idA, a], [idB, b]) => compareMainCategories({ name: a.name, sort_order: a.sortOrder, id: idA }, { name: b.name, sort_order: b.sortOrder, id: idB }))
+    .map(([id, g]) => [id, { ...g, items: [...g.items].sort(compareSubcategories) }] as const);
   const selectedSubcategory = subcategories.find((c: any) => c.id === form.subcategory_id);
 
   const { data: transactions = [] } = useTransactions(user?.id, dateFilter);
@@ -584,39 +586,28 @@ export default function TransactionsPage() {
         type SubGroup = { name: string; icon: string; color: string; sortOrder: number; transactions: typeof transactions };
         type MainGroup = { name: string; color: string; sortOrder: number; subGroups: Record<string, SubGroup>; ungrouped: typeof transactions };
 
-        // Fixed main category order: Income, Needs, Wants, Investments, Transfers
-        const MAIN_CAT_ORDER: Record<string, number> = {
-          "Income": 0, "Приходи": 0,
-          "Needs": 1, "Нужди": 1,
-          "Wants": 2, "Желания": 2,
-          "Investments": 3, "Инвестиции": 3,
-          "Transfers": 4, "Преводи": 4,
-          "Uncategorized": 5, "Без категория": 5,
-        };
-
-        const getMainSortOrder = (name: string) => MAIN_CAT_ORDER[name] ?? 99;
-
-        const mainGroups: Record<string, MainGroup> = {};
+        const mainGroups: Record<string, MainGroup & { dbSortOrder: number }> = {};
 
         filteredTransactions.forEach((tItem) => {
           const mainCatName = tItem.subcategories?.main_categories?.name || (tItem.transaction_type === "income" ? "Income" : tItem.transaction_type === "transfer" ? "Transfers" : "Uncategorized");
           const mainCatColor = tItem.subcategories?.main_categories?.color || (tItem.transaction_type === "income" ? "145 45% 42%" : "0 0% 50%");
 
           if (!mainGroups[mainCatName]) {
-            mainGroups[mainCatName] = { name: mainCatName, color: mainCatColor, sortOrder: getMainSortOrder(mainCatName), subGroups: {}, ungrouped: [] };
+            const dbSortOrder = (tItem.subcategories?.main_categories as any)?.sort_order ?? 999;
+            mainGroups[mainCatName] = { name: mainCatName, color: mainCatColor, sortOrder: getMainCategoryOrder(mainCatName), dbSortOrder, subGroups: {}, ungrouped: [] };
           }
 
           const subName = tItem.subcategories?.name;
           if (subName) {
             const subId = tItem.subcategory_id || subName;
             if (!mainGroups[mainCatName].subGroups[subId]) {
-              // Find the subcategory's sort_order from the subcategories query
+              // Prefer the joined sort_order (works for inactive subcategories too)
               const subMeta = subcategories.find((s: any) => s.id === tItem.subcategory_id);
               mainGroups[mainCatName].subGroups[subId] = {
                 name: subName,
                 icon: tItem.subcategories?.icon || "circle",
                 color: tItem.subcategories?.color || mainCatColor,
-                sortOrder: subMeta?.sort_order ?? 999,
+                sortOrder: (tItem.subcategories as any)?.sort_order ?? subMeta?.sort_order ?? 999,
                 transactions: [],
               };
             }
@@ -626,8 +617,10 @@ export default function TransactionsPage() {
           }
         });
 
-        // Sort main groups by fixed order
-        const groups = Object.values(mainGroups).sort((a, b) => a.sortOrder - b.sortOrder);
+        // Fixed main group order (system order → user sort_order → name); never date-dependent
+        const groups = Object.values(mainGroups).sort((a, b) =>
+          a.sortOrder - b.sortOrder || compareMainCategories({ name: a.name, sort_order: a.dbSortOrder }, { name: b.name, sort_order: b.dbSortOrder })
+        );
         if (groups.length === 0) {
           return (
             <Card>
@@ -733,9 +726,9 @@ export default function TransactionsPage() {
                 <CollapsibleContent>
                   <CardContent className="pt-0 pb-2">
                     <div className="space-y-0.5">
-                    {Object.values(group.subGroups)
-                      .sort((a, b) => a.sortOrder - b.sortOrder)
-                      .map((sg) => {
+                    {Object.entries(group.subGroups)
+                      .sort(([idA, a], [idB, b]) => compareSubcategories({ name: a.name, sort_order: a.sortOrder, id: idA }, { name: b.name, sort_order: b.sortOrder, id: idB }))
+                      .map(([, sg]) => {
                         // Sort transactions within subcategory by date desc
                         const sortedTxns = [...sg.transactions].sort((a, b) => b.date.localeCompare(a.date) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
                         const subTotal = sortedTxns.reduce((s, tItem) => s + tItem.amount, 0);

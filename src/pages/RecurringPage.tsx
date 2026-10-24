@@ -5,7 +5,7 @@ import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useRecurringTransactions, useSaveRecurringTransaction, useDeleteRecurringTransaction } from "@/hooks/queries/useTransactions";
 import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { useAuth } from "@/hooks/useAuth";
-import { formatCurrency, parseCurrencyToCents } from "@/lib/financial";
+import { formatCurrency, parseCurrencyToCents, compareMainCategories, compareSubcategories } from "@/lib/financial";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { AccountSelectItems, formatAccountNameWithOwner } from "@/components/AccountSelectItems";
 import { Card, CardContent } from "@/components/ui/card";
@@ -242,11 +242,18 @@ export default function RecurringPage() {
               <Select value={form.subcategory_id} onValueChange={(v) => setForm({ ...form, subcategory_id: v })}>
                 <SelectTrigger><SelectValue placeholder={t("transactions.selectCategory")} /></SelectTrigger>
                 <SelectContent>
-                  {subcategories.map((s: any) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {translateCategory(s.main_categories?.name)} → {translateCategory(s.name)}
-                    </SelectItem>
-                  ))}
+                  {[...subcategories]
+                    .sort((a: any, b: any) =>
+                      compareMainCategories(
+                        { name: a.main_categories?.name, sort_order: a.main_categories?.sort_order },
+                        { name: b.main_categories?.name, sort_order: b.main_categories?.sort_order }
+                      ) || compareSubcategories(a, b)
+                    )
+                    .map((s: any) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {translateCategory(s.main_categories?.name)} → {translateCategory(s.name)}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

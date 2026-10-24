@@ -7,7 +7,9 @@ import {
   getTransactionTypeColor,
   getBudgetTarget,
   isIncomeCategory,
-  getMainCategoryOrder
+  getMainCategoryOrder,
+  compareMainCategories,
+  compareSubcategories,
 } from "./financial";
 
 describe("financial.ts characterization tests", () => {
@@ -137,7 +139,63 @@ describe("financial.ts characterization tests", () => {
       expect(getMainCategoryOrder("Wants")).toBe(2);
       expect(getMainCategoryOrder("Инвестиции")).toBe(3);
       expect(getMainCategoryOrder("Investments")).toBe(3);
+      expect(getMainCategoryOrder("Transfers")).toBe(4);
+      expect(getMainCategoryOrder("Преводи")).toBe(4);
+      expect(getMainCategoryOrder("Uncategorized")).toBe(5);
       expect(getMainCategoryOrder("Other")).toBe(999);
+    });
+  });
+
+  describe("compareMainCategories", () => {
+    it("sorts main categories in fixed system order: Income, Needs, Wants, Investments, Transfers, Uncategorized", () => {
+      const categories = [
+        { name: "Uncategorized" },
+        { name: "Transfers" },
+        { name: "Wants" },
+        { name: "Income" },
+        { name: "Investments" },
+        { name: "Needs" },
+      ];
+
+      const sorted = [...categories].sort(compareMainCategories);
+      expect(sorted.map((c) => c.name)).toEqual([
+        "Income",
+        "Needs",
+        "Wants",
+        "Investments",
+        "Transfers",
+        "Uncategorized",
+      ]);
+    });
+
+    it("falls back to sort_order and name for custom categories", () => {
+      const customCats = [
+        { name: "Hobby Projects", sort_order: 2 },
+        { name: "Side Hustle", sort_order: 1 },
+      ];
+      const sorted = [...customCats].sort(compareMainCategories);
+      expect(sorted.map((c) => c.name)).toEqual(["Side Hustle", "Hobby Projects"]);
+    });
+  });
+
+  describe("compareSubcategories", () => {
+    it("sorts subcategories deterministically by sort_order then name", () => {
+      const subs = [
+        { name: "Utilities", sort_order: 2 },
+        { name: "Housing", sort_order: 0 },
+        { name: "Groceries", sort_order: 1 },
+      ];
+      const sorted = [...subs].sort(compareSubcategories);
+      expect(sorted.map((s) => s.name)).toEqual(["Housing", "Groceries", "Utilities"]);
+    });
+
+    it("breaks ties by alphabetical name", () => {
+      const subs = [
+        { name: "Water", sort_order: 1 },
+        { name: "Electricity", sort_order: 1 },
+      ];
+      const sorted = [...subs].sort(compareSubcategories);
+      expect(sorted.map((s) => s.name)).toEqual(["Electricity", "Water"]);
     });
   });
 });

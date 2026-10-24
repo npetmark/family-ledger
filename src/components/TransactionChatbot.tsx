@@ -8,7 +8,7 @@ import { useSaveBudgets } from "@/hooks/queries/useBudgets";
 import { budgetRepository } from "@/repositories/budgetRepository";
 import { useAuth } from "@/hooks/useAuth";
 import { getFirstName } from "@/hooks/queries/useProfile";
-import { formatCurrency } from "@/lib/financial";
+import { formatCurrency, compareMainCategories, compareSubcategories } from "@/lib/financial";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -222,9 +222,9 @@ export function TransactionChatbot({ open, onOpenChange }: { open: boolean; onOp
   const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name || "Unknown";
 
   // Group subcategories by main category for the picker
-  const groupedSubcategories = mainCategories.map((mc) => ({
+  const groupedSubcategories = [...mainCategories].sort(compareMainCategories).map((mc) => ({
     ...mc,
-    subs: subcategories.filter((s: any) => s.main_category_id === mc.id),
+    subs: subcategories.filter((s: any) => s.main_category_id === mc.id).sort(compareSubcategories),
   }));
 
   return (

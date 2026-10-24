@@ -102,5 +102,38 @@ export function getMainCategoryOrder(categoryName?: string | null): number {
   if (n === "нужди" || n === "needs") return 1;
   if (n === "желания" || n === "wants") return 2;
   if (n === "инвестиции" || n === "investments") return 3;
+  if (n === "преводи" || n === "transfers") return 4;
+  if (n === "без категория" || n === "uncategorized") return 5;
   return 999;
+}
+
+type SortableCategory = { name?: string | null; sort_order?: number | null; id?: string | null };
+
+const compareNames = (a?: string | null, b?: string | null) =>
+  (a ?? "").localeCompare(b ?? "", undefined, { sensitivity: "base", numeric: true });
+
+/**
+ * Fixed, deterministic order for main categories:
+ * system order (Income, Needs, Wants, Investments, Transfers, Uncategorized),
+ * then the user's sort_order, then name, then id.
+ */
+export function compareMainCategories(a: SortableCategory, b: SortableCategory): number {
+  return (
+    getMainCategoryOrder(a.name) - getMainCategoryOrder(b.name) ||
+    (a.sort_order ?? 999) - (b.sort_order ?? 999) ||
+    compareNames(a.name, b.name) ||
+    compareNames(a.id, b.id)
+  );
+}
+
+/**
+ * Fixed, deterministic order for subcategories: sort_order, then name, then id.
+ * Never depends on amounts or transaction dates, so the list doesn't jump around.
+ */
+export function compareSubcategories(a: SortableCategory, b: SortableCategory): number {
+  return (
+    (a.sort_order ?? 999) - (b.sort_order ?? 999) ||
+    compareNames(a.name, b.name) ||
+    compareNames(a.id, b.id)
+  );
 }

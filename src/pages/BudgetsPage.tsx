@@ -6,15 +6,17 @@ import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useBudgets, useSaveBudgets, useDeleteBudgets } from "@/hooks/queries/useBudgets";
 import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { useAuth } from "@/hooks/useAuth";
-import { formatCurrency, parseCurrencyToCents, getMonthYear, getBudgetTarget, isIncomeCategory, getMainCategoryOrder } from "@/lib/financial";
+import { formatCurrency, parseCurrencyToCents, getMonthYear, getBudgetTarget, isIncomeCategory, compareMainCategories, compareSubcategories } from "@/lib/financial";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, Bell, AlertTriangle, Copy, Trash2, History } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronsUpDown, Bell, AlertTriangle, Copy, Trash2, History, Pencil, Check } from "lucide-react";
 import { format, addMonths, subMonths } from "date-fns";
 import { useLanguage } from "@/lib/i18n";
 
@@ -25,6 +27,8 @@ export default function BudgetsPage() {
   const { t, translateCategory, formatDate } = useLanguage();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [budgetVersion, setBudgetVersion] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const monthYear = getMonthYear(currentDate);
 
   const { data: householdInfo } = useHouseholdMembers(user?.id);
@@ -200,207 +204,406 @@ export default function BudgetsPage() {
   const totalBudget = expenseSubIds.reduce((s, id) => s + getBudget(id), 0);
   const totalSpent = expenseSubIds.reduce((s, id) => s + getSpent(id), 0);
 
-  return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">{t("budgets.title")}</h1>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-medium min-w-[100px] text-center">{formatDate(currentDate, "MMM yyyy")}</span>
-            <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => copyFromPreviousMonth.mutate()}
-            disabled={prevBudgets.length === 0 || copyFromPreviousMonth.isPending}
-            className="text-xs gap-1.5"
-          >
-            <Copy className="h-3.5 w-3.5" />
-            {t("budgets.copyPrevMonth")}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (confirm(t("budgets.clearBudgetsConfirm"))) {
-                clearBudgetsMutation.mutate();
-              }
-            }}
-            disabled={budgets.length === 0 || clearBudgetsMutation.isPending}
-            className="text-xs gap-1.5 text-destructive hover:text-destructive"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            {t("budgets.clearBudgets")}
-          </Button>
-        </div>
-      </div>
+  const sortedMainEntries = Object.entries(grouped).sort(([a, subsA], [b, subsB]) =>
+    compareMainCategories(
+      { name: a, ...(subsA[0] as any)?.main_categories },
+      { name: b, ...(subsB[0] as any)?.main_categories }
+    )
+  );
 
-      {/* Total Budget Summary */}
-      <Card>
-        <CardContent className="pt-6">
+  const allCollapsed =
+    sortedMainEntries.length > 0 &&
+    sortedMainEntries.every(([name]) => !!collapsedCategories[name]);
+
+  const toggleAllCategories = () => {
+    if (allCollapsed) {
+      setCollapsedCategories({});
+    } else {
+      const next: Record<string, boolean> = {};
+      sortedMainEntries.forEach(([name]) => {
+        next[name] = true;
+      });
+      setCollapsedCategories(next);
+    }
+  };
+
+  const toggleCategory = (mainName: string) => {
+    setCollapsedCategories((prev) => ({
+      ...prev,
+      [mainName]: !prev[mainName],
+    }));
+  };
+
+  const handleToggleEdit = () => {
+    if (!isEditing) {
+      // Opening edit mode -> expand all for quick editing
+      setCollapsedCategories({});
+    }
+    setIsEditing((prev) => !prev);
+  };
+
+  return (
+    <TooltipProvider delayDuration={150}>
+      <div className="space-y-6 max-w-4xl">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">{t("budgets.totalBudget")}</div>
-            <div className="flex items-center gap-4 text-sm">
-              <div className="text-right">
-                <div className="text-xs text-muted-foreground">{t("budgets.budgeted")}</div>
-                <span className={`font-mono-numbers font-semibold ${totalBudget > incomeTotal && incomeTotal > 0 ? "text-destructive animate-pulse" : ""}`}>
-                  {formatCurrency(totalBudget)}
-                </span>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-muted-foreground">{t("dashboard.spent")}</div>
-                <span className={`font-mono-numbers font-semibold ${totalSpent > totalBudget && totalBudget > 0 ? "text-destructive" : ""}`}>
-                  {formatCurrency(totalSpent)}
-                </span>
-              </div>
-              <div className="text-right">
-                <div className="text-xs text-muted-foreground">{t("transactions.income")}</div>
-                <span className="font-mono-numbers font-semibold">
-                  {formatCurrency(incomeTotal)}
-                </span>
-              </div>
+            <h1 className="text-2xl font-semibold">{t("budgets.title")}</h1>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-[100px] text-center">{formatDate(currentDate, "MMM yyyy")}</span>
+              <Button variant="ghost" size="icon" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          {totalBudget > 0 && (
-            <Progress
-              value={Math.min((totalSpent / totalBudget) * 100, 100)}
-              className={`h-2 mt-3 ${totalSpent > totalBudget ? "[&>div]:bg-destructive" : ""}`}
-            />
-          )}
-        </CardContent>
-      </Card>
 
-      {Object.keys(grouped).length === 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <div className="flex items-center gap-2">
+              <Button
+                variant={isEditing ? "default" : "outline"}
+                size="sm"
+                onClick={handleToggleEdit}
+                className="text-xs gap-1.5 font-medium"
+              >
+                {isEditing ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                {isEditing ? t("budgets.doneEditing") : t("budgets.editBudgets")}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleAllCategories}
+                className="text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+              >
+                <ChevronsUpDown className="h-3.5 w-3.5" />
+                {allCollapsed ? t("budgets.expandAll") : t("budgets.collapseAll")}
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copyFromPreviousMonth.mutate()}
+                disabled={prevBudgets.length === 0 || copyFromPreviousMonth.isPending}
+                className="text-xs gap-1.5"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                {t("budgets.copyPrevMonth")}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (confirm(t("budgets.clearBudgetsConfirm"))) {
+                    clearBudgetsMutation.mutate();
+                  }
+                }}
+                disabled={budgets.length === 0 || clearBudgetsMutation.isPending}
+                className="text-xs gap-1.5 text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {t("budgets.clearBudgets")}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Total Budget Summary */}
         <Card>
           <CardContent className="pt-6">
-            <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
-              {t("budgets.noCategoriesYet")}
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium">{t("budgets.totalBudget")}</div>
+              <div className="flex items-center gap-4 text-sm">
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground">{t("budgets.budgeted")}</div>
+                  <span className={`font-mono-numbers font-semibold ${totalBudget > incomeTotal && incomeTotal > 0 ? "text-destructive animate-pulse" : ""}`}>
+                    {formatCurrency(totalBudget)}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground">{t("dashboard.spent")}</div>
+                  <span className={`font-mono-numbers font-semibold ${totalSpent > totalBudget && totalBudget > 0 ? "text-destructive" : ""}`}>
+                    {formatCurrency(totalSpent)}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground">{t("transactions.income")}</div>
+                  <span className="font-mono-numbers font-semibold">
+                    {formatCurrency(incomeTotal)}
+                  </span>
+                </div>
+              </div>
             </div>
+            {totalBudget > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="cursor-pointer py-1 mt-2">
+                    <Progress
+                      value={Math.min((totalSpent / totalBudget) * 100, 100)}
+                      className={`h-2.5 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${totalSpent > totalBudget ? "[&>div]:bg-destructive" : ""}`}
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <span className="font-mono-numbers text-xs font-medium">
+                    {((totalSpent / totalBudget) * 100).toFixed(1)}% {t("dashboard.spent")} ({formatCurrency(totalSpent)} / {formatCurrency(totalBudget)})
+                  </span>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </CardContent>
         </Card>
-      )}
 
-      {Object.entries(grouped)
-        .sort(([a], [b]) => getMainCategoryOrder(a) - getMainCategoryOrder(b))
-        .map(([mainName, subs]) => {
+        {sortedMainEntries.length === 0 && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
+                {t("budgets.noCategoriesYet")}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {sortedMainEntries.map(([mainName, unsortedSubs]) => {
+          const subs = [...unsortedSubs].sort(compareSubcategories);
           const mainBudgetTotal = subs.reduce((s, sub) => s + getBudget(sub.id), 0);
           const mainSpentTotal = subs.reduce((s, sub) => s + getSpent(sub.id), 0);
           const mainPct = mainBudgetTotal > 0 ? Math.min((mainSpentTotal / mainBudgetTotal) * 100, 100) : 0;
           const isMainOver = mainSpentTotal > mainBudgetTotal && mainBudgetTotal > 0;
           const targetPct = getBudgetTarget(mainName);
-          // Share of the total plan (independent of income), so the main categories always sum to 100%
           const budgetedPct = totalBudget > 0 ? (mainBudgetTotal / totalBudget) * 100 : 0;
           const targetAmount = targetPct !== undefined ? Math.round((totalBudget * targetPct) / 100) : 0;
           const offTarget = targetPct !== undefined && Math.abs(budgetedPct - targetPct) > 2;
 
+          const overCount = subs.filter((sub) => {
+            const b = getBudget(sub.id);
+            const s = getSpent(sub.id);
+            return (s > b && b > 0) || (b === 0 && s > 0);
+          }).length;
+
           const displayName = translateCategory(mainName);
+          const isOpen = !collapsedCategories[mainName];
 
           return (
-            <Card key={mainName}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <CardTitle className="text-base font-medium">{displayName}</CardTitle>
-                    {targetPct !== undefined && (
-                      <>
-                        <Badge variant="secondary" className="text-xs font-mono-numbers">
-                          {t("budgets.target")} {targetPct}% ({formatCurrency(targetAmount)})
+            <Card key={mainName} className="overflow-hidden transition-shadow">
+              <Collapsible open={isOpen} onOpenChange={() => toggleCategory(mainName)}>
+                <CardHeader
+                  className="pb-3 cursor-pointer select-none hover:bg-muted/20 transition-colors"
+                  onClick={() => toggleCategory(mainName)}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
+                      />
+                      <CardTitle className="text-base font-semibold">{displayName}</CardTitle>
+                      {targetPct !== undefined && (
+                        <>
+                          <Badge variant="secondary" className="text-xs font-mono-numbers">
+                            {t("budgets.target")} {targetPct}% ({formatCurrency(targetAmount)})
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs font-mono-numbers ${offTarget ? "text-warning border-warning/40" : ""}`}
+                          >
+                            {t("budgets.budgeted")} {budgetedPct.toFixed(1)}%
+                          </Badge>
+                        </>
+                      )}
+                      {overCount > 0 ? (
+                        <Badge variant="destructive" className="text-xs font-mono-numbers gap-1 py-0 px-1.5">
+                          <AlertTriangle className="h-3 w-3" />
+                          {overCount} {t("budgets.overBudget").toLowerCase()}
                         </Badge>
-                        <Badge
-                          variant="outline"
-                          className={`text-xs font-mono-numbers ${offTarget ? "text-warning border-warning/40" : ""}`}
-                        >
-                          {t("budgets.budgeted")} {budgetedPct.toFixed(1)}%
-                        </Badge>
-                      </>
-                    )}
-                    {isMainOver && <AlertTriangle className="h-4 w-4 text-destructive" />}
+                      ) : isMainOver ? (
+                        <AlertTriangle className="h-4 w-4 text-destructive" />
+                      ) : null}
+                    </div>
+                    <div className="text-right text-sm">
+                      <span className={`font-mono-numbers font-semibold ${isMainOver ? "text-destructive" : ""}`}>
+                        {formatCurrency(mainSpentTotal)}
+                      </span>
+                      <span className="text-muted-foreground font-mono-numbers"> / {formatCurrency(mainBudgetTotal)}</span>
+                    </div>
                   </div>
-                  <div className="text-right text-sm">
-                    <span className={`font-mono-numbers ${isMainOver ? "text-destructive" : ""}`}>
-                      {formatCurrency(mainSpentTotal)}
-                    </span>
-                    <span className="text-muted-foreground"> / {formatCurrency(mainBudgetTotal)}</span>
-                  </div>
-                </div>
-                <Progress value={mainPct} className={`h-2 mt-2 ${isMainOver ? "[&>div]:bg-destructive" : ""}`} />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {subs.map((sub) => {
-                    const budget = getBudget(sub.id);
-                    const spent = getSpent(sub.id);
-                    const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
-                    const isOver = spent > budget && budget > 0;
-                    const isAlerted = budget > 0 && (spent / budget) * 100 >= 90;
-                    const isUnbudgetedSpend = budget === 0 && spent > 0;
-                    const prevSpent = getPrevSpent(sub.id);
 
-                    return (
-                      <div key={sub.id} className="space-y-1">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                          <div className="flex items-center gap-2 sm:min-w-[140px]">
-                            <DynamicIcon name={sub.icon} className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">{translateCategory(sub.name)}</span>
-                            {isAlerted && <Bell className="h-3 w-3 text-warning" />}
-                            {isUnbudgetedSpend && (
-                              <span className="text-[10px] uppercase tracking-wide text-warning font-medium">{t("budgets.unbudgeted")}</span>
-                            )}
-                            <span className={`text-xs font-mono-numbers sm:hidden ${isOver ? "text-destructive" : isUnbudgetedSpend ? "text-warning" : ""}`}>
-                              {formatCurrency(spent)}
-                            </span>
-                          </div>
-                          <div className="flex-1">
-                            {isUnbudgetedSpend ? (
-                              <Progress value={100} className="h-1.5 [&>div]:bg-warning" />
-                            ) : (
-                              <Progress value={pct} className={`h-1.5 ${isOver ? "[&>div]:bg-destructive" : ""}`} />
-                            )}
-                          </div>
-                          <div className="hidden sm:block text-right min-w-[90px]">
-                            <span className={`text-xs font-mono-numbers ${isOver ? "text-destructive" : isUnbudgetedSpend ? "text-warning" : ""}`}>
-                              {formatCurrency(spent)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              key={`${sub.id}-${budgetVersion}-${budget}`}
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="Budget"
-                              className="flex-1 sm:w-24 h-8 text-xs"
-                              defaultValue={budget > 0 ? (budget / 100).toFixed(2) : ""}
-                              onBlur={(e) => {
-                                if (e.target.value) {
-                                  setBudgetMutation.mutate({ subcategory_id: sub.id, amount: e.target.value });
-                                }
-                              }}
-                            />
-                            <div className="flex items-center gap-1 min-w-[80px] justify-end opacity-60" title={`Spent in ${format(subMonths(currentDate, 1), "MMM yyyy")}`}>
-                              <History className="h-3 w-3 text-muted-foreground shrink-0" />
-                              <span className="text-xs font-mono-numbers text-muted-foreground italic">
-                                {prevSpent > 0 ? formatCurrency(prevSpent) : "—"}
-                              </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        className="cursor-pointer py-1 mt-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Progress
+                          value={mainPct}
+                          className={`h-2 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${isMainOver ? "[&>div]:bg-destructive" : ""}`}
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <span className="font-mono-numbers text-xs font-medium">
+                        {mainBudgetTotal > 0 ? ((mainSpentTotal / mainBudgetTotal) * 100).toFixed(1) : "0.0"}% {t("dashboard.spent")} ({formatCurrency(mainSpentTotal)} / {formatCurrency(mainBudgetTotal)})
+                      </span>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+
+                <CollapsibleContent>
+                  <CardContent className="pt-2 pb-4">
+                    <div className="space-y-2 divide-y divide-border/30 [&>div:not(:first-child)]:pt-2">
+                      {subs.map((sub) => {
+                        const budget = getBudget(sub.id);
+                        const spent = getSpent(sub.id);
+                        const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
+                        const isOver = spent > budget && budget > 0;
+                        const isAlerted = budget > 0 && (spent / budget) * 100 >= 90;
+                        const isUnbudgetedSpend = budget === 0 && spent > 0;
+                        const prevSpent = getPrevSpent(sub.id);
+
+                        if (isEditing) {
+                          return (
+                            <div
+                              key={sub.id}
+                              className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-2 rounded-lg bg-muted/30 hover:bg-muted/40 transition-colors"
+                            >
+                              <div className="flex items-center gap-2 sm:min-w-[170px]">
+                                <DynamicIcon name={sub.icon} className="h-4 w-4 text-muted-foreground shrink-0" />
+                                <span className="text-sm font-medium">{translateCategory(sub.name)}</span>
+                              </div>
+
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                  <span>
+                                    {t("dashboard.spent")}: <strong className="font-mono-numbers text-foreground">{formatCurrency(spent)}</strong>
+                                  </span>
+                                  {prevSpent > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setBudgetMutation.mutate({
+                                          subcategory_id: sub.id,
+                                          amount: (prevSpent / 100).toFixed(2),
+                                        });
+                                      }}
+                                      className="hover:underline text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 cursor-pointer transition-colors"
+                                      title={`${t("budgets.applyLastMonth")}: ${formatCurrency(prevSpent)}`}
+                                    >
+                                      <History className="h-3 w-3 shrink-0" />
+                                      <span className="font-mono-numbers">{t("budgets.applyLastMonth")} ({formatCurrency(prevSpent)})</span>
+                                    </button>
+                                  )}
+                                </div>
+                                <Progress
+                                  value={pct}
+                                  className={`h-1.5 rounded-full ${isOver ? "[&>div]:bg-destructive" : ""}`}
+                                />
+                              </div>
+
+                              <div className="flex items-center gap-2 justify-end sm:min-w-[130px]">
+                                <Input
+                                  key={`${sub.id}-${budgetVersion}-${budget}`}
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="0.00"
+                                  className="w-24 sm:w-28 h-8 text-xs font-mono-numbers text-right"
+                                  defaultValue={budget > 0 ? (budget / 100).toFixed(2) : ""}
+                                  onBlur={(e) => {
+                                    if (e.target.value !== "" || budget > 0) {
+                                      setBudgetMutation.mutate({
+                                        subcategory_id: sub.id,
+                                        amount: e.target.value || "0",
+                                      });
+                                    }
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={sub.id}
+                            className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 py-1.5 px-1 rounded-md hover:bg-muted/20 transition-colors"
+                          >
+                            <div className="flex items-center gap-2 sm:min-w-[180px]">
+                              <DynamicIcon name={sub.icon} className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <span className="text-sm font-medium">{translateCategory(sub.name)}</span>
+                              {isAlerted && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Bell className="h-3.5 w-3.5 text-warning shrink-0 cursor-default" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>{t("budgets.alertThreshold")}</TooltipContent>
+                                </Tooltip>
+                              )}
+                              {isUnbudgetedSpend && (
+                                <Badge variant="outline" className="text-[10px] uppercase tracking-wide text-warning border-warning/40 py-0 px-1 font-semibold">
+                                  {t("budgets.unbudgeted")}
+                                </Badge>
+                              )}
+                            </div>
+
+                            <div className="flex-1">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="cursor-pointer py-1">
+                                    {isUnbudgetedSpend ? (
+                                      <Progress value={100} className="h-2 transition-all hover:ring-2 hover:ring-warning/20 rounded-full [&>div]:bg-warning" />
+                                    ) : (
+                                      <Progress value={pct} className={`h-2 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${isOver ? "[&>div]:bg-destructive" : ""}`} />
+                                    )}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <span className="font-mono-numbers text-xs font-medium">
+                                    {isUnbudgetedSpend
+                                      ? `${t("budgets.unbudgeted")}: ${formatCurrency(spent)}`
+                                      : `${budget > 0 ? ((spent / budget) * 100).toFixed(1) : "0.0"}% (${formatCurrency(spent)} / ${formatCurrency(budget)})`}
+                                  </span>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+
+                            <div className="flex items-center justify-between sm:justify-end gap-3 sm:min-w-[180px]">
+                              <div className="text-right text-xs">
+                                <span className={`font-mono-numbers font-semibold ${isOver ? "text-destructive" : isUnbudgetedSpend ? "text-warning" : ""}`}>
+                                  {formatCurrency(spent)}
+                                </span>
+                                <span className="text-muted-foreground font-mono-numbers">
+                                  {" "}/ {budget > 0 ? formatCurrency(budget) : "—"}
+                                </span>
+                              </div>
+                              <div className="min-w-[48px] text-right">
+                                {budget > 0 ? (
+                                  <Badge
+                                    variant={isOver ? "destructive" : "secondary"}
+                                    className="font-mono-numbers text-[11px] px-1.5 py-0"
+                                  >
+                                    {((spent / budget) * 100).toFixed(0)}%
+                                  </Badge>
+                                ) : isUnbudgetedSpend ? (
+                                  <Badge variant="outline" className="font-mono-numbers text-[11px] text-warning border-warning/40 px-1.5 py-0">
+                                    !
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground font-mono-numbers">—</span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
             </Card>
           );
         })}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }
