@@ -97,6 +97,13 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   { en: "Sweets & Snacks", bg: "Закуски и сладки" },
   { en: "Sweets", bg: "Сладки" },
   { en: "Desserts", bg: "Десерти" },
+  { en: "Food Vouchers", bg: "Ваучери за харана" }, // Database typo handled
+  { en: "Food Vouchers", bg: "Ваучери за храна" },
+  { en: "Food Voucher", bg: "Ваучер за храна" },
+  { en: "Food Vouchers", bg: "Ваучер за храна" },
+  { en: "Vouchers", bg: "Ваучери" },
+  { en: "Voucher", bg: "Ваучер" },
+  { en: "Eco Vouchers", bg: "Еко ваучери" },
 
   // ----------------------------------------------------
   // Transport & Auto
@@ -129,8 +136,8 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   // ----------------------------------------------------
   // Health, Wellness & Personal Care
   // ----------------------------------------------------
-  { en: "Healthcare", bg: "Здраве" },
   { en: "Health", bg: "Здраве" },
+  { en: "Healthcare", bg: "Здраве" },
   { en: "Healthcare", bg: "Здравеопазване" },
   { en: "Medications", bg: "Лекарства" },
   { en: "Medicine", bg: "Лекарства" },
@@ -169,6 +176,7 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   { en: "Gifts", bg: "Подаръци" },
   { en: "Gift", bg: "Подарък" },
   { en: "Hobbies", bg: "Хобита" },
+  { en: "Hobbies", bg: "Хоби" },
   { en: "Hobby", bg: "Хоби" },
   { en: "Pets", bg: "Домашни любимци" },
   { en: "Pet Supplies", bg: "Зоомагазин" },
@@ -177,7 +185,10 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   // ----------------------------------------------------
   // Entertainment & Travel
   // ----------------------------------------------------
+  { en: "Entertainment", bg: "Забавление" },
   { en: "Entertainment", bg: "Забавления" },
+  { en: "Entertainment", bg: "Забавлението" },
+  { en: "Entertainment", bg: "Забавленията" },
   { en: "Cinema", bg: "Кино" },
   { en: "Movies", bg: "Кино" },
   { en: "Theater", bg: "Театър" },
@@ -193,6 +204,7 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   { en: "Gaming", bg: "Игри" },
   { en: "Games", bg: "Игри" },
   { en: "Subscriptions", bg: "Абонаменти" },
+  { en: "Subscription", bg: "Абонамент" },
   { en: "Streaming", bg: "Стрийминг" },
   { en: "Sports", bg: "Спорт" },
   { en: "Fitness", bg: "Фитнес" },
@@ -202,7 +214,7 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   { en: "Bars", bg: "Барове" },
 
   // ----------------------------------------------------
-  // Family & Kids
+  // Family & Kids & Education
   // ----------------------------------------------------
   { en: "Kids", bg: "Деца" },
   { en: "Children", bg: "Деца" },
@@ -212,7 +224,13 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   { en: "Kindergarten", bg: "Детска градина" },
   { en: "Nursery", bg: "Ясла" },
   { en: "School", bg: "Училище" },
+  { en: "Education", bg: "Обучение" },
+  { en: "Education", bg: "Обучения" },
+  { en: "Education", bg: "Обучението" },
+  { en: "Education", bg: "Обученията" },
   { en: "Education", bg: "Образование" },
+  { en: "Training", bg: "Обучение" },
+  { en: "Training", bg: "Обучения" },
   { en: "Courses", bg: "Курсове" },
   { en: "Lessons", bg: "Уроци" },
   { en: "Tutoring", bg: "Частни уроци" },
@@ -223,6 +241,11 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   // ----------------------------------------------------
   // Investments, Savings & Finance
   // ----------------------------------------------------
+  // Zhara & Zharcheto (Transliteration explicitly allowed)
+  { en: "Zharcheto", bg: "Жарчето" },
+  { en: "Zhara", bg: "Жара" },
+  { en: 'Fund "Zhara"', bg: 'Фонд "Жара"' },
+  { en: 'Fund "Zhara"', bg: 'Фонд „Жара“' },
   { en: 'Fund "Pension"', bg: 'Фонд "Пенсии"' },
   { en: 'Fund "Pension"', bg: 'Фонд „Пенсии“' },
   { en: 'Fund "Emergency"', bg: 'Фонд "Аварии"' },
@@ -233,6 +256,10 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   { en: 'Fund "Travel"', bg: 'Фонд „Пътувания“' },
   { en: 'Fund "Car"', bg: 'Фонд "Автомобил"' },
   { en: 'Fund "Car"', bg: 'Фонд „Автомобил“' },
+  { en: "Other Needs", bg: "Други нужди" },
+  { en: "Other Wants", bg: "Други желания" },
+  { en: "Other Investments", bg: "Други инвестиции" },
+  { en: "Other Savings", bg: "Други спестявания" },
   { en: "Emergency Fund", bg: "Авариен фонд" },
   { en: "Emergency", bg: "Аварии" },
   { en: "Emergency", bg: "Авария" },
@@ -271,7 +298,14 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   // ----------------------------------------------------
   // Income
   // ----------------------------------------------------
+  { en: "Salary - Dragi", bg: "Заплата - Драги" },
+  { en: "Salary - Niki", bg: "Заплата - Ники" },
+  { en: "Salary - Raw Byte", bg: "Заплата - Роу Байт" },
+  { en: "Dragi", bg: "Драги" },
+  { en: "Niki", bg: "Ники" },
+  { en: "Raw Byte", bg: "Роу Байт" },
   { en: "Salary", bg: "Заплата" },
+  { en: "Salaries", bg: "Заплати" },
   { en: "Bonus", bg: "Бонус" },
   { en: "Bonuses", bg: "Бонуси" },
   { en: "Extra Income", bg: "Допълнителни доходи" },
@@ -371,6 +405,14 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   // ----------------------------------------------------
   // Clothing & personal
   { en: "Clothing", bg: "Облекло" },
+  { en: "Luxury Clothing", bg: "Луксозно облекло" },
+  { en: "Luxury Clothing", bg: "Луксозни дрехи" },
+  { en: "Luxury Clothes", bg: "Луксозни дрехи" },
+  { en: "Luxury", bg: "Луксозно" },
+  { en: "Luxury", bg: "Луксозен" },
+  { en: "Luxury", bg: "Луксозна" },
+  { en: "Luxury", bg: "Луксозни" },
+  { en: "Luxury", bg: "Лукс" },
   { en: "Clothing & Shoes", bg: "Облекло и обувки" },
   { en: "Underwear", bg: "Бельо" },
   { en: "Socks", bg: "Чорапи" },
@@ -398,7 +440,7 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   { en: "Annual", bg: "Годишни" },
   { en: "Weekly", bg: "Седмични" },
 
-  // Family members (common in custom subcategory names)
+  // Family members & personal names (common in custom subcategory names)
   { en: "Parents", bg: "Родители" },
   { en: "Wife", bg: "Съпруга" },
   { en: "Husband", bg: "Съпруг" },
@@ -410,6 +452,15 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   { en: "Daughter", bg: "Дъщеря" },
   { en: "Brother", bg: "Брат" },
   { en: "Sister", bg: "Сестра" },
+  { en: "Nikola", bg: "Никола" },
+  { en: "Maria", bg: "Мария" },
+  { en: "Ivan", bg: "Иван" },
+  { en: "Georgi", bg: "Георги" },
+  { en: "Aleksandar", bg: "Александър" },
+  { en: "Tsvetelina", bg: "Цветелина" },
+  { en: "Boris", bg: "Борис" },
+  { en: "Stefan", bg: "Стефан" },
+  { en: "Kaloyan", bg: "Калоян" },
 
   // Kids & education
   { en: "Kids'", bg: "Детски" },

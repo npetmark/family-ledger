@@ -120,6 +120,48 @@ describe("i18n system tests", () => {
       expect(translateCategory('Фонд "Ипотека"', "en")).toBe('Fund "Mortgage"');
       expect(translateCategory('Фонд "Пътувания"', "en")).toBe('Fund "Travel"');
       expect(translateCategory('Фонд "Автомобил"', "en")).toBe('Fund "Car"');
+      expect(translateCategory('Фонд "Жара"', "en")).toBe('Fund "Zhara"');
+      expect(translateCategory('Фонд „Жара“', "en")).toBe('Fund "Zhara"');
+    });
+
+    it("translates all user database subcategories without transliteration (except Zhara/Zharcheto)", () => {
+      // User-specific reported translations
+      expect(translateCategory("Обучение", "en")).toBe("Education");
+      expect(translateCategory("Луксозно облекло", "en")).toBe("Luxury Clothing");
+      expect(translateCategory("Забавление", "en")).toBe("Entertainment");
+
+      // Zhara & Zharcheto (the only transliterations allowed)
+      expect(translateCategory("Жара", "en")).toBe("Zhara");
+      expect(translateCategory("Жарчето", "en")).toBe("Zharcheto");
+
+      // All remaining Bulgarian subcategories in user's database
+      expect(translateCategory("Абонаменти", "en")).toBe("Subscriptions");
+      expect(translateCategory("Автомобил", "en")).toBe("Car");
+      expect(translateCategory("Ваучери за харана", "en")).toBe("Food Vouchers");
+      expect(translateCategory("Ваучери за храна", "en")).toBe("Food Vouchers");
+      expect(translateCategory("Дом", "en")).toBe("Home");
+      expect(translateCategory("Други", "en")).toBe("Other");
+      expect(translateCategory("Други желания", "en")).toBe("Other Wants");
+      expect(translateCategory("Други инвестиции", "en")).toBe("Other Investments");
+      expect(translateCategory("Други нужди", "en")).toBe("Other Needs");
+      expect(translateCategory("Други спестявания", "en")).toBe("Other Savings");
+      expect(translateCategory("Заплата - Драги", "en")).toBe("Salary - Dragi");
+      expect(translateCategory("Заплата - Ники", "en")).toBe("Salary - Niki");
+      expect(translateCategory("Заплата - Роу Байт", "en")).toBe("Salary - Raw Byte");
+      expect(translateCategory("Здраве", "en")).toBe("Health");
+      expect(translateCategory("Ипотека", "en")).toBe("Mortgage");
+      expect(translateCategory("Кешбек", "en")).toBe("Cashback");
+      expect(translateCategory("Козметика", "en")).toBe("Cosmetics");
+      expect(translateCategory("Облекло", "en")).toBe("Clothing");
+      expect(translateCategory("Пазар", "en")).toBe("Groceries");
+      expect(translateCategory("Подаръци", "en")).toBe("Gifts");
+      expect(translateCategory("Почивка", "en")).toBe("Vacation");
+      expect(translateCategory("Продажби", "en")).toBe("Sales");
+      expect(translateCategory("Сметки", "en")).toBe("Utilities");
+      expect(translateCategory("Спорт", "en")).toBe("Sports");
+      expect(translateCategory("Транспорт", "en")).toBe("Transport");
+      expect(translateCategory("Хоби", "en")).toBe("Hobbies");
+      expect(translateCategory("Хранене навън", "en")).toBe("Eating Out");
     });
 
     it("guarantees NO Cyrillic remains in category names when English is selected", () => {
