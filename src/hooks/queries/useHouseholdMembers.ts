@@ -7,14 +7,20 @@ export const useHouseholdMembers = (userId?: string) => {
     queryFn: async () => {
       if (!userId) return null;
 
-      // 1. Get user's household_id
-      const { data: memberData, error: mErr } = await supabase
+      // 1. Get user's household_id (take the most recent joined household)
+      const { data: memberRows, error: mErr } = await supabase
         .from("household_members")
         .select("household_id, role")
         .eq("user_id", userId)
-        .single();
+        .order("joined_at", { ascending: false })
+        .limit(1);
       
-      if (mErr || !memberData) return null;
+      if (mErr) {
+        console.error("useHouseholdMembers fetch membership error:", mErr);
+        return null;
+      }
+      const memberData = memberRows?.[0];
+      if (!memberData) return null;
       
       const householdId = memberData.household_id;
 

@@ -152,20 +152,32 @@ export default function AccountsPage() {
               </div>
               <div className="space-y-2">
                 <Label>{t("accounts.ownership")}</Label>
-                <Select value={form.owner_user_id} onValueChange={(v) => setForm({ ...form, owner_user_id: v })} disabled={!isOwner}>
+                <Select 
+                  value={form.owner_user_id} 
+                  onValueChange={(v) => setForm({ ...form, owner_user_id: v })} 
+                  disabled={editing ? !isOwner : false}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select owner" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="shared">{t("accounts.sharedHousehold")}</SelectItem>
-                    {householdInfo?.members?.map((m: any) => (
-                      <SelectItem key={m.user_id} value={m.user_id}>
-                        {t("accounts.personal")} - {getFirstName(m.profile) || t("common.unknown")} {m.user_id === user?.id ? "(You)" : ""}
-                      </SelectItem>
-                    ))}
+                    {isOwner ? (
+                      householdInfo?.members?.map((m: any) => (
+                        <SelectItem key={m.user_id} value={m.user_id}>
+                          {t("accounts.personal")} - {getFirstName(m.profile) || t("common.unknown")} {m.user_id === user?.id ? `(${t("accounts.you")})` : ""}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      user && (
+                        <SelectItem value={user.id}>
+                          {t("accounts.personal")} - {getFirstName(householdInfo?.members?.find((m: any) => m.user_id === user.id)?.profile) || t("accounts.you")} ({t("accounts.you")})
+                        </SelectItem>
+                      )
+                    )}
                   </SelectContent>
                 </Select>
-                {!isOwner && <p className="text-xs text-muted-foreground">{t("accounts.onlyOwnersChange")}</p>}
+                {editing && !isOwner && <p className="text-xs text-muted-foreground">{t("accounts.onlyOwnersChange")}</p>}
               </div>
               <div className="flex items-center justify-between">
                 <div>
@@ -183,55 +195,85 @@ export default function AccountsPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {[...accounts].sort((a, b) => (b.is_visible ? 1 : 0) - (a.is_visible ? 1 : 0)).map((account) => {
-          const balance = computeBalance(account);
-          const isJoint = account.owner_user_id === null;
-          const ownerMember = householdInfo?.members?.find((m: any) => m.user_id === account.owner_user_id);
-          const ownerName = getFirstName(ownerMember?.profile) || t("common.unknown");
-          // Household owners can edit any account (e.g. to reassign ownership).
-          const canEdit = isJoint || account.owner_user_id === user?.id || isOwner;
-          const canDelete = isJoint || account.owner_user_id === user?.id;
-          return (
-            <Card key={account.id} className={!account.is_visible ? "opacity-60" : ""}>
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <DynamicIcon name={account.icon} className="h-5 w-5 text-primary" />
+        {[...accounts]
+          .sort((a, b) => {
+            // 1. Visible accounts first
+            if (a.is_visible !== b.is_visible) {
+              return a.is_visible ? -1 : 1;
+            }
+            // 2. Current user's personal accounts first
+            const aMine = a.owner_user_id === user?.id;
+            const bMine = b.owner_user_id === user?.id;
+            if (aMine && !bMine) return -1;
+            if (!aMine && bMine) return 1;
+
+            // 3. Shared accounts second
+            const aShared = a.owner_user_id === null;
+            const bShared = b.owner_user_id === null;
+            if (aShared && !bShared) return -1;
+            if (!aShared && bShared) return 1;
+
+            // 4. Sort order
+            return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+          })
+          .map((account) => {
+            const balance = computeBalance(account);
+            const isJoint = account.owner_user_id === null;
+            const isMine = account.owner_user_id === user?.id;
+            const ownerMember = householdInfo?.members?.find((m: any) => m.user_id === account.owner_user_id);
+            const ownerFirstName = getFirstName(ownerMember?.profile);
+            const ownerName = isMine
+              ? (ownerFirstName ? `${ownerFirstName} (${t("accounts.you")})` : t("accounts.you"))
+              : (ownerFirstName || t("common.unknown"));
+
+            // Household owners can edit any account (e.g. to reassign ownership).
+            const canEdit = isJoint || account.owner_user_id === user?.id || isOwner;
+            const canDelete = isJoint || account.owner_user_id === user?.id;
+            return (
+              <Card key={account.id} className={!account.is_visible ? "opacity-60" : ""}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <DynamicIcon name={account.icon} className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{formatAccountNameWithOwner(account, householdInfo?.members)}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{translateAccountType(account.account_type)} · {(account as any).currency || "EUR"}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{formatAccountNameWithOwner(account, householdInfo?.members)}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{translateAccountType(account.account_type)} · {(account as any).currency || "EUR"}</p>
-                    </div>
-                  </div>
-                  {canEdit && (
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(account)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      {canDelete && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(account.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
+                    {canEdit && (
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(account)}>
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="mt-4 flex items-end justify-between">
-                  <div>
-                    <p className="text-2xl font-semibold font-mono-numbers">{formatCurrency(balance, (account as any).currency || "EUR")}</p>
-                    {!account.is_visible && <p className="text-xs text-muted-foreground mt-1">{t("accounts.hiddenFromTotals")}</p>}
+                        {canDelete && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(account.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {isJoint ? (
-                    <Badge variant="secondary" className="flex items-center gap-1.5 opacity-70"><Users className="h-3 w-3"/> {t("accounts.shared")}</Badge>
-                  ) : (
-                    <Badge variant="outline" className="flex items-center gap-1.5 opacity-50"><User className="h-3 w-3"/> {ownerName}</Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+                  <div className="mt-4 flex items-end justify-between">
+                    <div>
+                      <p className="text-2xl font-semibold font-mono-numbers">{formatCurrency(balance, (account as any).currency || "EUR")}</p>
+                      {!account.is_visible && <p className="text-xs text-muted-foreground mt-1">{t("accounts.hiddenFromTotals")}</p>}
+                    </div>
+                    {isJoint ? (
+                      <Badge variant="secondary" className="flex items-center gap-1.5 opacity-70"><Users className="h-3 w-3"/> {t("accounts.shared")}</Badge>
+                    ) : isMine ? (
+                      <Badge variant="outline" className="flex items-center gap-1.5 border-primary/40 text-primary font-medium">
+                        <User className="h-3 w-3"/> {ownerName}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="flex items-center gap-1.5 opacity-60"><User className="h-3 w-3"/> {ownerName}</Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
       </div>
     </div>
   );

@@ -25,11 +25,13 @@ export default function SettingsPage() {
     queryKey: ["household-info", user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data: members, error: memberErr } = await supabase
+      const { data: memberRows, error: memberErr } = await supabase
         .from("household_members")
         .select("household_id")
         .eq("user_id", user.id)
-        .single();
+        .order("joined_at", { ascending: false })
+        .limit(1);
+      const members = memberRows?.[0];
       if (memberErr || !members) return null;
 
       const { data: household, error: hErr } = await supabase

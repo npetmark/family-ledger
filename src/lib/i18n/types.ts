@@ -193,6 +193,7 @@ export interface TranslationDictionary {
     updateAccount: string;
     hiddenFromTotals: string;
     shared: string;
+    you: string;
   };
   analytics: {
     title: string;
@@ -298,6 +299,16 @@ export interface TranslationDictionary {
     joinHousehold: string;
     enterInviteCode: string;
     join: string;
+    leaveHousehold: string;
+    leaveHouseholdConfirm: string;
+    leaveHouseholdDesc: string;
+    leftHouseholdSuccess: string;
+    householdMembers: string;
+    householdMembersDesc: string;
+    removeMember: string;
+    removeMemberConfirm: string;
+    removeMemberDesc: string;
+    memberRemovedSuccess: string;
   };
   profile: {
     title: string;

@@ -273,9 +273,15 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   { en: "Sales", bg: "Продажби" },
   { en: "Cashback", bg: "Кешбек" },
   { en: "Other Income", bg: "Други приходи" },
+  { en: "Advance", bg: "Аванс" },
+  { en: "Maternity", bg: "Майчинство" },
+  { en: "Benefits", bg: "Обезщетения" },
+  { en: "Benefit", bg: "Обезщетение" },
+  { en: "Child Allowance", bg: "Детски надбавки" },
+  { en: "Child Benefits", bg: "Детски надбавки" },
 
   // ----------------------------------------------------
-  // Other / General
+  // Other / General / Miscellaneous
   // ----------------------------------------------------
   { en: "Other", bg: "Други" },
   { en: "Other Expenses", bg: "Други разходи" },
@@ -284,6 +290,67 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   { en: "Unexpected Expenses", bg: "Непредвидени разходи" },
   { en: "Donations", bg: "Дарения" },
   { en: "Charity", bg: "Благотворителност" },
+  { en: "Birthday", bg: "Рожден ден" },
+  { en: "Name Day", bg: "Имен ден" },
+  { en: "Wedding", bg: "Сватба" },
+  { en: "Celebrations", bg: "Празници" },
+  { en: "Christmas", bg: "Коледа" },
+  { en: "Flowers", bg: "Цветя" },
+  { en: "Garden", bg: "Градина" },
+  { en: "Plants", bg: "Растения" },
+  { en: "Swimming", bg: "Плуване" },
+  { en: "Tennis", bg: "Тенис" },
+  { en: "Ski", bg: "Ски" },
+  { en: "Football", bg: "Футбол" },
+  { en: "Hiking", bg: "Планина" },
+  { en: "Software", bg: "Софтуер" },
+  { en: "Hosting", bg: "Хостинг" },
+  { en: "Domain", bg: "Домейн" },
+  { en: "Accountant", bg: "Счетоводител" },
+  { en: "Lawyer", bg: "Адвокат" },
+  { en: "Notary", bg: "Нотариус" },
+  { en: "Legal Services", bg: "Правни услуги" },
+  { en: "Installment", bg: "Вноска" },
+  { en: "Leasing", bg: "Лизинг" },
+  { en: "Consumer Loan", bg: "Потребителски кредит" },
+  { en: "Overdraft", bg: "Овърдрафт" },
+  { en: "Babysitter", bg: "Детегледачка" },
+  { en: "Pocket Money", bg: "Джобни пари" },
+  { en: "Baby Food", bg: "Детска кухня" },
+  { en: "School Supplies", bg: "Ученически пособия" },
+  { en: "School Supplies", bg: "Учебници и помагала" },
+  { en: "Veterinarian", bg: "Ветеринар" },
+  { en: "Pet Grooming", bg: "Груминг" },
+  { en: "Vitamins", bg: "Витамини" },
+  { en: "Supplements", bg: "Хранителни добавки" },
+  { en: "Supplements", bg: "Добавки" },
+  { en: "Hospital", bg: "Болница" },
+  { en: "Laboratory", bg: "Лаборатория" },
+  { en: "Orthodontist", bg: "Ортодонт" },
+  { en: "Psychologist", bg: "Психолог" },
+  { en: "Barber", bg: "Бръснар" },
+  { en: "Cosmetician", bg: "Козметик" },
+  { en: "Spa", bg: "Спа" },
+  { en: "Vehicle Tax", bg: "Данък МПС" },
+  { en: "Vehicle Tax", bg: "Данък кола" },
+  { en: "Technical Inspection", bg: "ГТП" },
+  { en: "Third Party Insurance", bg: "Гражданска" },
+  { en: "Third Party Insurance", bg: "ГО" },
+  { en: "Toll", bg: "Тол такси" },
+  { en: "Toll", bg: "Тол" },
+  { en: "Road Tax", bg: "Пътни такси" },
+  { en: "Oil Change", bg: "Смяна на масло" },
+  { en: "Auto Parts", bg: "Авточасти" },
+  { en: "Flights", bg: "Самолетни билети" },
+  { en: "Train", bg: "Влак" },
+  { en: "Bus", bg: "Автобус" },
+  { en: "Heating", bg: "ТЕЦ" },
+  { en: "Waste Tax", bg: "Такса смет" },
+  { en: "Home Insurance", bg: "Застраховка дом" },
+  { en: "Home Insurance", bg: "Застраховка имущество" },
+  { en: "Security", bg: "СОТ" },
+  { en: "Security", bg: "Охрана" },
+  { en: "Cleaning", bg: "Почистване" },
 ];
 
 const DEFAULT_SHOPPING_CATEGORIES: DefaultNameMap[] = [
@@ -352,10 +419,51 @@ for (const item of ALL_SYSTEM_NAMES) {
   }
 }
 
+// Pre-sorted list of Bulgarian phrases (longest first) to replace known words in compound names
+const sortedBgEntries: [string, string][] = Array.from(bgToEnMap.entries()).sort(
+  (a, b) => b[0].length - a[0].length
+);
+
+/**
+ * Official Bulgarian transliteration standard (Streamlined system).
+ * Transliterates Cyrillic characters to Latin.
+ */
+export function transliterateBulgarianToLatin(text: string): string {
+  if (!text) return "";
+
+  // Special rule (Transliteration Act): "ия" at the end of a word is transliterated as "ia"
+  // Note: Standard \b is ASCII-only in JS, so we use explicit boundary matching for Cyrillic
+  const wordEnd = "(?=[^а-яА-ЯёЁa-zA-Z0-9]|$)";
+  let result = text
+    .replace(new RegExp(`ия${wordEnd}`, "g"), "ia")
+    .replace(new RegExp(`Ия${wordEnd}`, "g"), "Ia")
+    .replace(new RegExp(`ИЯ${wordEnd}`, "g"), "IA")
+    .replace(new RegExp(`иЯ${wordEnd}`, "g"), "iA");
+
+  const map: Record<string, string> = {
+    а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ж: "zh", з: "z",
+    и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p",
+    р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "ts", ч: "ch",
+    ш: "sh", щ: "sht", ъ: "a", ь: "y", ю: "yu", я: "ya",
+    А: "A", Б: "B", В: "V", Г: "G", Д: "D", Е: "E", Ж: "Zh", З: "Z",
+    И: "I", Й: "Y", К: "K", Л: "L", М: "M", Н: "N", О: "O", П: "P",
+    Р: "R", С: "S", Т: "T", У: "U", Ф: "F", Х: "H", Ц: "Ts", Ч: "Ch",
+    Ш: "Sh", Щ: "Sht", Ъ: "A", Ь: "Y", Ю: "Yu", Я: "Ya",
+  };
+
+  return result
+    .split("")
+    .map((char) => map[char] ?? char)
+    .join("");
+}
+
 /**
  * Translates a system category/subcategory name into the active language.
- * If the input was custom user text (e.g. "UniCredit", "Custom Hobby"),
- * it is returned unchanged (language-agnostic).
+ * When translating to English:
+ * 1. Checks exact match in system dictionary.
+ * 2. Replaces known phrases in compound categories.
+ * 3. Transliterates any remaining Cyrillic (names or custom text) into Latin so
+ *    that NO Cyrillic remains when English is selected.
  */
 export function translateCategory(name?: string | null, lang: Language = "en"): string {
   if (!name) return "";
@@ -363,17 +471,33 @@ export function translateCategory(name?: string | null, lang: Language = "en"): 
   const lower = trimmed.toLowerCase();
 
   if (lang === "en") {
-    // Translating to English: check if input is a known Bulgarian category
+    // 1. Direct exact match in dictionary
     const enMatch = bgToEnMap.get(lower);
     if (enMatch) {
       return enMatch;
     }
-    // If it's already a known English category, preserve or canonicalize
+    // 2. Already a known English category name
     if (enToBgMap.has(lower)) {
       return trimmed;
     }
-    // Language agnostic custom user input
-    return trimmed;
+    // 3. If there are NO Cyrillic characters, it's pure Latin/English custom text (e.g. "UniCredit", "Hobby") -> leave as is
+    if (!/[а-яА-ЯёЁ]/.test(trimmed)) {
+      return trimmed;
+    }
+
+    // 4. Has Cyrillic: translate any embedded known dictionary phrases/words (longest first)
+    let processed = trimmed;
+    for (const [bgPhrase, enTranslation] of sortedBgEntries) {
+      // Only match phrases with at least 3 letters to avoid false positive substring matches
+      if (bgPhrase.length < 3) continue;
+      const escaped = bgPhrase.replace(/[-[\]/{}()*+?.\\^$|]/g, "\\$&");
+      const regex = new RegExp(`(^|[^а-яА-ЯёЁa-zA-Z0-9])${escaped}(?=[^а-яА-ЯёЁa-zA-Z0-9]|$)`, "gi");
+      processed = processed.replace(regex, (match, prefix) => `${prefix}${enTranslation}`);
+    }
+
+    // 5. Transliterate any remaining Cyrillic text to Latin alphabet
+    // Ensures NO Cyrillic remains when English is selected
+    return transliterateBulgarianToLatin(processed);
   }
 
   // Translating to Bulgarian (lang === "bg"): check if input is a known English category

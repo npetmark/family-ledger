@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { translateCategory, translateAccountType } from "@/lib/i18n/categories";
+import { translateCategory, translateAccountType, transliterateBulgarianToLatin } from "@/lib/i18n/categories";
 import { en } from "@/lib/i18n/translations/en";
 import { bg } from "@/lib/i18n/translations/bg";
 
@@ -95,10 +95,70 @@ describe("i18n system tests", () => {
       expect(translateCategory("Revolut Vault", "bg")).toBe("Revolut Vault");
     });
 
+    it("transliterates personal names and custom Cyrillic words into Latin", () => {
+      expect(translateCategory("Никола", "en")).toBe("Nikola");
+      expect(translateCategory("Мария", "en")).toBe("Maria");
+      expect(translateCategory("Иван", "en")).toBe("Ivan");
+      expect(translateCategory("Георги", "en")).toBe("Georgi");
+      expect(translateCategory("Александър", "en")).toBe("Aleksandar");
+      expect(translateCategory("Цветелина", "en")).toBe("Tsvetelina");
+      expect(translateCategory("Борис", "en")).toBe("Boris");
+    });
+
+    it("translates compound subcategories containing personal names or custom text", () => {
+      expect(translateCategory("Дрехи - Никола", "en")).toBe("Clothing - Nikola");
+      expect(translateCategory("Джобни Никола", "en")).toBe("Pocket Money Nikola");
+      expect(translateCategory("Училище - Мария", "en")).toBe("School - Maria");
+      expect(translateCategory("Детска градина - Борис", "en")).toBe("Kindergarten - Boris");
+      expect(translateCategory("Курсове по плуване", "en")).toBe("Courses po Swimming");
+    });
+
+    it("guarantees NO Cyrillic remains in category names when English is selected", () => {
+      const sampleBulgarianCategories = [
+        "Никола",
+        "Дрехи - Никола",
+        "Джобни Никола",
+        "Мария",
+        "Иван",
+        "ГТП",
+        "Гражданска",
+        "Такса смет",
+        "Детегледачка",
+        "Смяна на масло",
+        "Вноска по лизинг",
+        "Непозната категория",
+        "Зъболекар Калоян",
+        "Бебешки стоки - Стефан",
+      ];
+
+      for (const cat of sampleBulgarianCategories) {
+        const enTranslated = translateCategory(cat, "en");
+        expect(
+          /[а-яА-ЯёЁ]/.test(enTranslated),
+          `Expected no Cyrillic in "${cat}" -> "${enTranslated}"`
+        ).toBe(false);
+      }
+    });
+
     it("handles null or empty gracefully", () => {
       expect(translateCategory(null, "bg")).toBe("");
       expect(translateCategory(undefined, "en")).toBe("");
       expect(translateCategory("", "bg")).toBe("");
+    });
+  });
+
+  describe("transliterateBulgarianToLatin", () => {
+    it("handles standard letter mappings and the terminal -ия rule", () => {
+      expect(transliterateBulgarianToLatin("Никола")).toBe("Nikola");
+      expect(transliterateBulgarianToLatin("Мария")).toBe("Maria"); // terminal -ия -> -ia
+      expect(transliterateBulgarianToLatin("София")).toBe("Sofia");
+      expect(transliterateBulgarianToLatin("България")).toBe("Balgaria");
+      expect(transliterateBulgarianToLatin("приятел")).toBe("priyatel"); // non-terminal -ия- preserves "ya"
+      expect(transliterateBulgarianToLatin("Чавдар")).toBe("Chavdar");
+      expect(transliterateBulgarianToLatin("Щъркел")).toBe("Shtarkel");
+      expect(transliterateBulgarianToLatin("Юлия")).toBe("Yulia");
+      expect(transliterateBulgarianToLatin("Жоро")).toBe("Zhoro");
+      expect(transliterateBulgarianToLatin("")).toBe("");
     });
   });
 
