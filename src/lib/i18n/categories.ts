@@ -223,7 +223,19 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   // ----------------------------------------------------
   // Investments, Savings & Finance
   // ----------------------------------------------------
+  { en: 'Fund "Pension"', bg: 'Фонд "Пенсии"' },
+  { en: 'Fund "Pension"', bg: 'Фонд „Пенсии“' },
+  { en: 'Fund "Emergency"', bg: 'Фонд "Аварии"' },
+  { en: 'Fund "Emergency"', bg: 'Фонд „Аварии“' },
+  { en: 'Fund "Mortgage"', bg: 'Фонд "Ипотека"' },
+  { en: 'Fund "Mortgage"', bg: 'Фонд „Ипотека“' },
+  { en: 'Fund "Travel"', bg: 'Фонд "Пътувания"' },
+  { en: 'Fund "Travel"', bg: 'Фонд „Пътувания“' },
+  { en: 'Fund "Car"', bg: 'Фонд "Автомобил"' },
+  { en: 'Fund "Car"', bg: 'Фонд „Автомобил“' },
   { en: "Emergency Fund", bg: "Авариен фонд" },
+  { en: "Emergency", bg: "Аварии" },
+  { en: "Emergency", bg: "Авария" },
   { en: "Savings", bg: "Спестявания" },
   { en: "Investments", bg: "Инвестиции" },
   { en: "Stocks", bg: "Акции" },
@@ -234,6 +246,7 @@ const DEFAULT_SUBCATEGORIES: DefaultNameMap[] = [
   { en: "Cryptocurrencies", bg: "Криптовалути" },
   { en: "Pension Fund", bg: "Пенсионен фонд" },
   { en: "Pension Insurance", bg: "Пенсионно осигуряване" },
+  { en: "Pension", bg: "Пенсии" },
   { en: "Deposit", bg: "Депозит" },
   { en: "Deposits", bg: "Депозити" },
   { en: "Mutual Funds", bg: "Взаимни фондове" },

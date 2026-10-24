@@ -20,6 +20,27 @@ import { ChevronLeft, ChevronRight, ChevronDown, ChevronsUpDown, Bell, AlertTria
 import { format, addMonths, subMonths } from "date-fns";
 import { useLanguage } from "@/lib/i18n";
 
+function getBurndownColor(pct: number, alertThreshold: number, isInvestment = false): string {
+  if (isInvestment) {
+    if (pct >= 80) return "[&>div]:bg-income";
+    if (pct >= 50) return "[&>div]:bg-warning";
+    return "[&>div]:bg-destructive";
+  }
+  if (pct >= 100) return "[&>div]:bg-destructive";
+  if (pct >= alertThreshold) return "[&>div]:bg-warning";
+  return "[&>div]:bg-income";
+}
+
+function getBurndownTextColor(pct: number, alertThreshold: number, isInvestment = false): string {
+  if (isInvestment) {
+    if (pct >= 80) return "text-income";
+    if (pct >= 50) return "text-warning";
+    return "text-destructive";
+  }
+  if (pct >= 100) return "text-destructive";
+  if (pct >= alertThreshold) return "text-warning";
+  return "text-income";
+}
 
 export default function BudgetsPage() {
   const { user } = useAuth();
@@ -312,7 +333,7 @@ export default function BudgetsPage() {
 
         {/* Total Budget Summary */}
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 space-y-4">
             <div className="flex items-center justify-between">
               <div className="text-sm font-medium">{t("budgets.totalBudget")}</div>
               <div className="flex items-center gap-4 text-sm">
@@ -337,21 +358,97 @@ export default function BudgetsPage() {
               </div>
             </div>
             {totalBudget > 0 && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="cursor-pointer py-1 mt-2">
-                    <Progress
-                      value={Math.min((totalSpent / totalBudget) * 100, 100)}
-                      className={`h-2.5 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${totalSpent > totalBudget ? "[&>div]:bg-destructive" : ""}`}
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <span className="font-mono-numbers text-xs font-medium">
-                    {((totalSpent / totalBudget) * 100).toFixed(1)}% {t("dashboard.spent")} ({formatCurrency(totalSpent)} / {formatCurrency(totalBudget)})
+              <div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="cursor-pointer py-1">
+                      <Progress
+                        value={Math.min((totalSpent / totalBudget) * 100, 100)}
+                        className={`h-2.5 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${totalSpent > totalBudget ? "[&>div]:bg-destructive" : "[&>div]:bg-income"}`}
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <span className="font-mono-numbers text-xs font-medium">
+                      {((totalSpent / totalBudget) * 100).toFixed(1)}% {t("dashboard.spent")} ({formatCurrency(totalSpent)} / {formatCurrency(totalBudget)})
+                    </span>
+                  </TooltipContent>
+                </Tooltip>
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>
+                    {totalBudget - totalSpent >= 0
+                      ? `${formatCurrency(totalBudget - totalSpent)} ${t("dashboard.remaining")}`
+                      : `${formatCurrency(Math.abs(totalBudget - totalSpent))} ${t("budgets.overBudget")}`}
                   </span>
-                </TooltipContent>
-              </Tooltip>
+                  <span className="font-mono-numbers">{Math.round((totalSpent / totalBudget) * 100)}%</span>
+                </div>
+              </div>
+            )}
+
+            {/* Main Categories Burndown Overview */}
+            {sortedMainEntries.length > 0 && (
+              <div className="pt-3 border-t border-border/50 space-y-3">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t("dashboard.budgetBurndown")}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {sortedMainEntries.map(([mainName, unsortedSubs]) => {
+                    const subs = [...unsortedSubs];
+                    const mBudget = subs.reduce((s, sub) => s + getBudget(sub.id), 0);
+                    const mSpent = subs.reduce((s, sub) => s + getSpent(sub.id), 0);
+                    const mPct = mBudget > 0 ? (mSpent / mBudget) * 100 : 0;
+                    const mClampedPct = Math.min(mPct, 100);
+                    const mIsInvestment = ["Инвестиции", "Investments"].includes(mainName);
+                    const mTargetPct = getBudgetTarget(mainName);
+                    const mRemaining = mBudget - mSpent;
+                    const mDisplayName = translateCategory(mainName);
+
+                    return (
+                      <div key={mainName} className="p-3 rounded-lg bg-muted/30 border border-border/40 space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5 font-medium">
+                            <span>{mDisplayName}</span>
+                            {mTargetPct !== undefined && (
+                              <span className="text-[10px] text-muted-foreground font-mono-numbers">({mTargetPct}%)</span>
+                            )}
+                          </div>
+                          <div className="font-mono-numbers text-xs">
+                            <span className={`font-semibold ${getBurndownTextColor(mPct, 90, mIsInvestment)}`}>
+                              {formatCurrency(mSpent)}
+                            </span>
+                            <span className="text-muted-foreground"> / {formatCurrency(mBudget)}</span>
+                          </div>
+                        </div>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="cursor-pointer py-0.5">
+                              <Progress
+                                value={mClampedPct}
+                                className={`h-2 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${getBurndownColor(mPct, 90, mIsInvestment)}`}
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <span className="font-mono-numbers text-xs font-medium">
+                              {mPct.toFixed(1)}% ({formatCurrency(mSpent)} / {formatCurrency(mBudget)})
+                            </span>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <div className="flex justify-between text-[11px] text-muted-foreground font-mono-numbers">
+                          <span>
+                            {mRemaining >= 0
+                              ? `${formatCurrency(mRemaining)} ${t("dashboard.remaining")}`
+                              : `${formatCurrency(Math.abs(mRemaining))} ${t("budgets.overBudget")}`}
+                          </span>
+                          <span>{Math.round(mPct)}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -372,6 +469,7 @@ export default function BudgetsPage() {
           const mainSpentTotal = subs.reduce((s, sub) => s + getSpent(sub.id), 0);
           const mainPct = mainBudgetTotal > 0 ? Math.min((mainSpentTotal / mainBudgetTotal) * 100, 100) : 0;
           const isMainOver = mainSpentTotal > mainBudgetTotal && mainBudgetTotal > 0;
+          const isInvestment = ["Инвестиции", "Investments"].includes(mainName);
           const targetPct = getBudgetTarget(mainName);
           const budgetedPct = totalBudget > 0 ? (mainBudgetTotal / totalBudget) * 100 : 0;
           const targetAmount = targetPct !== undefined ? Math.round((totalBudget * targetPct) / 100) : 0;
@@ -437,7 +535,7 @@ export default function BudgetsPage() {
                       >
                         <Progress
                           value={mainPct}
-                          className={`h-2 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${isMainOver ? "[&>div]:bg-destructive" : ""}`}
+                          className={`h-2 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${getBurndownColor(mainPct, 90, isInvestment)}`}
                         />
                       </div>
                     </TooltipTrigger>
@@ -447,6 +545,14 @@ export default function BudgetsPage() {
                       </span>
                     </TooltipContent>
                   </Tooltip>
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>
+                      {mainBudgetTotal - mainSpentTotal >= 0
+                        ? `${formatCurrency(mainBudgetTotal - mainSpentTotal)} ${t("dashboard.remaining")}`
+                        : `${formatCurrency(Math.abs(mainBudgetTotal - mainSpentTotal))} ${t("budgets.overBudget")}`}
+                    </span>
+                    <span className="font-mono-numbers">{Math.round(mainPct)}%</span>
+                  </div>
                 </CardHeader>
 
                 <CollapsibleContent>

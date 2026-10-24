@@ -115,6 +115,11 @@ describe("i18n system tests", () => {
       expect(translateCategory("Детска градина - Борис", "en")).toBe("Kindergarten - Boris");
       expect(translateCategory("Курсове по плуване", "en")).toBe("Courses for Swimming");
       expect(translateCategory("Поддръжка на кола", "en")).toBe("Maintenance of Car");
+      expect(translateCategory('Фонд "Пенсии"', "en")).toBe('Fund "Pension"');
+      expect(translateCategory('Фонд "Аварии"', "en")).toBe('Fund "Emergency"');
+      expect(translateCategory('Фонд "Ипотека"', "en")).toBe('Fund "Mortgage"');
+      expect(translateCategory('Фонд "Пътувания"', "en")).toBe('Fund "Travel"');
+      expect(translateCategory('Фонд "Автомобил"', "en")).toBe('Fund "Car"');
     });
 
     it("guarantees NO Cyrillic remains in category names when English is selected", () => {
