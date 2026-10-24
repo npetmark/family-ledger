@@ -56,7 +56,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  DELETE FROM public.transactions WHERE household_id = p_household_id;
+  DELETE FROM public.transactions WHERE account_id IN (SELECT id FROM public.accounts WHERE household_id = p_household_id);
   DELETE FROM public.recurring_transactions WHERE household_id = p_household_id;
   DELETE FROM public.accounts WHERE household_id = p_household_id;
   DELETE FROM public.subcategories WHERE household_id = p_household_id;
