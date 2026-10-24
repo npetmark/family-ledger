@@ -434,7 +434,7 @@ export function transliterateBulgarianToLatin(text: string): string {
   // Special rule (Transliteration Act): "ия" at the end of a word is transliterated as "ia"
   // Note: Standard \b is ASCII-only in JS, so we use explicit boundary matching for Cyrillic
   const wordEnd = "(?=[^а-яА-ЯёЁa-zA-Z0-9]|$)";
-  let result = text
+  const result = text
     .replace(new RegExp(`ия${wordEnd}`, "g"), "ia")
     .replace(new RegExp(`Ия${wordEnd}`, "g"), "Ia")
     .replace(new RegExp(`ИЯ${wordEnd}`, "g"), "IA")
