@@ -150,6 +150,9 @@ export const bg: TranslationDictionary = {
     collapseAll: "Сгъни всички",
     applyLastMonth: "Използвай от предходен месец",
     allOnTrack: "Всичко по план",
+    targetTooltip: "Препоръчителен целеви дял по модела 50/30/20 спрямо общия планиран бюджет.",
+    budgetedTooltip: "Общо планиран бюджет за всички подкатегории в тази основна категория.",
+    budgetedOffTargetTooltip: "Планираният бюджет се отклонява от препоръчителната цел по 50/30/20.",
   },
   categories: {
     title: "Категории",

@@ -14,11 +14,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronsUpDown, Bell, Copy, Trash2, History, Pencil, Check, RotateCcw, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronsUpDown, Bell, Copy, Trash2, History, Pencil, Check, Menu } from "lucide-react";
 import { addMonths, subMonths } from "date-fns";
 import { useLanguage } from "@/lib/i18n";
 
@@ -72,8 +78,6 @@ export default function BudgetsPage() {
   const [budgetVersion, setBudgetVersion] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
-  const [restoreSub, setRestoreSub] = useState<SubcategoryWithMain | null>(null);
-  const [restoreAmounts, setRestoreAmounts] = useState<Record<string, string>>({});
   const monthYear = getMonthYear(currentDate);
 
   const { data: householdInfo } = useHouseholdMembers(user?.id);
@@ -130,182 +134,9 @@ export default function BudgetsPage() {
     enabled: !!user,
   });
 
-  // Historical data for the Restore Subcategory History modal
-  const restoreSubId = restoreSub?.id;
-  const { data: historyData, refetch: refetchHistory } = useQuery({
-    queryKey: ["subcategory-restore-history", user?.id, restoreSubId],
-    queryFn: async () => {
-      if (!restoreSubId) {
-        return { allBudgets: [], subTransactions: [], orphanTransactions: [] };
-      }
-      const [allBudgetsRes, subTxRes, orphanTxRes] = await Promise.all([
-        supabase.from("budgets").select("*").order("month_year", { ascending: false }),
-        supabase
-          .from("transactions")
-          .select("id, amount, date, note, account_id, subcategory_id")
-          .eq("subcategory_id", restoreSubId)
-          .order("date", { ascending: false }),
-        supabase
-          .from("transactions")
-          .select("id, amount, date, note, account_id, subcategory_id, transaction_type")
-          .is("subcategory_id", null)
-          .eq("transaction_type", "expense")
-          .order("date", { ascending: false }),
-      ]);
-      if (allBudgetsRes.error) throw allBudgetsRes.error;
-      if (subTxRes.error) throw subTxRes.error;
-      if (orphanTxRes.error) throw orphanTxRes.error;
-      return {
-        allBudgets: allBudgetsRes.data ?? [],
-        subTransactions: subTxRes.data ?? [],
-        orphanTransactions: orphanTxRes.data ?? [],
-      };
-    },
-    enabled: !!user && !!restoreSubId,
-  });
-
-  // Compute per-month estimates when historyData loads
-  const monthlyRestoreRows = useMemo(() => {
-    if (!restoreSub || !historyData) return [];
-    const mainName = restoreSub.main_categories?.name || "";
-    const targetPct = getBudgetTarget(mainName); // e.g. 50 for Needs
-    const siblingSubIds = new Set(
-      subcategories
-        .filter((s) => s.main_category_id === restoreSub.main_category_id && s.id !== restoreSub.id)
-        .map((s) => s.id)
-    );
-    const otherMainSubIds = new Set(
-      subcategories
-        .filter((s) => s.main_category_id !== restoreSub.main_category_id && !isIncomeCategory(s.main_categories?.name))
-        .map((s) => s.id)
-    );
-
-    const monthSet = new Set<string>([monthYear]);
-    historyData.allBudgets.forEach((b) => monthSet.add(b.month_year));
-    historyData.subTransactions.forEach((tx) => monthSet.add(tx.date.slice(0, 7)));
-
-    const sortedMonths = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
-
-    return sortedMonths.map((my) => {
-      const monthBudgets = historyData.allBudgets.filter((b) => b.month_year === my);
-      const existingForSub = monthBudgets.find((b) => b.subcategory_id === restoreSub.id);
-      const siblingBudgetTotal = monthBudgets
-        .filter((b) => siblingSubIds.has(b.subcategory_id))
-        .reduce((s, b) => s + b.amount, 0);
-      const otherMainBudgetTotal = monthBudgets
-        .filter((b) => otherMainSubIds.has(b.subcategory_id))
-        .reduce((s, b) => s + b.amount, 0);
-
-      // If targetPct is 50%, expectedMainTotal = otherMainBudgetTotal * (50 / 50)
-      let inferredFromTarget = 0;
-      if (targetPct !== undefined && targetPct < 100 && otherMainBudgetTotal > 0) {
-        const expectedMainTotal = Math.round(otherMainBudgetTotal * (targetPct / (100 - targetPct)));
-        inferredFromTarget = Math.max(0, expectedMainTotal - siblingBudgetTotal);
-      }
-
-      const spentInMonth = historyData.subTransactions
-        .filter((tx) => tx.date.startsWith(my))
-        .reduce((s, tx) => s + tx.amount, 0);
-
-      return {
-        monthYear: my,
-        existingBudgetId: existingForSub?.id,
-        existingAmount: existingForSub?.amount ?? 0,
-        spentInMonth,
-        inferredFromTarget,
-        siblingBudgetTotal,
-        otherMainBudgetTotal,
-      };
-    });
-  }, [restoreSub, historyData, subcategories, monthYear]);
-
-  useEffect(() => {
-    if (!restoreSub || monthlyRestoreRows.length === 0) return;
-    setRestoreAmounts((prev) => {
-      const next = { ...prev };
-      monthlyRestoreRows.forEach((r) => {
-        if (next[r.monthYear] === undefined) {
-          const defaultCents =
-            r.existingAmount > 0
-              ? r.existingAmount
-              : r.inferredFromTarget > 0
-              ? r.inferredFromTarget
-              : r.spentInMonth;
-          next[r.monthYear] = defaultCents > 0 ? (defaultCents / 100).toFixed(2) : "";
-        }
-      });
-      return next;
-    });
-  }, [restoreSub, monthlyRestoreRows]);
-
-  const relinkOrphansMutation = useMutation({
-    mutationFn: async () => {
-      if (!restoreSub || !historyData?.orphanTransactions.length) return;
-      const ids = historyData.orphanTransactions.map((t) => t.id);
-      const { error } = await supabase
-        .from("transactions")
-        .update({ subcategory_id: restoreSub.id })
-        .in("id", ids);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success(
-        language === "bg"
-          ? "Транзакциите бяха успешно свързани с подкатегорията"
-          : "Uncategorized transactions re-linked successfully"
-      );
-      refetchHistory();
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions-for-budgets"] });
-      queryClient.invalidateQueries({ queryKey: ["prev-transactions-for-budgets"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   const saveBudgetsMutation = useSaveBudgets({
     onSuccess: () => toast.success("Budget updated"),
     onError: (e) => toast.error(e.message),
-  });
-
-  const saveRestoredBudgetsMutation = useMutation({
-    mutationFn: async () => {
-      if (!restoreSub || !user) return;
-      const inserts: BudgetInsertPayload[] = [];
-      const updates: { id: string; payload: BudgetUpdatePayload }[] = [];
-
-      monthlyRestoreRows.forEach((row) => {
-        const raw = restoreAmounts[row.monthYear];
-        if (raw === undefined || raw.trim() === "") return;
-        const cents = parseCurrencyToCents(raw);
-        if (cents <= 0 && !row.existingBudgetId) return;
-
-        if (row.existingBudgetId) {
-          updates.push({
-            id: row.existingBudgetId,
-            payload: { amount: cents },
-          });
-        } else {
-          inserts.push({
-            user_id: user.id,
-            subcategory_id: restoreSub.id,
-            month_year: row.monthYear,
-            amount: cents,
-            alert_threshold: 90,
-            ...(householdId ? { household_id: householdId } : {}),
-          });
-        }
-      });
-
-      if (inserts.length === 0 && updates.length === 0) return;
-      await saveBudgetsMutation.mutateAsync({ inserts, updates });
-    },
-    onSuccess: () => {
-      setBudgetVersion((v) => v + 1);
-      queryClient.invalidateQueries({ queryKey: ["budgets"] });
-      queryClient.invalidateQueries({ queryKey: ["budgets-with-categories"] });
-      setRestoreSub(null);
-      setRestoreAmounts({});
-    },
   });
 
   const copyFromPreviousMonth = useMutation({
@@ -464,11 +295,6 @@ export default function BudgetsPage() {
     setIsEditing((prev) => !prev);
   };
 
-  const openRestoreModal = (sub: SubcategoryWithMain) => {
-    setRestoreAmounts({});
-    setRestoreSub(sub);
-  };
-
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-6 max-w-4xl">
@@ -486,54 +312,64 @@ export default function BudgetsPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div className="flex items-center justify-between gap-2 pt-1">
             <div className="flex items-center gap-2">
               <Button
-                variant={isEditing ? "default" : "outline"}
-                size="sm"
-                onClick={handleToggleEdit}
-                className="text-xs gap-1.5 font-medium"
-              >
-                {isEditing ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-                {isEditing ? t("budgets.doneEditing") : t("budgets.editBudgets")}
-              </Button>
-              <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={toggleAllCategories}
-                className="text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                className="text-xs gap-1.5"
               >
                 <ChevronsUpDown className="h-3.5 w-3.5" />
                 {allCollapsed ? t("budgets.expandAll") : t("budgets.collapseAll")}
               </Button>
+              {isEditing && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleToggleEdit}
+                  className="text-xs gap-1.5 font-medium animate-in fade-in"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  {t("budgets.doneEditing")}
+                </Button>
+              )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyFromPreviousMonth.mutate()}
-                disabled={prevBudgets.length === 0 || copyFromPreviousMonth.isPending}
-                className="text-xs gap-1.5"
-              >
-                <Copy className="h-3.5 w-3.5" />
-                {t("budgets.copyPrevMonth")}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (confirm(t("budgets.clearBudgetsConfirm"))) {
-                    clearBudgetsMutation.mutate();
-                  }
-                }}
-                disabled={budgets.length === 0 || clearBudgetsMutation.isPending}
-                className="text-xs gap-1.5 text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {t("budgets.clearBudgets")}
-              </Button>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="Menu">
+                  <Menu className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={handleToggleEdit} className="gap-2 cursor-pointer">
+                  {isEditing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                  <span>{isEditing ? t("budgets.doneEditing") : t("budgets.editBudgets")}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => copyFromPreviousMonth.mutate()}
+                  disabled={prevBudgets.length === 0 || copyFromPreviousMonth.isPending}
+                  className="gap-2 cursor-pointer"
+                >
+                  <Copy className="h-4 w-4" />
+                  <span>{t("budgets.copyPrevMonth")}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (confirm(t("budgets.clearBudgetsConfirm"))) {
+                      clearBudgetsMutation.mutate();
+                    }
+                  }}
+                  disabled={budgets.length === 0 || clearBudgetsMutation.isPending}
+                  className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>{t("budgets.clearBudgets")}</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -717,8 +553,11 @@ export default function BudgetsPage() {
                               {t("budgets.target")} {targetPct}%
                             </Badge>
                           </TooltipTrigger>
-                          <TooltipContent align="end">
-                            <span>{t("budgets.target")}: {targetPct}% ({formatCurrency(targetAmount)})</span>
+                          <TooltipContent align="end" className="max-w-[260px] text-xs">
+                            <div className="font-semibold">{t("budgets.target")}: {targetPct}% ({formatCurrency(targetAmount)})</div>
+                            <div className="text-muted-foreground text-[11px] mt-0.5 leading-snug">
+                              {t("budgets.targetTooltip")}
+                            </div>
                           </TooltipContent>
                         </Tooltip>
 
@@ -733,8 +572,11 @@ export default function BudgetsPage() {
                               {t("budgets.budgeted")} {budgetedPct.toFixed(1)}%
                             </Badge>
                           </TooltipTrigger>
-                          <TooltipContent align="end">
-                            <span>{t("budgets.budgeted")}: {budgetedPct.toFixed(1)}% ({formatCurrency(mainBudgetTotal)})</span>
+                          <TooltipContent align="end" className="max-w-[260px] text-xs">
+                            <div className="font-semibold">{t("budgets.budgeted")}: {budgetedPct.toFixed(1)}% ({formatCurrency(mainBudgetTotal)})</div>
+                            <div className="text-muted-foreground text-[11px] mt-0.5 leading-snug">
+                              {offTarget ? t("budgets.budgetedOffTargetTooltip") : t("budgets.budgetedTooltip")}
+                            </div>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -819,14 +661,6 @@ export default function BudgetsPage() {
                                         <span className="font-mono-numbers">{t("budgets.applyLastMonth")} ({formatCurrency(prevSpent)})</span>
                                       </button>
                                     )}
-                                    <button
-                                      type="button"
-                                      onClick={() => openRestoreModal(sub)}
-                                      className="hover:underline text-[11px] text-primary flex items-center gap-1 cursor-pointer transition-colors font-medium"
-                                    >
-                                      <RotateCcw className="h-3 w-3 shrink-0" />
-                                      <span>{language === "bg" ? "Възстанови по месеци" : "Restore multi-month"}</span>
-                                    </button>
                                   </div>
                                 </div>
                                 <Progress
@@ -877,15 +711,9 @@ export default function BudgetsPage() {
                                 </Tooltip>
                               )}
                               {isUnbudgetedSpend && (
-                                <button
-                                  type="button"
-                                  onClick={() => openRestoreModal(sub)}
-                                  className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-warning border border-warning/40 hover:bg-warning/10 rounded-full py-0.5 px-2 font-semibold cursor-pointer transition-colors"
-                                  title={language === "bg" ? "Натиснете за възстановяване на бюджетите по месеци" : "Click to restore monthly budgets"}
-                                >
+                                <span className="text-[10px] uppercase tracking-wide text-warning border border-warning/40 rounded-full py-0.5 px-2 font-semibold">
                                   {t("budgets.unbudgeted")}
-                                  <RotateCcw className="h-2.5 w-2.5" />
-                                </button>
+                                </span>
                               )}
                             </div>
 
@@ -946,140 +774,6 @@ export default function BudgetsPage() {
             </Card>
           );
         })}
-
-        {/* Multi-month Budget & Transaction Recovery Dialog */}
-        <Dialog open={!!restoreSub} onOpenChange={(open) => { if (!open) setRestoreSub(null); }}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <RotateCcw className="h-4 w-4 text-primary" />
-                {language === "bg"
-                  ? `Възстановяване на бюджети: ${translateCategory(restoreSub?.name)}`
-                  : `Restore Monthly Budgets: ${translateCategory(restoreSub?.name)}`}
-              </DialogTitle>
-              <DialogDescription>
-                {language === "bg"
-                  ? "Оценихме липсващия бюджет за всеки месец спрямо целта 50/30/20 (остатъка от другите подкатегории) и реалните разходи за месеца."
-                  : "We estimated each month's missing budget from your 50/30/20 target gap (remaining main category budget) and your actual spending in that month."}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              {historyData?.orphanTransactions && historyData.orphanTransactions.length > 0 && (
-                <div className="p-3 rounded-lg bg-warning/10 border border-warning/30 flex items-center justify-between gap-3">
-                  <div className="text-xs space-y-0.5">
-                    <p className="font-semibold text-foreground">
-                      {language === "bg"
-                        ? `Намерени са ${historyData.orphanTransactions.length} транзакции без категория`
-                        : `Found ${historyData.orphanTransactions.length} uncategorized expense transactions`}
-                    </p>
-                    <p className="text-muted-foreground">
-                      {language === "bg"
-                        ? "Ако те са били от тази изтрита подкатегория, можете да ги свържете отново с 1 клик."
-                        : "If these belonged to this deleted subcategory, re-link them first so monthly spend is accurate."}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0 text-xs"
-                    disabled={relinkOrphansMutation.isPending}
-                    onClick={() => relinkOrphansMutation.mutate()}
-                  >
-                    {language === "bg" ? "Свържи ги" : "Re-link"}
-                  </Button>
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="h-7 text-xs gap-1"
-                  onClick={() => {
-                    const next: Record<string, string> = {};
-                    monthlyRestoreRows.forEach((r) => {
-                      const val = r.inferredFromTarget > 0 ? r.inferredFromTarget : r.spentInMonth;
-                      next[r.monthYear] = val > 0 ? (val / 100).toFixed(2) : "";
-                    });
-                    setRestoreAmounts(next);
-                  }}
-                >
-                  <Sparkles className="h-3 w-3" />
-                  {language === "bg" ? "Попълни от 50/30/20 остатък" : "Fill from 50/30/20 Target Gap"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs gap-1"
-                  onClick={() => {
-                    const next: Record<string, string> = {};
-                    monthlyRestoreRows.forEach((r) => {
-                      next[r.monthYear] = r.spentInMonth > 0 ? (r.spentInMonth / 100).toFixed(2) : "";
-                    });
-                    setRestoreAmounts(next);
-                  }}
-                >
-                  <History className="h-3 w-3" />
-                  {language === "bg" ? "Попълни от реално изхарчено" : "Fill from Actual Monthly Spend"}
-                </Button>
-              </div>
-
-              <div className="max-h-64 overflow-y-auto divide-y divide-border/50 border rounded-lg px-3">
-                {monthlyRestoreRows.map((row) => {
-                  const [y, m] = row.monthYear.split("-").map(Number);
-                  const monthLabel = formatDate(new Date(y, m - 1, 1), "MMM yyyy");
-                  return (
-                    <div key={row.monthYear} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                      <div className="space-y-0.5 min-w-0">
-                        <div className="font-semibold text-sm">{monthLabel}</div>
-                        <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 font-mono-numbers">
-                          <span>
-                            {t("dashboard.spent")}: <strong className="text-foreground">{formatCurrency(row.spentInMonth)}</strong>
-                          </span>
-                          {row.inferredFromTarget > 0 && (
-                            <span>
-                              {language === "bg" ? "50% остатък" : "50% gap"}:{" "}
-                              <strong className="text-primary">{formatCurrency(row.inferredFromTarget)}</strong>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        className="w-28 h-8 text-xs font-mono-numbers text-right shrink-0"
-                        value={restoreAmounts[row.monthYear] ?? ""}
-                        onChange={(e) =>
-                          setRestoreAmounts((prev) => ({
-                            ...prev,
-                            [row.monthYear]: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setRestoreSub(null)}>
-                {t("common.cancel")}
-              </Button>
-              <Button
-                onClick={() => saveRestoredBudgetsMutation.mutate()}
-                disabled={saveRestoredBudgetsMutation.isPending}
-              >
-                {t("common.save")}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </TooltipProvider>
   );

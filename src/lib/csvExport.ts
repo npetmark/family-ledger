@@ -50,42 +50,55 @@ export async function exportTransactionsToCsv(options: CsvExportOptions): Promis
     throw new Error("No accounts selected for export.");
   }
 
-  // 1. Build query
-  let query = supabase
-    .from("transactions")
-    .select(`
-      id,
-      date,
-      amount,
-      transaction_type,
-      note,
-      account_id,
-      transfer_to_account_id,
-      subcategory_id,
-      created_by,
-      subcategories (
+  // 1. Fetch transactions with pagination to bypass PostgREST's default 1000-row limit
+  const pageSize = 1000;
+  const rows: any[] = [];
+
+  for (let page = 0; ; page++) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = supabase
+      .from("transactions")
+      .select(`
         id,
-        name,
-        main_categories (
+        date,
+        amount,
+        transaction_type,
+        note,
+        account_id,
+        transfer_to_account_id,
+        subcategory_id,
+        created_by,
+        subcategories (
           id,
-          name
+          name,
+          main_categories (
+            id,
+            name
+          )
         )
-      )
-    `)
-    .in("account_id", accountIds)
-    .order("date", { ascending: false });
+      `)
+      .in("account_id", accountIds)
+      .order("date", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to);
 
-  if (dateRange?.from) {
-    const fromStr = dateRange.from.toISOString().split("T")[0];
-    query = query.gte("date", fromStr);
-  }
-  if (dateRange?.to) {
-    const toStr = dateRange.to.toISOString().split("T")[0];
-    query = query.lte("date", toStr);
-  }
+    if (dateRange?.from) {
+      const fromStr = dateRange.from.toISOString().split("T")[0];
+      query = query.gte("date", fromStr);
+    }
+    if (dateRange?.to) {
+      const toStr = dateRange.to.toISOString().split("T")[0];
+      query = query.lte("date", toStr);
+    }
 
-  const { data: rows, error } = await query;
-  if (error) throw error;
+    const { data: pageRows, error } = await query;
+    if (error) throw error;
+
+    rows.push(...(pageRows || []));
+    if (!pageRows || pageRows.length < pageSize) break;
+  }
 
   const accountMap = new Map(accounts.map((a) => [a.id, a]));
   const memberMap = new Map(

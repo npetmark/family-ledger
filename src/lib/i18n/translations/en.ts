@@ -150,6 +150,9 @@ export const en: TranslationDictionary = {
     collapseAll: "Collapse All",
     applyLastMonth: "Use last month",
     allOnTrack: "All on track",
+    targetTooltip: "Target allocation under the 50/30/20 budget framework based on total household budget.",
+    budgetedTooltip: "Total allocated budget for all subcategories in this main category.",
+    budgetedOffTargetTooltip: "Allocated budget differs from the 50/30/20 target recommendation.",
   },
   categories: {
     title: "Categories",

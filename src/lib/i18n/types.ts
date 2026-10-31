@@ -150,6 +150,9 @@ export interface TranslationDictionary {
     collapseAll: string;
     applyLastMonth: string;
     allOnTrack: string;
+    targetTooltip: string;
+    budgetedTooltip: string;
+    budgetedOffTargetTooltip: string;
   };
   categories: {
     title: string;

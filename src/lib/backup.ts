@@ -67,14 +67,14 @@ export function bufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
   return btoa(binary);
 }
 
-export function base64ToBuffer(base64: string): Uint8Array {
+export function base64ToBuffer(base64: string): Uint8Array<ArrayBuffer> {
   const binary = atob(base64);
   const len = binary.length;
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return bytes;
+  return bytes as Uint8Array<ArrayBuffer>;
 }
 
 /**
@@ -92,7 +92,7 @@ export async function encryptBackup(payload: HouseholdBackup, password: string):
 
   const keyMaterial = await cryptoObj.subtle.importKey(
     "raw",
-    enc.encode(password),
+    enc.encode(password) as unknown as BufferSource,
     { name: "PBKDF2" },
     false,
     ["deriveKey"]
@@ -101,7 +101,7 @@ export async function encryptBackup(payload: HouseholdBackup, password: string):
   const aesKey = await cryptoObj.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt,
+      salt: salt as unknown as BufferSource,
       iterations: 250000,
       hash: "SHA-256",
     },
@@ -113,9 +113,9 @@ export async function encryptBackup(payload: HouseholdBackup, password: string):
 
   const plaintext = enc.encode(JSON.stringify(payload));
   const ciphertext = await cryptoObj.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: iv as unknown as BufferSource },
     aesKey,
-    plaintext
+    plaintext as unknown as BufferSource
   );
 
   const envelope: EncryptedBackupEnvelope = {
@@ -162,7 +162,7 @@ export async function decryptBackup(encryptedJson: string, password: string): Pr
 
   const keyMaterial = await cryptoObj.subtle.importKey(
     "raw",
-    enc.encode(password),
+    enc.encode(password) as unknown as BufferSource,
     { name: "PBKDF2" },
     false,
     ["deriveKey"]
@@ -171,7 +171,7 @@ export async function decryptBackup(encryptedJson: string, password: string): Pr
   const aesKey = await cryptoObj.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt,
+      salt: salt as unknown as BufferSource,
       iterations: 250000,
       hash: "SHA-256",
     },
@@ -184,9 +184,9 @@ export async function decryptBackup(encryptedJson: string, password: string): Pr
   let decryptedBuffer: ArrayBuffer;
   try {
     decryptedBuffer = await cryptoObj.subtle.decrypt(
-      { name: "AES-GCM", iv },
+      { name: "AES-GCM", iv: iv as unknown as BufferSource },
       aesKey,
-      ciphertext
+      ciphertext as unknown as BufferSource
     );
   } catch {
     throw new Error("Decryption failed. The password provided is incorrect, or the file is corrupted.");
@@ -204,97 +204,159 @@ export async function decryptBackup(encryptedJson: string, password: string): Pr
 }
 
 /**
+ * Helper to fetch all rows across PostgREST's default 1000-row limit using pagination.
+ */
+async function fetchAllPaged<T = any>(
+  fetchPage: (from: number, to: number) => PromiseLike<any>,
+  pageSize = 1000
+): Promise<T[]> {
+  const all: T[] = [];
+  let page = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const res: any = await fetchPage(from, to);
+    if (res?.error) {
+      throw res.error;
+    }
+    const data = res?.data || [];
+    all.push(...data);
+    if (data.length < pageSize) {
+      hasMore = false;
+    } else {
+      page++;
+    }
+  }
+
+  return all;
+}
+
+/**
  * Queries all data belonging to the household from the Supabase database.
  */
 export async function createHouseholdBackup(householdId: string): Promise<HouseholdBackup> {
   // 1. Accounts
-  const { data: accounts, error: accErr } = await supabase
-    .from("accounts")
-    .select("*")
-    .eq("household_id", householdId);
-  if (accErr) throw accErr;
+  const accounts = await fetchAllPaged((from, to) =>
+    supabase
+      .from("accounts")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
 
-  const accountIds = (accounts || []).map((a) => a.id);
+  const accountIds = (accounts || []).map((a: { id: string }) => a.id);
 
   // 2. Main Categories
-  const { data: mainCats, error: mcErr } = await supabase
-    .from("main_categories")
-    .select("*")
-    .eq("household_id", householdId);
-  if (mcErr) throw mcErr;
+  const mainCats = await fetchAllPaged((from, to) =>
+    supabase
+      .from("main_categories")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
 
   // 3. Subcategories
-  const { data: subCats, error: scErr } = await supabase
-    .from("subcategories")
-    .select("*")
-    .eq("household_id", householdId);
-  if (scErr) throw scErr;
+  const subCats = await fetchAllPaged((from, to) =>
+    supabase
+      .from("subcategories")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
 
   // 4. Budgets
-  const { data: budgets, error: bErr } = await supabase
-    .from("budgets")
-    .select("*")
-    .eq("household_id", householdId);
-  if (bErr) throw bErr;
+  const budgets = await fetchAllPaged((from, to) =>
+    supabase
+      .from("budgets")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
 
-  // 5. Transactions
+  // 5. Transactions (paginated to bypass PostgREST 1000-row default limit)
   let transactions: any[] = [];
   if (accountIds.length > 0) {
-    const { data: txs, error: txErr } = await supabase
-      .from("transactions")
-      .select("*")
-      .in("account_id", accountIds);
-    if (txErr) throw txErr;
-    transactions = txs || [];
+    transactions = await fetchAllPaged((from, to) =>
+      supabase
+        .from("transactions")
+        .select("*")
+        .in("account_id", accountIds)
+        .order("date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+    );
   }
 
   // 6. Recurring Transactions
-  const { data: recurring, error: recErr } = await supabase
-    .from("recurring_transactions")
-    .select("*")
-    .eq("household_id", householdId);
-  if (recErr) throw recErr;
+  const recurring = await fetchAllPaged((from, to) =>
+    supabase
+      .from("recurring_transactions")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
 
   // 7. Transaction Templates
-  const { data: templates, error: tmplErr } = await supabase
-    .from("transaction_templates")
-    .select("*")
-    .eq("household_id", householdId);
-  if (tmplErr) throw tmplErr;
+  const templates = await fetchAllPaged((from, to) =>
+    supabase
+      .from("transaction_templates")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
 
   // 8. Shopping Categories
-  const { data: shopCats, error: shcErr } = await supabase
-    .from("shopping_categories")
-    .select("*")
-    .eq("household_id", householdId);
-  if (shcErr) throw shcErr;
+  const shopCats = await fetchAllPaged((from, to) =>
+    supabase
+      .from("shopping_categories")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
 
   // 9. Shopping Trips
-  const { data: shopTrips, error: shtErr } = await supabase
-    .from("shopping_trips")
-    .select("*")
-    .eq("household_id", householdId);
-  if (shtErr) throw shtErr;
+  const shopTrips = await fetchAllPaged((from, to) =>
+    supabase
+      .from("shopping_trips")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
 
-  const tripIds = (shopTrips || []).map((t) => t.id);
+  const tripIds = (shopTrips || []).map((t: { id: string }) => t.id);
 
-  // 10. Shopping Items
+  // 10. Shopping Items (paginated to bypass PostgREST 1000-row default limit)
   let shoppingItems: any[] = [];
   if (tripIds.length > 0) {
-    const { data: shItems, error: shiErr } = await supabase
-      .from("shopping_items")
-      .select("*")
-      .in("trip_id", tripIds);
-    if (shiErr) throw shiErr;
-    shoppingItems = shItems || [];
+    shoppingItems = await fetchAllPaged((from, to) =>
+      supabase
+        .from("shopping_items")
+        .select("*")
+        .in("trip_id", tripIds)
+        .order("id", { ascending: true })
+        .range(from, to)
+    );
   }
 
   // 11. Shopping Item Dictionary
-  const { data: shopDict, error: shdErr } = await supabase
-    .from("shopping_item_dictionary")
-    .select("*")
-    .eq("household_id", householdId);
-  if (shdErr) throw shdErr;
+  const shopDict = await fetchAllPaged((from, to) =>
+    supabase
+      .from("shopping_item_dictionary")
+      .select("*")
+      .eq("household_id", householdId)
+      .order("id", { ascending: true })
+      .range(from, to)
+  );
 
   return {
     format: "family-ledger-backup-payload",
@@ -361,13 +423,13 @@ export async function restoreHouseholdBackup(
     .from("shopping_trips")
     .select("id")
     .eq("household_id", currentHouseholdId);
-  const currentTripIds = (currentTrips || []).map((t) => t.id);
+  const currentTripIds = (currentTrips || []).map((t: { id: string }) => t.id);
 
   const { data: currentAccs } = await supabase
     .from("accounts")
     .select("id")
     .eq("household_id", currentHouseholdId);
-  const currentAccountIds = (currentAccs || []).map((a) => a.id);
+  const currentAccountIds = (currentAccs || []).map((a: { id: string }) => a.id);
 
   // 2. DELETE existing records in reverse dependency order (children first)
   if (currentTripIds.length > 0) {
