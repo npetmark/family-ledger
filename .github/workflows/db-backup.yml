@@ -46,7 +46,8 @@ jobs:
           echo "deb [signed-by=/etc/apt/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update -y
           sudo apt-get install -y postgresql-client-17
-          pg_dump --version
+          echo "/usr/lib/postgresql/17/bin" >> $GITHUB_PATH
+          /usr/lib/postgresql/17/bin/pg_dump --version
 
       - name: Validate Secrets
         env:
@@ -65,6 +66,10 @@ jobs:
           BACKUP_TYPE: ${{ inputs.backup_type || 'full' }}
           TIMESTAMP: ${{ steps.vars.outputs.timestamp }}
         run: |
+          export PATH="/usr/lib/postgresql/17/bin:$PATH"
+          echo "Using pg_dump at $(which pg_dump):"
+          pg_dump --version
+
           mkdir -p backups
           OUTPUT_BASE="backups/supabase_backup_${TIMESTAMP}_${BACKUP_TYPE}"
 
