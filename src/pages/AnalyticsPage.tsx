@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAccounts, useAccountBalances } from "@/hooks/queries/useAccounts";
 import { useActiveSubcategories } from "@/hooks/queries/useCategories";
 import { useAuth } from "@/hooks/useAuth";
-import { formatCurrency } from "@/lib/financial";
+import { formatCurrency, isIncomeCategory, compareMainCategories } from "@/lib/financial";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -113,6 +113,7 @@ export default function AnalyticsPage() {
   const [customOpen, setCustomOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [accountFilter, setAccountFilter] = useState<AccountFilterValue>({ mode: "all-visible" });
+  const [breakdownViewMode, setBreakdownViewMode] = useState<"totals" | "monthly" | "daily">("totals");
 
   const selectPreset = (preset: FilterPreset) => {
     if (preset === "custom") { setCustomRange({}); setCalendarMonth(new Date()); setCustomOpen(true); return; }
@@ -256,28 +257,48 @@ export default function AnalyticsPage() {
   });
 
   // Include fund transfers (transfers with subcategory_id) alongside expenses
-  const allExpenseLike = filteredYearTransactions.filter(
-    (t) => t.transaction_type === "expense" || (t.transaction_type === "transfer" && t.subcategory_id)
-  );
-  const incomes = filteredYearTransactions.filter((t) => t.transaction_type === "income");
-  const totalIncome = incomes.reduce((s, t) => s + t.amount, 0);
+  const allExpenseLike = useMemo(() => {
+    return filteredYearTransactions.filter(
+      (t) => t.transaction_type === "expense" || (t.transaction_type === "transfer" && t.subcategory_id)
+    );
+  }, [filteredYearTransactions]);
+
+  const incomes = useMemo(() => {
+    return filteredYearTransactions.filter((t) => t.transaction_type === "income");
+  }, [filteredYearTransactions]);
+
+  const totalIncome = useMemo(() => {
+    return incomes.reduce((s, t) => s + t.amount, 0);
+  }, [incomes]);
 
   // Identify investment category to separate from expenses
-  const investmentCatIds = new Set(
-    mainCategories.filter((c) => c.name === "Investments" || c.name === "Инвестиции").map((c) => c.id)
-  );
+  const investmentCatIds = useMemo(() => {
+    return new Set(
+      mainCategories.filter((c) => c.name === "Investments" || c.name === "Инвестиции").map((c) => c.id)
+    );
+  }, [mainCategories]);
 
   // Expenses = all expense-like MINUS investments
-  const expenses = allExpenseLike.filter(
-    (t) => !investmentCatIds.has(t.subcategories?.main_categories?.id)
-  );
-  const totalExpenses = expenses.reduce((s, t) => s + t.amount, 0);
+  const expenses = useMemo(() => {
+    return allExpenseLike.filter(
+      (t) => !investmentCatIds.has(t.subcategories?.main_categories?.id)
+    );
+  }, [allExpenseLike, investmentCatIds]);
+
+  const totalExpenses = useMemo(() => {
+    return expenses.reduce((s, t) => s + t.amount, 0);
+  }, [expenses]);
 
   // Investments total
-  const investmentExpenses = allExpenseLike.filter(
-    (t) => investmentCatIds.has(t.subcategories?.main_categories?.id)
-  );
-  const totalInvestments = investmentExpenses.reduce((s, t) => s + t.amount, 0);
+  const investmentExpenses = useMemo(() => {
+    return allExpenseLike.filter(
+      (t) => investmentCatIds.has(t.subcategories?.main_categories?.id)
+    );
+  }, [allExpenseLike, investmentCatIds]);
+
+  const totalInvestments = useMemo(() => {
+    return investmentExpenses.reduce((s, t) => s + t.amount, 0);
+  }, [investmentExpenses]);
 
   // Net Savings = Investments only
   const netSavings = totalInvestments;
@@ -304,9 +325,20 @@ export default function AnalyticsPage() {
 
   const remainingBalance = endOfPeriodAssets;
 
-  // For pie/category charts, use ALL expense-like (including investments) and income so all categories appear
+  // For expense/investment charts (By Category and Breakdown pies), exclude income so % allocations reflect spending
   const allExpenses = allExpenseLike;
-  const allCategoryItems = [...allExpenseLike, ...incomes];
+
+  // Expense-only main categories (excludes Income), sorted deterministically
+  const expenseMainCategories = useMemo(() => {
+    return mainCategories
+      .filter((c) => !isIncomeCategory(c.name))
+      .sort(compareMainCategories);
+  }, [mainCategories]);
+
+  // All category items including income (used for the second tile under Breakdown tab)
+  const allCategoryItems = useMemo(() => {
+    return [...allExpenseLike, ...incomes];
+  }, [allExpenseLike, incomes]);
 
   // Monthly trend data
   const trendData = useMemo(() => {
@@ -339,17 +371,18 @@ export default function AnalyticsPage() {
     }
   }, [filteredYearTransactions, activePreset, dateFilter, formatDate]);
 
+  // By Category trend data — only expenses (excludes Income)
   const categoryTrendData = useMemo(() => {
     if (activePreset === "year") {
       return eachMonthOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((monthDate) => {
         const m = monthDate.getMonth();
         const y = monthDate.getFullYear();
-        const monthTxns = allCategoryItems.filter((t) => {
+        const monthTxns = allExpenses.filter((t) => {
           const d = new Date(t.date);
           return d.getMonth() === m && d.getFullYear() === y;
         });
         const entry: Record<string, any> = { label: formatDate(monthDate, "MMM") };
-        mainCategories.forEach((c) => {
+        expenseMainCategories.forEach((c) => {
           entry[c.name] = monthTxns.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0);
         });
         return entry;
@@ -357,29 +390,29 @@ export default function AnalyticsPage() {
     } else {
       return eachDayOfInterval({ start: dateFilter.from, end: dateFilter.to }).map((day) => {
         const dayStr = format(day, "yyyy-MM-dd");
-        const dayTxns = allCategoryItems.filter((t) => t.date === dayStr);
+        const dayTxns = allExpenses.filter((t) => t.date === dayStr);
         const entry: Record<string, any> = { label: formatDate(day, activePreset === "week" ? "EEE d" : "d MMM") };
-        mainCategories.forEach((c) => {
+        expenseMainCategories.forEach((c) => {
           entry[c.name] = dayTxns.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0);
         });
         return entry;
       });
     }
-  }, [allExpenses, mainCategories, activePreset, dateFilter, formatDate]);
+  }, [allExpenses, expenseMainCategories, activePreset, dateFilter, formatDate]);
 
-
-
-
-  // Pie data by subcategory — colors derived from parent main category
+  // Pie data by subcategory — only expense/investment subcategories (excludes Income)
   const subcategoryPieData = useMemo(() => {
     const map: Record<string, { name: string; value: number; icon: string; mainCatColor: string; mainCat: string; subId: string }> = {};
-    allCategoryItems.forEach((t) => {
+    allExpenses.forEach((t) => {
+      const mainCatName = t.subcategories?.main_categories?.name;
+      if (isIncomeCategory(mainCatName)) return;
+
       const subId = t.subcategory_id || "uncategorized";
       const subName = t.subcategories?.name || "Uncategorized";
       const subIcon = t.subcategories?.icon || "circle";
       const mainCatColor = t.subcategories?.main_categories?.color || "0 0% 50%";
-      const mainCatName = t.subcategories?.main_categories?.name || "Other";
-      if (!map[subId]) map[subId] = { name: subName, value: 0, icon: subIcon, mainCatColor, mainCat: mainCatName, subId };
+      const mainCat = mainCatName || "Other";
+      if (!map[subId]) map[subId] = { name: subName, value: 0, icon: subIcon, mainCatColor, mainCat, subId };
       map[subId].value += t.amount;
     });
     const sorted = Object.values(map).sort((a, b) => b.value - a.value);
@@ -397,7 +430,7 @@ export default function AnalyticsPage() {
       const shade = getSubcategoryShade(item.mainCatColor, indexInGroup, group.length);
       return { ...item, color: shade };
     });
-  }, [allCategoryItems]);
+  }, [allExpenses]);
 
   // Top 5 transactions per subcategory for tooltip
   const topTransactionsBySubcategory = useMemo(() => {
@@ -419,16 +452,16 @@ export default function AnalyticsPage() {
     return map;
   }, [allExpenses]);
 
-  // Main category pie data
+  // Main category pie data — only expense/investment categories (excludes Income)
   const mainCatPieData = useMemo(() => {
-    return mainCategories.map((c) => ({
+    return expenseMainCategories.map((c) => ({
       name: c.name,
-      value: allCategoryItems.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0),
+      value: allExpenses.filter((t) => t.subcategories?.main_categories?.id === c.id).reduce((s, t) => s + t.amount, 0),
       color: `hsl(${c.color})`,
     })).filter((c) => c.value > 0);
-  }, [allCategoryItems, mainCategories]);
+  }, [allExpenses, expenseMainCategories]);
 
-  // Average mode and period count
+  // Average mode and period count for summary cards
   const averageMode = useMemo(() => {
     if (activePreset === "week" || activePreset === "month") return "daily";
     if (activePreset === "year") return "monthly";
@@ -436,75 +469,137 @@ export default function AnalyticsPage() {
     return differenceInDays(dateFilter.to, dateFilter.from) + 1 > 30 ? "monthly" : "daily";
   }, [activePreset, dateFilter]);
 
-  const periodCount = useMemo(() => {
-    // Don't count future days/months — cap the range at today (year-to-date)
+  // Accurate daily and monthly period counts (capped at today for year-to-date)
+  const { dailyPeriodCount, monthlyPeriodCount } = useMemo(() => {
     const now = new Date();
     const end = dateFilter.to > now ? now : dateFilter.to;
-    if (end < dateFilter.from) return 1;
-    if (averageMode === "daily") {
-      return eachDayOfInterval({ start: dateFilter.from, end }).length;
+    if (end < dateFilter.from) {
+      return { dailyPeriodCount: 1, monthlyPeriodCount: 1 };
     }
-    // Fractional months: partial months count as (days covered / days in month)
-    return eachMonthOfInterval({ start: dateFilter.from, end }).reduce((sum, monthStart) => {
-      const mStart = startOfMonth(monthStart);
-      const mEnd = endOfMonth(monthStart);
-      const from = dateFilter.from > mStart ? dateFilter.from : mStart;
-      const to = end < mEnd ? end : mEnd;
-      const daysCovered = differenceInDays(to, from) + 1;
-      return sum + daysCovered / getDaysInMonth(monthStart);
-    }, 0);
-  }, [averageMode, dateFilter]);
+    const days = Math.max(1, eachDayOfInterval({ start: dateFilter.from, end }).length);
+    const months = Math.max(
+      0.1,
+      eachMonthOfInterval({ start: dateFilter.from, end }).reduce((sum, monthStart) => {
+        const mStart = startOfMonth(monthStart);
+        const mEnd = endOfMonth(monthStart);
+        const from = dateFilter.from > mStart ? dateFilter.from : mStart;
+        const to = end < mEnd ? end : mEnd;
+        const daysCovered = differenceInDays(to, from) + 1;
+        return sum + daysCovered / getDaysInMonth(monthStart);
+      }, 0)
+    );
+    return { dailyPeriodCount: days, monthlyPeriodCount: months };
+  }, [dateFilter]);
 
+  const periodCount = averageMode === "daily" ? dailyPeriodCount : monthlyPeriodCount;
 
   const avgExpense = periodCount > 0 ? Math.round(totalExpenses / periodCount) : 0;
   const avgIncome = periodCount > 0 ? Math.round(totalIncome / periodCount) : 0;
 
-  // Average per period, broken down by main category → subcategory
-  const averageBreakdown = useMemo(() => {
-    const divisor = periodCount > 0 ? periodCount : 1;
+  // Metadata maps for deterministic sorting
+  const subcategoryMetaMap = useMemo(() => {
+    return new Map(subcategories.map((s) => [s.id, s]));
+  }, [subcategories]);
+
+  const mainCategoryMetaMap = useMemo(() => {
+    return new Map(mainCategories.map((m) => [m.id, m]));
+  }, [mainCategories]);
+
+  // Hierarchical breakdown for Tile 2 under Breakdown tab:
+  // Shows Income, Needs, Wants, Investments in canonical order with subtabs for Totals, Monthly Avg, Daily Avg
+  const hierarchicalBreakdown = useMemo(() => {
     const groups: Record<string, {
-      id: string; name: string; color: string; total: number;
-      subs: Record<string, { name: string; icon: string; total: number; color: string }>;
+      id: string;
+      name: string;
+      color: string;
+      sort_order?: number | null;
+      total: number;
+      subs: Record<string, {
+        id: string;
+        name: string;
+        icon: string;
+        color: string;
+        sort_order?: number | null;
+        total: number;
+      }>;
     }> = {};
 
     allCategoryItems.forEach((t) => {
       const mc = t.subcategories?.main_categories;
       const mcId = mc?.id || "other";
-      const mcName = mc?.name || "Other";
-      const mcColor = mc?.color || "0 0% 50%";
-      if (!groups[mcId]) groups[mcId] = { id: mcId, name: mcName, color: mcColor, total: 0, subs: {} };
+      const mcMeta = mainCategoryMetaMap.get(mcId);
+      const mcName = mcMeta?.name || mc?.name || "Other";
+      const mcColor = mcMeta?.color || mc?.color || "0 0% 50%";
+      const mcSortOrder = mcMeta?.sort_order;
+
+      if (!groups[mcId]) {
+        groups[mcId] = {
+          id: mcId,
+          name: mcName,
+          color: mcColor,
+          sort_order: mcSortOrder,
+          total: 0,
+          subs: {},
+        };
+      }
       groups[mcId].total += t.amount;
 
       const subId = t.subcategory_id || "uncategorized";
-      const sub = groups[mcId].subs[subId] ||
-        (groups[mcId].subs[subId] = {
-          name: t.subcategories?.name || "Uncategorized",
-          icon: t.subcategories?.icon || "circle",
-          total: 0,
+      const subMeta = subcategoryMetaMap.get(subId);
+      const subName = subMeta?.name || t.subcategories?.name || "Uncategorized";
+      const subIcon = subMeta?.icon || t.subcategories?.icon || "circle";
+      const subSortOrder = subMeta?.sort_order;
+
+      if (!groups[mcId].subs[subId]) {
+        groups[mcId].subs[subId] = {
+          id: subId,
+          name: subName,
+          icon: subIcon,
           color: mcColor,
-        });
-      sub.total += t.amount;
+          sort_order: subSortOrder,
+          total: 0,
+        };
+      }
+      groups[mcId].subs[subId].total += t.amount;
     });
 
+    const divisor =
+      breakdownViewMode === "totals"
+        ? 1
+        : breakdownViewMode === "monthly"
+        ? monthlyPeriodCount
+        : dailyPeriodCount;
+
     return Object.values(groups)
+      .filter((g) => g.total > 0)
+      .sort((a, b) => b.total - a.total)
       .map((g) => {
-        const subs = Object.values(g.subs).sort((a, b) => b.total - a.total);
+        const sortedSubs = Object.values(g.subs)
+          .filter((s) => s.total > 0)
+          .sort((a, b) => b.total - a.total);
+
         return {
           id: g.id,
           name: g.name,
           color: g.color,
-          avg: Math.round(g.total / divisor),
-          subs: subs.map((s, i) => ({
+          displayAmount: Math.round(g.total / divisor),
+          subs: sortedSubs.map((s, i) => ({
+            id: s.id,
             name: s.name,
             icon: s.icon,
-            avg: Math.round(s.total / divisor),
-            color: getSubcategoryShade(g.color, i, subs.length),
+            color: getSubcategoryShade(g.color, i, sortedSubs.length),
+            displayAmount: Math.round(s.total / divisor),
           })),
         };
-      })
-      .filter((g) => g.avg > 0)
-      .sort((a, b) => b.avg - a.avg);
-  }, [allCategoryItems, periodCount]);
+      });
+  }, [
+    allCategoryItems,
+    breakdownViewMode,
+    dailyPeriodCount,
+    monthlyPeriodCount,
+    mainCategoryMetaMap,
+    subcategoryMetaMap,
+  ]);
 
   const customTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
@@ -779,8 +874,8 @@ export default function AnalyticsPage() {
                     <YAxis tickFormatter={(v) => `€${(v / 100).toFixed(0)}`} className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
                     <Tooltip content={customTooltip} />
                     <Legend />
-                    {mainCategories.map((c, i) => (
-                      <Bar key={c.id} dataKey={c.name} name={translateCategory(c.name)} stackId="a" fill={`hsl(${c.color})`} radius={i === mainCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                    {expenseMainCategories.map((c, i) => (
+                      <Bar key={c.id} dataKey={c.name} name={translateCategory(c.name)} stackId="a" fill={`hsl(${c.color})`} radius={i === expenseMainCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
@@ -904,22 +999,41 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          {/* Average breakdown by category & subcategory */}
+          {/* Breakdown by category & subcategory (Totals, Monthly Avg, Daily Avg) */}
           <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="text-base font-medium">
-                {averageMode === "daily" ? t("analytics.dailyAvgByCategory") : t("analytics.monthlyAvgByCategory")}
-              </CardTitle>
-              <CardDescription>
-                {language === "bg"
-                  ? `Осреднено за ${averageMode === "daily" ? periodCount : Math.round(periodCount * 10) / 10} ${averageMode === "daily" ? (periodCount === 1 ? "ден" : "дни") : (periodCount === 1 ? "месец" : "месеца")} в избрания период`
-                  : `Averaged over ${averageMode === "daily" ? periodCount : Math.round(periodCount * 10) / 10} ${averageMode === "daily" ? (periodCount === 1 ? "day" : "days") : (periodCount === 1 ? "month" : "months")} in the selected period`}
-              </CardDescription>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3">
+              <div>
+                <CardTitle className="text-base font-medium">
+                  {breakdownViewMode === "totals"
+                    ? t("analytics.totalsByCategory")
+                    : breakdownViewMode === "monthly"
+                    ? t("analytics.monthlyAvgByCategory")
+                    : t("analytics.dailyAvgByCategory")}
+                </CardTitle>
+                <CardDescription>
+                  {breakdownViewMode === "totals"
+                    ? (language === "bg" ? "Общи суми за избрания период" : "Total amounts for the selected period")
+                    : breakdownViewMode === "monthly"
+                    ? (language === "bg"
+                        ? `Осреднено за ${Math.round(monthlyPeriodCount * 10) / 10} ${monthlyPeriodCount === 1 ? "месец" : "месеца"} в избрания период`
+                        : `Averaged over ${Math.round(monthlyPeriodCount * 10) / 10} ${monthlyPeriodCount === 1 ? "month" : "months"} in the selected period`)
+                    : (language === "bg"
+                        ? `Осреднено за ${dailyPeriodCount} ${dailyPeriodCount === 1 ? "ден" : "дни"} в избрания период`
+                        : `Averaged over ${dailyPeriodCount} ${dailyPeriodCount === 1 ? "day" : "days"} in the selected period`)}
+                </CardDescription>
+              </div>
+              <Tabs value={breakdownViewMode} onValueChange={(v) => setBreakdownViewMode(v as any)} className="w-full sm:w-auto">
+                <TabsList className="grid grid-cols-3 h-8">
+                  <TabsTrigger value="totals" className="text-xs px-2.5">{t("analytics.totals")}</TabsTrigger>
+                  <TabsTrigger value="monthly" className="text-xs px-2.5">{t("analytics.monthlyAvg")}</TabsTrigger>
+                  <TabsTrigger value="daily" className="text-xs px-2.5">{t("analytics.dailyAvg")}</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </CardHeader>
             <CardContent>
-              {averageBreakdown.length > 0 ? (
+              {hierarchicalBreakdown.length > 0 ? (
                 <div className="space-y-5">
-                  {averageBreakdown.map((cat) => (
+                  {hierarchicalBreakdown.map((cat) => (
                     <div key={cat.id} className="space-y-2">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0">
@@ -927,20 +1041,31 @@ export default function AnalyticsPage() {
                           <span className="text-sm font-medium truncate">{translateCategory(cat.name)}</span>
                         </div>
                         <span className="text-sm font-mono-numbers font-semibold whitespace-nowrap flex-shrink-0">
-                          {formatCurrency(cat.avg)}
-                          <span className="text-xs text-muted-foreground ml-1">/{averageMode === "daily" ? (language === "bg" ? "ден" : "day") : (language === "bg" ? "мес" : "mo")}</span>
+                          {formatCurrency(cat.displayAmount)}
+                          {breakdownViewMode !== "totals" && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              /{breakdownViewMode === "daily" ? (language === "bg" ? "ден" : "day") : (language === "bg" ? "мес" : "mo")}
+                            </span>
+                          )}
                         </span>
                       </div>
                       <div className="space-y-1.5 pl-4 border-l border-border">
-                        {cat.subs.map((sub, i) => (
-                          <div key={i} className="flex items-center justify-between gap-3">
+                        {cat.subs.map((sub) => (
+                          <div key={sub.id} className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2 min-w-0">
                               <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style={{ background: `hsl(${sub.color} / 0.15)` }}>
                                 <DynamicIcon name={sub.icon} className="h-3 w-3" style={{ color: `hsl(${sub.color})` }} />
                               </div>
                               <span className="text-sm text-muted-foreground truncate">{translateCategory(sub.name)}</span>
                             </div>
-                            <span className="text-sm font-mono-numbers whitespace-nowrap flex-shrink-0">{formatCurrency(sub.avg)}</span>
+                            <span className="text-sm font-mono-numbers whitespace-nowrap flex-shrink-0">
+                              {formatCurrency(sub.displayAmount)}
+                              {breakdownViewMode !== "totals" && (
+                                <span className="text-xs text-muted-foreground ml-1">
+                                  /{breakdownViewMode === "daily" ? (language === "bg" ? "ден" : "day") : (language === "bg" ? "мес" : "mo")}
+                                </span>
+                              )}
+                            </span>
                           </div>
                         ))}
                       </div>

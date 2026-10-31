@@ -248,6 +248,10 @@ export interface TranslationDictionary {
     byMainCategory: string;
     dailyAvgByCategory: string;
     monthlyAvgByCategory: string;
+    totalsByCategory: string;
+    totals: string;
+    monthlyAvg: string;
+    dailyAvg: string;
     noExpensesThisYear: string;
     noDataForPeriod: string;
     topTransactions: string;
