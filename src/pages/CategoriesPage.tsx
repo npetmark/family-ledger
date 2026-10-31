@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useMainCategories, useSubcategories, useSaveMainCategory, useDeleteMainCategory, useSaveSubcategory, useDeleteSubcategory } from "@/hooks/queries/useCategories";
+import {
+  useMainCategories,
+  useSubcategories,
+  useSaveMainCategory,
+  useDeleteMainCategory,
+  useSaveSubcategory,
+  useDeleteSubcategory,
+  useReorderSubcategories,
+  useReorderMainCategories,
+} from "@/hooks/queries/useCategories";
 import { useHouseholdMembers } from "@/hooks/queries/useHouseholdMembers";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,7 +34,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { getBudgetTarget, compareMainCategories, compareSubcategories } from "@/lib/financial";
 import { useLanguage } from "@/lib/i18n";
@@ -117,6 +126,102 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
   const deleteSubMutation = useDeleteSubcategory({
     onError: (e) => toast.error(e.message),
   });
+
+  const reorderSubMutation = useReorderSubcategories({
+    onError: (e) => toast.error(e.message),
+  });
+
+  const reorderMainMutation = useReorderMainCategories({
+    onError: (e) => toast.error(e.message),
+  });
+
+  const [draggedSubId, setDraggedSubId] = useState<string | null>(null);
+  const [dragOverSubId, setDragOverSubId] = useState<string | null>(null);
+
+  const handleMoveSub = (mainCatId: string, currentIndex: number, direction: -1 | 1) => {
+    const parentSubs = subcategories.filter((s) => s.main_category_id === mainCatId).sort(compareSubcategories);
+    const targetIndex = currentIndex + direction;
+    if (targetIndex < 0 || targetIndex >= parentSubs.length) return;
+
+    const reordered = [...parentSubs];
+    const [moved] = reordered.splice(currentIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+
+    const updates = reordered.map((s, idx) => ({ id: s.id, sort_order: idx }));
+
+    const subKey = ["subcategories", user?.id];
+    const activeKey = ["active-subcategories", user?.id];
+    const updateSortMap = new Map(updates.map((u) => [u.id, u.sort_order]));
+
+    queryClient.setQueryData<SubcategoryRow[]>(subKey, (old) =>
+      (old ?? []).map((s) => (updateSortMap.has(s.id) ? { ...s, sort_order: updateSortMap.get(s.id)! } : s))
+    );
+    queryClient.setQueryData<any[]>(activeKey, (old) =>
+      (old ?? []).map((s) => (updateSortMap.has(s.id) ? { ...s, sort_order: updateSortMap.get(s.id)! } : s))
+    );
+
+    reorderSubMutation.mutate(updates);
+  };
+
+  const handleDropSub = (mainCatId: string, targetSubId: string) => {
+    if (!draggedSubId || draggedSubId === targetSubId) {
+      setDraggedSubId(null);
+      setDragOverSubId(null);
+      return;
+    }
+
+    const parentSubs = subcategories.filter((s) => s.main_category_id === mainCatId).sort(compareSubcategories);
+    const fromIndex = parentSubs.findIndex((s) => s.id === draggedSubId);
+    const toIndex = parentSubs.findIndex((s) => s.id === targetSubId);
+
+    if (fromIndex === -1 || toIndex === -1) {
+      setDraggedSubId(null);
+      setDragOverSubId(null);
+      return;
+    }
+
+    const reordered = [...parentSubs];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+
+    const updates = reordered.map((s, idx) => ({ id: s.id, sort_order: idx }));
+
+    const subKey = ["subcategories", user?.id];
+    const activeKey = ["active-subcategories", user?.id];
+    const updateSortMap = new Map(updates.map((u) => [u.id, u.sort_order]));
+
+    queryClient.setQueryData<SubcategoryRow[]>(subKey, (old) =>
+      (old ?? []).map((s) => (updateSortMap.has(s.id) ? { ...s, sort_order: updateSortMap.get(s.id)! } : s))
+    );
+    queryClient.setQueryData<any[]>(activeKey, (old) =>
+      (old ?? []).map((s) => (updateSortMap.has(s.id) ? { ...s, sort_order: updateSortMap.get(s.id)! } : s))
+    );
+
+    reorderSubMutation.mutate(updates);
+    setDraggedSubId(null);
+    setDragOverSubId(null);
+  };
+
+  const handleMoveMain = (currentIndex: number, direction: -1 | 1) => {
+    const sortedMains = [...mainCategories].sort(compareMainCategories);
+    const targetIndex = currentIndex + direction;
+    if (targetIndex < 0 || targetIndex >= sortedMains.length) return;
+
+    const reordered = [...sortedMains];
+    const [moved] = reordered.splice(currentIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+
+    const updates = reordered.map((c, idx) => ({ id: c.id, sort_order: idx }));
+
+    const mainKey = ["main_categories", user?.id];
+    const updateSortMap = new Map(updates.map((u) => [u.id, u.sort_order]));
+
+    queryClient.setQueryData<MainCategoryRow[]>(mainKey, (old) =>
+      (old ?? []).map((c) => (updateSortMap.has(c.id) ? { ...c, sort_order: updateSortMap.get(c.id)! } : c))
+    );
+
+    reorderMainMutation.mutate(updates);
+  };
 
   const handleConfirmDelete = () => {
     if (!deleteConfirm) return;
@@ -260,7 +365,7 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
       )}
 
       <div className="space-y-6">
-        {[...mainCategories].sort(compareMainCategories).map((cat) => {
+        {[...mainCategories].sort(compareMainCategories).map((cat, catIndex, allMains) => {
           const subs = subcategories.filter((s) => s.main_category_id === cat.id).sort(compareSubcategories);
           const colorStyle = { backgroundColor: `hsl(${cat.color} / 0.12)`, color: `hsl(${cat.color})` };
           const targetPct = getBudgetTarget(cat.name);
@@ -278,7 +383,29 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
                       {targetPct !== undefined ? `${targetPct}% ${t("categories.targetHint")}` : ""}
                     </span>
                   </div>
-                  <div className="flex gap-1 flex-wrap">
+                  <div className="flex gap-1 flex-wrap items-center">
+                    <div className="flex items-center mr-1 bg-muted/40 rounded-md border border-border/50 p-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        disabled={catIndex === 0 || reorderMainMutation.isPending}
+                        onClick={() => handleMoveMain(catIndex, -1)}
+                        title={t("categories.moveUp")}
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        disabled={catIndex === allMains.length - 1 || reorderMainMutation.isPending}
+                        onClick={() => handleMoveMain(catIndex, 1)}
+                        title={t("categories.moveDown")}
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditMain(cat)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -293,13 +420,41 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {subs.map((sub) => (
+                  {subs.map((sub, subIndex) => (
                     <div
                       key={sub.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border border-border transition-colors group ${
-                        sub.is_active ? "bg-card" : "bg-muted/50 opacity-50"
-                      }`}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", sub.id);
+                        setDraggedSubId(sub.id);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (dragOverSubId !== sub.id) setDragOverSubId(sub.id);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverSubId === sub.id) setDragOverSubId(null);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleDropSub(cat.id, sub.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedSubId(null);
+                        setDragOverSubId(null);
+                      }}
+                      className={`flex items-center gap-2 p-2.5 rounded-lg border transition-all group ${
+                        dragOverSubId === sub.id
+                          ? "border-primary bg-primary/10 shadow-sm"
+                          : "border-border hover:border-border/80"
+                      } ${sub.is_active ? "bg-card" : "bg-muted/50 opacity-50"}`}
                     >
+                      <div
+                        className="text-muted-foreground/30 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0"
+                        title="Drag to reorder"
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </div>
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={colorStyle}>
                         <DynamicIcon name={sub.icon} className="h-4 w-4" />
                       </div>
@@ -307,11 +462,37 @@ export default function CategoriesPage({ isEmbedded = false }: { isEmbedded?: bo
                         <p className="text-sm font-medium truncate">{translateCategory(sub.name)}</p>
                         {!sub.is_active && <p className="text-xs text-muted-foreground">{t("common.inactive")}</p>}
                       </div>
-                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditSub(sub)}>
+                      <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          disabled={subIndex === 0 || reorderSubMutation.isPending}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMoveSub(cat.id, subIndex, -1);
+                          }}
+                          title={t("categories.moveUp")}
+                        >
+                          <ChevronUp className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          disabled={subIndex === subs.length - 1 || reorderSubMutation.isPending}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMoveSub(cat.id, subIndex, 1);
+                          }}
+                          title={t("categories.moveDown")}
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEditSub(sub); }}>
                           <Pencil className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteConfirm({ type: "sub", id: sub.id, name: sub.name })}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: "sub", id: sub.id, name: sub.name }); }}>
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>

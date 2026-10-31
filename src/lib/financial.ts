@@ -118,6 +118,11 @@ const compareNames = (a?: string | null, b?: string | null) =>
  * then the user's sort_order, then name, then id.
  */
 export function compareMainCategories(a: SortableCategory, b: SortableCategory): number {
+  const sortA = a.sort_order;
+  const sortB = b.sort_order;
+  if (sortA != null && sortB != null && sortA !== sortB) {
+    return sortA - sortB;
+  }
   return (
     getMainCategoryOrder(a.name) - getMainCategoryOrder(b.name) ||
     (a.sort_order ?? 999) - (b.sort_order ?? 999) ||

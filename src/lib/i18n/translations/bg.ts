@@ -174,6 +174,9 @@ export const bg: TranslationDictionary = {
     deletedToast: "беше изтрита",
     restoredToast: "беше възстановена",
     deactivatedToast: "беше деактивирана",
+    moveUp: "Премести нагоре",
+    moveDown: "Премести надолу",
+    reorderSuccess: "Подредбата е обновена",
   },
   accounts: {
     title: "Сметки",

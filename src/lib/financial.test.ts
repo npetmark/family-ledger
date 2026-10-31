@@ -168,6 +168,16 @@ describe("financial.ts characterization tests", () => {
       ]);
     });
 
+    it("respects user sort_order when rearranged across standard categories", () => {
+      const rearranged = [
+        { name: "Wants", sort_order: 0 },
+        { name: "Needs", sort_order: 1 },
+        { name: "Custom Main", sort_order: 2 },
+      ];
+      const sorted = [...rearranged].sort(compareMainCategories);
+      expect(sorted.map((c) => c.name)).toEqual(["Wants", "Needs", "Custom Main"]);
+    });
+
     it("falls back to sort_order and name for custom categories", () => {
       const customCats = [
         { name: "Hobby Projects", sort_order: 2 },

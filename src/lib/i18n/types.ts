@@ -174,6 +174,9 @@ export interface TranslationDictionary {
     deletedToast: string;
     restoredToast: string;
     deactivatedToast: string;
+    moveUp: string;
+    moveDown: string;
+    reorderSuccess: string;
   };
   accounts: {
     title: string;

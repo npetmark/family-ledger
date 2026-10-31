@@ -86,12 +86,15 @@ export default function DataBackupManagement({ householdId }: { householdId: str
   const [customTo, setCustomTo] = useState<string>("");
   const [isExportingCsv, setIsExportingCsv] = useState(false);
 
-  // Initialize selected accounts once loaded
+  const initializedHouseholdRef = useRef<string | null>(null);
+
+  // Initialize selected accounts once loaded per household
   useEffect(() => {
-    if (selectableAccounts.length > 0 && selectedAccountIds.length === 0) {
+    if (selectableAccounts.length > 0 && initializedHouseholdRef.current !== householdId) {
+      initializedHouseholdRef.current = householdId;
       setSelectedAccountIds(selectableAccounts.map((a: any) => a.id));
     }
-  }, [selectableAccounts, selectedAccountIds.length]);
+  }, [selectableAccounts, householdId]);
 
   const toggleAccount = (id: string) => {
     setSelectedAccountIds((prev) =>

@@ -107,3 +107,29 @@ export function useDeleteSubcategory(options?: { onSuccess?: () => void; onError
     onError: options?.onError,
   });
 }
+
+export function useReorderSubcategories(options?: { onSuccess?: () => void; onError?: (error: Error) => void }) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: categoryRepository.reorderSubcategories,
+    onSuccess: () => {
+      invalidateAllCategoryDependentQueries(queryClient);
+      options?.onSuccess?.();
+    },
+    onError: options?.onError,
+  });
+}
+
+export function useReorderMainCategories(options?: { onSuccess?: () => void; onError?: (error: Error) => void }) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: categoryRepository.reorderMainCategories,
+    onSuccess: () => {
+      invalidateAllCategoryDependentQueries(queryClient);
+      options?.onSuccess?.();
+    },
+    onError: options?.onError,
+  });
+}

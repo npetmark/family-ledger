@@ -69,4 +69,20 @@ export const categoryRepository = {
     const { error } = await supabase.from("subcategories").delete().eq("id", id);
     if (error) throw error;
   },
+
+  reorderMainCategories: async (items: Array<{ id: string; sort_order: number }>) => {
+    await Promise.all(
+      items.map((item) =>
+        supabase.from("main_categories").update({ sort_order: item.sort_order }).eq("id", item.id)
+      )
+    );
+  },
+
+  reorderSubcategories: async (items: Array<{ id: string; sort_order: number }>) => {
+    await Promise.all(
+      items.map((item) =>
+        supabase.from("subcategories").update({ sort_order: item.sort_order }).eq("id", item.id)
+      )
+    );
+  },
 };

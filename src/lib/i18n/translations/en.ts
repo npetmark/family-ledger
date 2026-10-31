@@ -174,6 +174,9 @@ export const en: TranslationDictionary = {
     deletedToast: "deleted",
     restoredToast: "restored",
     deactivatedToast: "deactivated",
+    moveUp: "Move Up",
+    moveDown: "Move Down",
+    reorderSuccess: "Order updated",
   },
   accounts: {
     title: "Accounts",
