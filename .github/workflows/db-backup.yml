@@ -1,0 +1,135 @@
+name: Automated Supabase DB Backup
+
+on:
+  schedule:
+    # Runs daily at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      backup_type:
+        description: 'Backup Scope'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - data-only
+          - schema-only
+      retention_days:
+        description: 'Artifact Retention Days (1-90)'
+        required: true
+        default: '30'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Database Backup
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set timestamp
+        id: vars
+        run: |
+          echo "timestamp=$(date -u +'%Y%m%d_%H%M%SZ')" >> $GITHUB_OUTPUT
+          echo "date=$(date -u +'%Y%m%d')" >> $GITHUB_OUTPUT
+
+      - name: Install PostgreSQL Client
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+
+      - name: Validate Secrets
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::SUPABASE_DB_URL secret is not configured in repository Settings -> Secrets and variables -> Actions."
+            echo "Please set SUPABASE_DB_URL to your Supabase PostgreSQL connection string."
+            echo "Format: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?sslmode=require"
+            exit 1
+          fi
+
+      - name: Run Database Dump
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_TYPE: ${{ inputs.backup_type || 'full' }}
+          TIMESTAMP: ${{ steps.vars.outputs.timestamp }}
+        run: |
+          mkdir -p backups
+          OUTPUT_BASE="backups/supabase_backup_${TIMESTAMP}_${BACKUP_TYPE}"
+
+          DUMP_FLAGS="--clean --if-exists --no-owner --no-privileges"
+
+          if [ "$BACKUP_TYPE" = "data-only" ]; then
+            DUMP_FLAGS="$DUMP_FLAGS --data-only"
+          elif [ "$BACKUP_TYPE" = "schema-only" ]; then
+            DUMP_FLAGS="$DUMP_FLAGS --schema-only"
+          fi
+
+          echo "Starting pg_dump with scope: $BACKUP_TYPE ..."
+
+          # Dump public, auth, and storage schemas while excluding transient / internal system schemas
+          pg_dump "$SUPABASE_DB_URL" \
+            $DUMP_FLAGS \
+            --schema=public \
+            --schema=auth \
+            --schema=storage \
+            -f "${OUTPUT_BASE}.sql"
+
+          # Compress with maximum compression
+          gzip -9 "${OUTPUT_BASE}.sql"
+          echo "Backup file created: ${OUTPUT_BASE}.sql.gz"
+          ls -lh "${OUTPUT_BASE}.sql.gz"
+
+      - name: Encrypt Backup (Optional)
+        id: encrypt
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          TIMESTAMP: ${{ steps.vars.outputs.timestamp }}
+          BACKUP_TYPE: ${{ inputs.backup_type || 'full' }}
+        run: |
+          OUTPUT_BASE="backups/supabase_backup_${TIMESTAMP}_${BACKUP_TYPE}"
+          if [ -n "$BACKUP_PASSPHRASE" ]; then
+            echo "Encrypting backup archive with GPG AES-256..."
+            gpg --batch --yes --passphrase "$BACKUP_PASSPHRASE" \
+                --symmetric --cipher-algo AES256 \
+                -o "${OUTPUT_BASE}.sql.gz.gpg" \
+                "${OUTPUT_BASE}.sql.gz"
+            rm "${OUTPUT_BASE}.sql.gz"
+            echo "encrypted=true" >> $GITHUB_OUTPUT
+            echo "Encrypted backup created: ${OUTPUT_BASE}.sql.gz.gpg"
+            ls -lh "${OUTPUT_BASE}.sql.gz.gpg"
+          else
+            echo "encrypted=false" >> $GITHUB_OUTPUT
+            echo "BACKUP_PASSPHRASE secret not set; saving as standard gzip archive."
+          fi
+
+      - name: Upload Backup Artifact to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ steps.vars.outputs.timestamp }}
+          path: backups/
+          retention-days: ${{ fromJSON(inputs.retention_days || '30') }}
+          if-no-files-found: error
+
+      - name: Upload to S3 / Cloudflare R2 (Optional)
+        if: env.AWS_ACCESS_KEY_ID != '' && env.S3_BUCKET != ''
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION || 'auto' }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+        run: |
+          ENDPOINT_FLAG=""
+          if [ -n "$S3_ENDPOINT" ]; then
+            ENDPOINT_FLAG="--endpoint-url $S3_ENDPOINT"
+          fi
+          echo "Syncing backup to S3 bucket $S3_BUCKET..."
+          aws s3 cp backups/ "s3://${S3_BUCKET}/supabase-backups/" --recursive $ENDPOINT_FLAG

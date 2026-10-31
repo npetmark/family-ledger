@@ -12,6 +12,7 @@ import { Languages, Check } from "lucide-react";
 import CategoriesPage from "./CategoriesPage";
 import { useQuery } from "@tanstack/react-query";
 import HouseholdMembers from "@/components/HouseholdMembers";
+import DataBackupManagement from "@/components/DataBackupManagement";
 import { useLanguage, Language } from "@/lib/i18n";
 
 export default function SettingsPage() {
@@ -74,10 +75,11 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="preferences" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:w-[480px]">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:w-[640px]">
           <TabsTrigger value="preferences">{t("settings.preferencesTab")}</TabsTrigger>
           <TabsTrigger value="household">{t("settings.householdTab")}</TabsTrigger>
           <TabsTrigger value="categories">{t("settings.categoriesTab")}</TabsTrigger>
+          <TabsTrigger value="data">{t("settings.dataTab")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="preferences" className="mt-6 space-y-6">
@@ -192,6 +194,18 @@ export default function SettingsPage() {
               <CategoriesPage isEmbedded={true} />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="data" className="mt-6">
+          {householdInfo?.id ? (
+            <DataBackupManagement householdId={householdInfo.id} />
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                Loading household data...
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
