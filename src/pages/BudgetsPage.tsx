@@ -14,7 +14,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  ResponsiveTooltip as Tooltip,
+  ResponsiveTooltipContent as TooltipContent,
+  ResponsiveTooltipProvider as TooltipProvider,
+  ResponsiveTooltipTrigger as TooltipTrigger,
+} from "@/components/ui/responsive-tooltip";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
@@ -548,7 +553,7 @@ export default function BudgetsPage() {
                           <TooltipTrigger asChild>
                             <Badge
                               variant="secondary"
-                              className="h-6 px-2.5 inline-flex items-center justify-center text-xs font-mono-numbers whitespace-nowrap cursor-help"
+                              className="h-6 px-2.5 inline-flex items-center justify-center text-xs font-mono-numbers whitespace-nowrap cursor-pointer select-none active:scale-95 transition-transform"
                             >
                               {t("budgets.target")} {targetPct}%
                             </Badge>
@@ -565,7 +570,7 @@ export default function BudgetsPage() {
                           <TooltipTrigger asChild>
                             <Badge
                               variant="outline"
-                              className={`h-6 px-2.5 inline-flex items-center justify-center text-xs font-mono-numbers whitespace-nowrap cursor-help ${
+                              className={`h-6 px-2.5 inline-flex items-center justify-center text-xs font-mono-numbers whitespace-nowrap cursor-pointer select-none active:scale-95 transition-transform ${
                                 offTarget ? "text-warning border-warning/50 bg-warning/10" : "bg-background/80"
                               }`}
                             >
