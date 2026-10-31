@@ -287,6 +287,13 @@ export const en: TranslationDictionary = {
     linkToItem: "Link to item",
     completedTrips: "Past Trips",
     recordTransactionPrompt: "Record transaction in ledger",
+    selectList: "Select list",
+    suggestions: "Suggestions",
+    suggestedItems: "Suggested Items",
+    suggestedItemsDesc: "Quickly add items from your frequently bought items.",
+    clearSuggestions: "Clear suggestions",
+    noSuggestions: "No suggestions available yet. As you add and shop for items, your frequent items will appear here.",
+    alreadyInList: "In list",
   },
   settings: {
     title: "Settings",

@@ -46,7 +46,7 @@
     --sidebar-ring: 168 35% 38%;
 
     /* Financial semantic tokens */
-    --income: 145 50% 42%;
+    --income: 168 38% 36%;
     --income-foreground: 0 0% 100%;
     --expense: 0 60% 52%;
     --expense-foreground: 0 0% 100%;
@@ -57,16 +57,16 @@
     --needs-foreground: 0 0% 100%;
     --wants: 280 45% 55%;
     --wants-foreground: 0 0% 100%;
-    --investments: 145 45% 42%;
+    --investments: 168 35% 38%;
     --investments-foreground: 0 0% 100%;
 
     --chart-1: 168 35% 38%;
     --chart-2: 38 85% 55%;
     --chart-3: 215 55% 52%;
     --chart-4: 280 45% 55%;
-    --chart-5: 145 45% 42%;
+    --chart-5: 168 35% 38%;
 
-    --success: 145 50% 42%;
+    --success: 168 38% 36%;
     --warning: 38 85% 55%;
   }
 
@@ -108,8 +108,8 @@
     --sidebar-border: 220 15% 22%;
     --sidebar-ring: 168 50% 55%;
 
-    --income: 145 60% 58%;
-    --income-foreground: 145 30% 10%;
+    --income: 168 45% 52%;
+    --income-foreground: 168 30% 10%;
     --expense: 0 75% 65%;
     --expense-foreground: 0 30% 10%;
     --transfer: 215 65% 65%;
@@ -119,16 +119,16 @@
     --needs-foreground: 215 40% 12%;
     --wants: 280 50% 68%;
     --wants-foreground: 280 40% 12%;
-    --investments: 145 55% 55%;
-    --investments-foreground: 145 30% 10%;
+    --investments: 168 45% 52%;
+    --investments-foreground: 168 30% 10%;
 
     --chart-1: 168 45% 52%;
     --chart-2: 38 85% 56%;
     --chart-3: 215 60% 65%;
     --chart-4: 280 50% 68%;
-    --chart-5: 145 55% 55%;
+    --chart-5: 168 45% 52%;
 
-    --success: 145 60% 58%;
+    --success: 168 45% 52%;
     --warning: 38 85% 56%;
   }
 }

@@ -15,13 +15,13 @@ import { useLanguage } from "@/lib/i18n";
 
 function getBurndownColor(pct: number, alertThreshold: number, isInvestment = false): string {
   if (isInvestment) {
-    if (pct >= 80) return "[&>div]:bg-income";
+    if (pct >= 80) return "[&>div]:bg-primary";
     if (pct >= 50) return "[&>div]:bg-warning";
     return "[&>div]:bg-destructive";
   }
   if (pct >= 100) return "[&>div]:bg-destructive";
   if (pct >= alertThreshold) return "[&>div]:bg-warning";
-  return "[&>div]:bg-income";
+  return "[&>div]:bg-primary";
 }
 
 function getBurndownTextColor(pct: number, alertThreshold: number, isInvestment = false): string {

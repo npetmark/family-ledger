@@ -38,12 +38,13 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import {
   ChevronDown, ChevronRight, Plus, Receipt, Check, Trash2,
   History, Paperclip, X, Pencil, Tag, RefreshCw, ShoppingBag,
-  ScanLine, Loader2, Link2, Undo2,
+  ScanLine, Loader2, Link2, Undo2, Sparkles, Menu,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -116,6 +117,7 @@ export default function ShoppingPage() {
   const [confirmDeleteListOpen, setConfirmDeleteListOpen] = useState(false);
   const [newListDialogOpen, setNewListDialogOpen] = useState(false);
   const [newListName, setNewListName] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [refreshingPromos, setRefreshingPromos] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -853,143 +855,130 @@ export default function ShoppingPage() {
         </Button>
       </div>
 
-      {/* List Selection Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {activeTrips.map((trip) => {
-          const isGeneral = isGeneralShoppingList(trip, activeTrips);
-          const isSelected = trip.id === activeTrip?.id;
-          return (
-            <button
-              key={trip.id}
-              type="button"
-              onClick={() => setSelectedTripId(trip.id)}
-              className={cn(
-                "flex items-center gap-2 px-3.5 py-1.5 rounded-full text-sm font-medium transition-all duration-150 border whitespace-nowrap shadow-xs",
-                isSelected
-                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                  : "bg-background hover:bg-muted/70 text-muted-foreground hover:text-foreground border-border/80"
-              )}
-            >
-              {isGeneral ? (
-                <ShoppingBag className="h-3.5 w-3.5" />
-              ) : (
-                <Tag className="h-3.5 w-3.5 opacity-70" />
-              )}
-              <span>{isGeneral && trip.name.toLowerCase() === "shopping" ? t("shopping.generalList") : trip.name}</span>
-              {isSelected && totalItems > 0 && (
-                <span
-                  className={cn(
-                    "ml-1 text-[11px] px-1.5 py-0.2 rounded-full font-semibold",
-                    isSelected
-                      ? "bg-primary-foreground/20 text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
+      {/* List Selection Dropdown */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="justify-between min-w-[200px] sm:min-w-[250px] font-medium h-9 px-3 gap-2"
+              >
+                <div className="flex items-center gap-2 truncate">
+                  {isGeneralList ? (
+                    <ShoppingBag className="h-4 w-4 text-primary shrink-0" />
+                  ) : (
+                    <Tag className="h-4 w-4 opacity-70 shrink-0" />
                   )}
-                >
-                  {totalChecked}/{totalItems}
-                </span>
-              )}
-            </button>
-          );
-        })}
+                  <span className="truncate">
+                    {isGeneralList && activeTrip?.name.toLowerCase() === "shopping"
+                      ? t("shopping.generalList")
+                      : activeTrip?.name ?? t("shopping.selectList")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                  {totalItems > 0 && (
+                    <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-mono-numbers">
+                      {totalChecked}/{totalItems}
+                    </Badge>
+                  )}
+                  <ChevronDown className="h-3.5 w-3.5 opacity-50" />
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[260px] max-h-[300px] overflow-y-auto">
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                {language === "bg" ? "Списъци за пазаруване" : "Shopping Lists"}
+              </div>
+              {activeTrips.map((trip) => {
+                const isGeneral = isGeneralShoppingList(trip, activeTrips);
+                const isSelected = trip.id === activeTrip?.id;
+                const name = isGeneral && trip.name.toLowerCase() === "shopping" ? t("shopping.generalList") : trip.name;
+                return (
+                  <DropdownMenuItem
+                    key={trip.id}
+                    onSelect={() => setSelectedTripId(trip.id)}
+                    className={cn(
+                      "flex items-center justify-between cursor-pointer py-2",
+                      isSelected && "bg-muted font-medium"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {isGeneral ? (
+                        <ShoppingBag className="h-4 w-4 text-primary shrink-0" />
+                      ) : (
+                        <Tag className="h-4 w-4 opacity-70 shrink-0" />
+                      )}
+                      <span className="truncate">{name}</span>
+                    </div>
+                    {isSelected && <Check className="h-4 w-4 text-primary shrink-0 ml-2" />}
+                  </DropdownMenuItem>
+                );
+              })}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => {
+                  setNewListName("");
+                  setNewListDialogOpen(true);
+                }}
+                className="cursor-pointer text-primary focus:text-primary gap-2 font-medium"
+              >
+                <Plus className="h-4 w-4" />
+                <span>{t("shopping.createList")}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full px-3 h-8 text-xs gap-1.5 border-dashed text-muted-foreground hover:text-foreground shrink-0 shadow-xs"
-          onClick={() => {
-            setNewListName("");
-            setNewListDialogOpen(true);
-          }}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          <span>{t("shopping.createList")}</span>
-        </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 px-3 gap-1.5 shrink-0"
+            onClick={() => {
+              setNewListName("");
+              setNewListDialogOpen(true);
+            }}
+            title={t("shopping.createList")}
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">{t("shopping.createList")}</span>
+          </Button>
+        </div>
       </div>
 
       {/* Active trip card */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div className="flex-1 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="min-w-0">
               <TripNameEditor
                 key={activeTrip?.id}
                 value={activeTrip?.name ?? "Loading…"}
                 onSave={(name) => renameTrip.mutate(name)}
               />
               <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
-                <span>{activeTrip ? formatDate(new Date(activeTrip.started_at), "PPP") : ""}</span>
-                <span>·</span>
-                <span>{totalChecked} / {totalItems} {language === "bg" ? "отбелязани" : "checked"}</span>
-                {headerTotal > 0 && (<><span>·</span><span className="font-mono-numbers" title={hasAnyActual ? (language === "bg" ? "Реално платени досега" : "Actual paid so far") : (language === "bg" ? "Очаквана сума" : "Expected total")}>{formatCurrency(headerTotal)}{!hasAnyActual && <span className="text-muted-foreground ml-1">{language === "bg" ? "прогнозни" : "expected"}</span>}</span></>)}
+                <span className="whitespace-nowrap">{activeTrip ? formatDate(new Date(activeTrip.started_at), "PPP") : ""}</span>
+                <span className="opacity-40">·</span>
+                <span className="whitespace-nowrap">{totalChecked} / {totalItems} {language === "bg" ? "отбелязани" : "checked"}</span>
+                {headerTotal > 0 && (
+                  <>
+                    <span className="opacity-40">·</span>
+                    <span className="font-mono-numbers whitespace-nowrap" title={hasAnyActual ? (language === "bg" ? "Реално платени досега" : "Actual paid so far") : (language === "bg" ? "Очаквана сума" : "Expected total")}>
+                      {formatCurrency(headerTotal)}
+                      {!hasAnyActual && <span className="text-muted-foreground ml-1">{language === "bg" ? "прогнозни" : "expected"}</span>}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 shrink-0">
               <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadReceipt(f); e.target.value = ""; }} />
               <input ref={receiptInputRef} type="file" accept="image/*" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) parseReceipt(f); e.target.value = ""; }} />
 
-              {/* Refresh promos is ONLY shown on the general list */}
-              {isGeneralList && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-40 justify-center"
-                  disabled={refreshingPromos || items.length === 0}
-                  onClick={refreshPromos}
-                  title="Re-check znamcenite.bg for discounts on every item"
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshingPromos ? "animate-spin" : ""}`} />
-                  {language === "bg" ? "Обнови промоции" : "Refresh promos"}
-                </Button>
-              )}
-
-              {/* Delete list is ONLY available on custom lists */}
-              {!isGeneralList && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-40 justify-center text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
-                  onClick={() => setConfirmDeleteListOpen(true)}
-                  title="Delete this shopping list"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  {t("shopping.deleteList")}
-                </Button>
-              )}
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-40 justify-center" disabled={!activeTrip}>
-                    <Receipt className="h-4 w-4 mr-2" />
-                    {t("shopping.receipt")}
-                    <ChevronDown className="h-4 w-4 ml-2 opacity-60" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem
-                    disabled={parsingReceipt || !activeTrip}
-                    onSelect={() => receiptInputRef.current?.click()}
-                  >
-                    {parsingReceipt ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ScanLine className="h-4 w-4 mr-2" />}
-                    {t("shopping.parseReceiptAI")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
-                    <Paperclip className="h-4 w-4 mr-2" />
-                    {activeTrip?.receipt_path ? (language === "bg" ? "Смени бележка" : "Replace receipt") : t("shopping.attachReceipt")}
-                  </DropdownMenuItem>
-                  {activeTrip?.receipt_path && (
-                    <DropdownMenuItem onSelect={() => setViewReceiptOpen(true)}>
-                      <Receipt className="h-4 w-4 mr-2" />
-                      {language === "bg" ? "Виж бележка" : "View receipt"}
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
               <Button
                 size="sm"
-                className="w-40 justify-center"
+                className="gap-1.5 shrink-0"
                 onClick={() => {
                   setCompleteForm({
                     store: !isGeneralList && activeTrip ? activeTrip.name : "",
@@ -1002,8 +991,105 @@ export default function ShoppingPage() {
                 }}
                 disabled={!totalItems}
               >
-                <Check className="h-4 w-4 mr-2" /> {t("shopping.completeTrip")}
+                <Check className="h-4 w-4" />
+                <span>{t("shopping.completeTrip")}</span>
               </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-9 p-0 shrink-0 relative"
+                    title={language === "bg" ? "Още опции" : "More options"}
+                  >
+                    <Menu className="h-4 w-4" />
+                    {chipSuggestions.length > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                      </span>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {/* Suggestions */}
+                  <DropdownMenuItem
+                    onSelect={() => setSuggestionsOpen(true)}
+                    className="cursor-pointer flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <span>{t("shopping.suggestedItems")}</span>
+                    </div>
+                    {chipSuggestions.length > 0 && (
+                      <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-mono-numbers">
+                        {chipSuggestions.length}
+                      </Badge>
+                    )}
+                  </DropdownMenuItem>
+
+                  {/* Refresh promos is ONLY shown on the general list */}
+                  {isGeneralList && (
+                    <DropdownMenuItem
+                      disabled={refreshingPromos || items.length === 0}
+                      onSelect={refreshPromos}
+                      className="cursor-pointer gap-2"
+                    >
+                      <RefreshCw className={cn("h-4 w-4", refreshingPromos && "animate-spin")} />
+                      <span>{language === "bg" ? "Обнови промоции" : "Refresh promos"}</span>
+                    </DropdownMenuItem>
+                  )}
+
+                  {/* Receipt options */}
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="cursor-pointer gap-2">
+                      <Receipt className="h-4 w-4" />
+                      <span>{t("shopping.receipt")}</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-56">
+                      <DropdownMenuItem
+                        disabled={parsingReceipt || !activeTrip}
+                        onSelect={() => receiptInputRef.current?.click()}
+                        className="cursor-pointer gap-2"
+                      >
+                        {parsingReceipt ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
+                        <span>{t("shopping.parseReceiptAI")}</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => fileInputRef.current?.click()}
+                        className="cursor-pointer gap-2"
+                      >
+                        <Paperclip className="h-4 w-4" />
+                        <span>{activeTrip?.receipt_path ? (language === "bg" ? "Смени бележка" : "Replace receipt") : t("shopping.attachReceipt")}</span>
+                      </DropdownMenuItem>
+                      {activeTrip?.receipt_path && (
+                        <DropdownMenuItem
+                          onSelect={() => setViewReceiptOpen(true)}
+                          className="cursor-pointer gap-2"
+                        >
+                          <Receipt className="h-4 w-4" />
+                          <span>{language === "bg" ? "Виж бележка" : "View receipt"}</span>
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+
+                  {/* Delete list is ONLY available on custom lists */}
+                  {!isGeneralList && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onSelect={() => setConfirmDeleteListOpen(true)}
+                        className="cursor-pointer gap-2 text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>{t("shopping.deleteList")}</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </CardHeader>
@@ -1027,7 +1113,7 @@ export default function ShoppingPage() {
                 onBlur={() => setTimeout(() => setShowSuggest(false), 150)}
                 autoComplete="off"
               />
-              <Button type="submit" disabled={!query.trim() || addItem.isPending}>
+              <Button type="submit" disabled={!query.trim() || addItem.isPending} title={t("shopping.addItem")}>
                 <Plus className="h-4 w-4" />
               </Button>
             </form>
@@ -1054,37 +1140,6 @@ export default function ShoppingPage() {
               </div>
             )}
           </div>
-
-          {/* Suggested chips */}
-          {chipSuggestions.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs text-muted-foreground">{language === "bg" ? "Препоръчани" : "Suggested"}</div>
-                <button
-                  type="button"
-                  onClick={() => clearSuggestions.mutate()}
-                  className="text-xs text-muted-foreground hover:text-destructive transition-colors"
-                >
-                  {language === "bg" ? "Изчисти препоръки" : "Clear suggestions"}
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {chipSuggestions.map((s) => {
-                  const cat = categories.find((c) => c.id === s.category_id);
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => addItem.mutate({ name: s.display_name, categoryId: s.category_id, dictEntry: s })}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted hover:bg-muted/70 text-xs"
-                    >
-                      <span>{cat?.emoji ?? "🛒"}</span>
-                      <span>{s.display_name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
         </CardContent>
       </Card>
@@ -1205,34 +1260,36 @@ export default function ShoppingPage() {
                         </div>
                       );
                     })()}
-                    {!it.is_excess && recentLinks[it.id] && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-primary"
-                        onClick={() => undoLink(it.id)}
-                        title="Undo link from excess"
-                      >
-                        <Undo2 className="h-3.5 w-3.5" />
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {!it.is_excess && recentLinks[it.id] && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-primary"
+                          onClick={() => undoLink(it.id)}
+                          title="Undo link from excess"
+                        >
+                          <Undo2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {it.is_excess && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-primary"
+                          onClick={() => { setMatchExcessFor(it); setMatchQuery(""); }}
+                          title="Link to an existing item on the list"
+                        >
+                          <Link2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setEditingItem(it)}>
+                        <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                    )}
-                    {it.is_excess && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-primary"
-                        onClick={() => { setMatchExcessFor(it); setMatchQuery(""); }}
-                        title="Link to an existing item on the list"
-                      >
-                        <Link2 className="h-3.5 w-3.5" />
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => requestDelete(it.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
-                    )}
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setEditingItem(it)}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => requestDelete(it.id)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1686,6 +1743,104 @@ export default function ShoppingPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Suggestions Dialog */}
+      <Dialog open={suggestionsOpen} onOpenChange={setSuggestionsOpen}>
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <span>{t("shopping.suggestedItems")}</span>
+            </DialogTitle>
+            <DialogDescription>
+              {t("shopping.suggestedItemsDesc")}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-2 space-y-2 pr-1">
+            {topSuggested.length === 0 ? (
+              <div className="text-center py-8 text-sm text-muted-foreground">
+                {t("shopping.noSuggestions")}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {topSuggested.map((s) => {
+                  const cat = categories.find((c) => c.id === s.category_id);
+                  const isAlreadyAdded = existingNorms.has(s.normalized_name);
+
+                  return (
+                    <div
+                      key={s.id}
+                      className={cn(
+                        "flex items-center justify-between p-2.5 rounded-lg border text-sm transition-all",
+                        isAlreadyAdded
+                          ? "bg-muted/40 border-border/50 text-muted-foreground"
+                          : "bg-card border-border hover:border-primary/50 hover:bg-muted/20"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 mr-2">
+                        <span className="text-base shrink-0">{cat?.emoji ?? "🛒"}</span>
+                        <div className="min-w-0">
+                          <p className={cn("text-xs font-medium truncate", isAlreadyAdded && "line-through opacity-75")}>
+                            {s.display_name}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {cat ? translateCategory(cat.name) : t("shopping.otherCategory")}
+                          </p>
+                        </div>
+                      </div>
+
+                      {isAlreadyAdded ? (
+                        <Badge variant="outline" className="text-[10px] py-0 px-1.5 shrink-0 text-muted-foreground border-border">
+                          <Check className="h-3 w-3 mr-1 text-primary" />
+                          {t("shopping.alreadyInList")}
+                        </Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10 shrink-0 font-medium"
+                          onClick={() => {
+                            addItem.mutate({ name: s.display_name, categoryId: s.category_id, dictEntry: s });
+                          }}
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" />
+                          {language === "bg" ? "Добави" : "Add"}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex-row items-center justify-between sm:justify-between border-t border-border pt-3 gap-2">
+            {topSuggested.length > 0 ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-destructive h-8 px-2"
+                onClick={() => {
+                  clearSuggestions.mutate();
+                  setSuggestionsOpen(false);
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                {t("shopping.clearSuggestions")}
+              </Button>
+            ) : <div />}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setSuggestionsOpen(false)}
+            >
+              {language === "bg" ? "Готово" : "Done"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1698,7 +1853,11 @@ function TripNameEditor({ value, onSave }: { value: string; onSave: (v: string) 
   useEffect(() => setVal(value), [value]);
   if (!editing) {
     return (
-      <button onClick={() => setEditing(true)} className="text-lg font-semibold hover:underline text-left">
+      <button
+        onClick={() => setEditing(true)}
+        className="text-lg font-semibold hover:underline text-left truncate max-w-full block"
+        title="Click to rename"
+      >
         {value}
       </button>
     );
@@ -1706,7 +1865,7 @@ function TripNameEditor({ value, onSave }: { value: string; onSave: (v: string) 
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); if (val.trim() && val !== value) onSave(val.trim()); setEditing(false); }}
-      className="flex items-center gap-2"
+      className="flex items-center gap-2 max-w-xs"
     >
       <Input value={val} onChange={(e) => setVal(e.target.value)} autoFocus className="h-8" />
       <Button type="submit" size="sm" variant="secondary">Save</Button>

@@ -22,13 +22,13 @@ import { useLanguage } from "@/lib/i18n";
 
 function getBurndownColor(pct: number, alertThreshold: number, isInvestment = false): string {
   if (isInvestment) {
-    if (pct >= 80) return "[&>div]:bg-income";
+    if (pct >= 80) return "[&>div]:bg-primary";
     if (pct >= 50) return "[&>div]:bg-warning";
     return "[&>div]:bg-destructive";
   }
   if (pct >= 100) return "[&>div]:bg-destructive";
   if (pct >= alertThreshold) return "[&>div]:bg-warning";
-  return "[&>div]:bg-income";
+  return "[&>div]:bg-primary";
 }
 
 function getBurndownTextColor(pct: number, alertThreshold: number, isInvestment = false): string {
@@ -364,7 +364,7 @@ export default function BudgetsPage() {
                     <div className="cursor-pointer py-1">
                       <Progress
                         value={Math.min((totalSpent / totalBudget) * 100, 100)}
-                        className={`h-2.5 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${totalSpent > totalBudget ? "[&>div]:bg-destructive" : "[&>div]:bg-income"}`}
+                        className={`h-2.5 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${totalSpent > totalBudget ? "[&>div]:bg-destructive" : "[&>div]:bg-primary"}`}
                       />
                     </div>
                   </TooltipTrigger>
@@ -400,23 +400,16 @@ export default function BudgetsPage() {
                     const mClampedPct = Math.min(mPct, 100);
                     const mIsInvestment = ["Инвестиции", "Investments"].includes(mainName);
                     const mTargetPct = getBudgetTarget(mainName);
-                    const mRemaining = mBudget - mSpent;
                     const mDisplayName = translateCategory(mainName);
 
                     return (
                       <div key={mainName} className="p-3 rounded-lg bg-muted/30 border border-border/40 space-y-2">
                         <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-1.5 font-medium">
-                            <span>{mDisplayName}</span>
+                          <div className="flex items-center gap-1.5 font-medium truncate">
+                            <span className="truncate">{mDisplayName}</span>
                             {mTargetPct !== undefined && (
-                              <span className="text-[10px] text-muted-foreground font-mono-numbers">({mTargetPct}%)</span>
+                              <span className="text-[10px] text-muted-foreground font-mono-numbers shrink-0">({mTargetPct}%)</span>
                             )}
-                          </div>
-                          <div className="font-mono-numbers text-xs">
-                            <span className={`font-semibold ${getBurndownTextColor(mPct, 90, mIsInvestment)}`}>
-                              {formatCurrency(mSpent)}
-                            </span>
-                            <span className="text-muted-foreground"> / {formatCurrency(mBudget)}</span>
                           </div>
                         </div>
 
@@ -436,13 +429,14 @@ export default function BudgetsPage() {
                           </TooltipContent>
                         </Tooltip>
 
-                        <div className="flex justify-between text-[11px] text-muted-foreground font-mono-numbers">
-                          <span>
-                            {mRemaining >= 0
-                              ? `${formatCurrency(mRemaining)} ${t("dashboard.remaining")}`
-                              : `${formatCurrency(Math.abs(mRemaining))} ${t("budgets.overBudget")}`}
-                          </span>
-                          <span>{Math.round(mPct)}%</span>
+                        <div className="flex items-center justify-between text-xs font-mono-numbers">
+                          <div>
+                            <span className={`font-semibold ${getBurndownTextColor(mPct, 90, mIsInvestment)}`}>
+                              {formatCurrency(mSpent)}
+                            </span>
+                            <span className="text-muted-foreground"> / {formatCurrency(mBudget)}</span>
+                          </div>
+                          <span className="text-muted-foreground text-[11px] font-medium">{Math.round(mPct)}%</span>
                         </div>
                       </div>
                     );
@@ -475,11 +469,6 @@ export default function BudgetsPage() {
           const targetAmount = targetPct !== undefined ? Math.round((totalBudget * targetPct) / 100) : 0;
           const offTarget = targetPct !== undefined && Math.abs(budgetedPct - targetPct) > 2;
 
-          const overCount = subs.filter((sub) => {
-            const b = getBudget(sub.id);
-            const s = getSpent(sub.id);
-            return (s > b && b > 0) || (b === 0 && s > 0);
-          }).length;
 
           const displayName = translateCategory(mainName);
           const isOpen = !collapsedCategories[mainName];
@@ -491,40 +480,24 @@ export default function BudgetsPage() {
                   className="pb-3 cursor-pointer select-none hover:bg-muted/20 transition-colors"
                   onClick={() => toggleCategory(mainName)}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
-                      />
-                      <CardTitle className="text-base font-semibold">{displayName}</CardTitle>
-                      {targetPct !== undefined && (
-                        <>
-                          <Badge variant="secondary" className="text-xs font-mono-numbers">
-                            {t("budgets.target")} {targetPct}% ({formatCurrency(targetAmount)})
-                          </Badge>
-                          <Badge
-                            variant="outline"
-                            className={`text-xs font-mono-numbers ${offTarget ? "text-warning border-warning/40" : ""}`}
-                          >
-                            {t("budgets.budgeted")} {budgetedPct.toFixed(1)}%
-                          </Badge>
-                        </>
-                      )}
-                      {overCount > 0 ? (
-                        <Badge variant="destructive" className="text-xs font-mono-numbers gap-1 py-0 px-1.5">
-                          <AlertTriangle className="h-3 w-3" />
-                          {overCount} {t("budgets.overBudget").toLowerCase()}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <ChevronDown
+                      className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
+                    />
+                    <CardTitle className="text-base font-semibold">{displayName}</CardTitle>
+                    {targetPct !== undefined && (
+                      <>
+                        <Badge variant="secondary" className="text-xs font-mono-numbers">
+                          {t("budgets.target")} {targetPct}% ({formatCurrency(targetAmount)})
                         </Badge>
-                      ) : isMainOver ? (
-                        <AlertTriangle className="h-4 w-4 text-destructive" />
-                      ) : null}
-                    </div>
-                    <div className="text-right text-sm">
-                      <span className={`font-mono-numbers font-semibold ${isMainOver ? "text-destructive" : ""}`}>
-                        {formatCurrency(mainSpentTotal)}
-                      </span>
-                      <span className="text-muted-foreground font-mono-numbers"> / {formatCurrency(mainBudgetTotal)}</span>
-                    </div>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs font-mono-numbers ${offTarget ? "text-warning border-warning/40" : ""}`}
+                        >
+                          {t("budgets.budgeted")} {budgetedPct.toFixed(1)}%
+                        </Badge>
+                      </>
+                    )}
                   </div>
 
                   <Tooltip>
@@ -545,13 +518,14 @@ export default function BudgetsPage() {
                       </span>
                     </TooltipContent>
                   </Tooltip>
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>
-                      {mainBudgetTotal - mainSpentTotal >= 0
-                        ? `${formatCurrency(mainBudgetTotal - mainSpentTotal)} ${t("dashboard.remaining")}`
-                        : `${formatCurrency(Math.abs(mainBudgetTotal - mainSpentTotal))} ${t("budgets.overBudget")}`}
-                    </span>
-                    <span className="font-mono-numbers">{Math.round(mainPct)}%</span>
+                  <div className="flex items-center justify-between text-xs font-mono-numbers mt-1.5">
+                    <div>
+                      <span className={`font-semibold ${isMainOver ? "text-destructive" : ""}`}>
+                        {formatCurrency(mainSpentTotal)}
+                      </span>
+                      <span className="text-muted-foreground"> / {formatCurrency(mainBudgetTotal)}</span>
+                    </div>
+                    <span className="text-muted-foreground font-medium">{Math.round(mainPct)}%</span>
                   </div>
                 </CardHeader>
 

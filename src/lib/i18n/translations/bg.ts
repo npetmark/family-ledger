@@ -287,6 +287,13 @@ export const bg: TranslationDictionary = {
     linkToItem: "Свържи с артикул",
     completedTrips: "Минали пазарувания",
     recordTransactionPrompt: "Запиши трансакция в счетоводството",
+    selectList: "Избери списък",
+    suggestions: "Препоръки",
+    suggestedItems: "Препоръчани продукти",
+    suggestedItemsDesc: "Бързо добавяне на често купувани продукти към списъка.",
+    clearSuggestions: "Изчисти препоръки",
+    noSuggestions: "Все още няма препоръки. Докато добавяте и пазарувате продукти, най-честите ще се появят тук.",
+    alreadyInList: "В списъка",
   },
   settings: {
     title: "Настройки",

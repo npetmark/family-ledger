@@ -287,6 +287,13 @@ export interface TranslationDictionary {
     linkToItem: string;
     completedTrips: string;
     recordTransactionPrompt: string;
+    selectList: string;
+    suggestions: string;
+    suggestedItems: string;
+    suggestedItemsDesc: string;
+    clearSuggestions: string;
+    noSuggestions: string;
+    alreadyInList: string;
   };
   settings: {
     title: string;
