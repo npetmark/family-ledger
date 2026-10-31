@@ -15,6 +15,9 @@ export const categoryRepository = {
   updateMainCategory: async (id: string, payload: any) => {
     const { error } = await supabase.from("main_categories").update(payload).eq("id", id);
     if (error) throw error;
+    if (payload.color) {
+      await supabase.from("subcategories").update({ color: payload.color }).eq("main_category_id", id);
+    }
   },
   
   deleteMainCategory: async (id: string) => {

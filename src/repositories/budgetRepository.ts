@@ -10,13 +10,13 @@ export const budgetRepository = {
   getBudgetsWithCategories: async (monthYear: string) => {
     const { data, error } = await supabase
       .from("budgets")
-      .select("*, subcategories(name, icon, sort_order, main_categories(name, id, sort_order))")
+      .select("*, subcategories(name, icon, color, sort_order, main_categories(name, id, color, sort_order))")
       .eq("month_year", monthYear);
     if (error) throw error;
     return data;
   },
 
-  findBudget: async (subcategoryId: string, monthYear: string, userId: string) => {
+  findBudget: async (subcategoryId: string, monthYear: string, _userId: string) => {
     const { data, error } = await supabase
       .from("budgets")
       .select("id")

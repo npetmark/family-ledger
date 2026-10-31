@@ -38,7 +38,7 @@ export const transactionRepository = {
   getRecurringTransactions: async () => {
     const { data, error } = await supabase
       .from("recurring_transactions")
-      .select("*, subcategories(name, icon, color), accounts!recurring_transactions_account_id_fkey(name, icon)")
+      .select("*, subcategories(name, icon, color, main_categories(id, name, color)), accounts!recurring_transactions_account_id_fkey(name, icon)")
       .order("created_at", { ascending: false });
     if (error) throw error;
     return data;

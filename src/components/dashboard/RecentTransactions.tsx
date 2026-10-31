@@ -214,10 +214,10 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                         <div className="flex items-center gap-2">
                           {categoryName && (
                             <div className="flex items-center gap-1.5">
-                              {mainCatColor && (
+                              {(mainCatColor || tItem.subcategories?.color) && (
                                 <div
                                   className="w-2 h-2 rounded-full flex-shrink-0"
-                                  style={{ backgroundColor: `hsl(${mainCatColor})` }}
+                                  style={{ backgroundColor: `hsl(${mainCatColor || tItem.subcategories?.color})` }}
                                 />
                               )}
                               <span className="text-sm font-medium truncate">{translateCategory(categoryName)}</span>
@@ -396,8 +396,12 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                       {selectedSubcategory ? (
                         <div className="flex items-center gap-2">
-                          <DynamicIcon name={selectedSubcategory.icon} className="h-4 w-4" />
-                          {translateCategory(selectedSubcategory.name)}
+                          <DynamicIcon
+                            name={selectedSubcategory.icon}
+                            className="h-4 w-4 shrink-0"
+                            style={{ color: `hsl(${(selectedSubcategory as any).main_categories?.color || selectedSubcategory.color || "var(--primary)"})` }}
+                          />
+                          <span className="truncate">{translateCategory(selectedSubcategory.name)}</span>
                         </div>
                       ) : (
                         t("quickAdd.selectCategory")
@@ -422,21 +426,24 @@ export function RecentTransactions({ transactions, accounts }: RecentTransaction
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <div className="ml-4">
-                              {group.items.map((sub: any) => (
-                                <button
-                                  key={sub.id}
-                                  className={`flex w-full items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted/50 ${
-                                    form.subcategory_id === sub.id ? "bg-primary/10 text-primary" : ""
-                                  }`}
-                                  onClick={() => {
-                                    setForm({ ...form, subcategory_id: sub.id });
-                                    setCategoryOpen(false);
-                                  }}
-                                >
-                                  <DynamicIcon name={sub.icon} className="h-4 w-4" />
-                                  {translateCategory(sub.name)}
-                                </button>
-                              ))}
+                              {group.items.map((sub: any) => {
+                                const subColor = group.color || sub.color;
+                                return (
+                                  <button
+                                    key={sub.id}
+                                    className={`flex w-full items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted/50 ${
+                                      form.subcategory_id === sub.id ? "bg-primary/10 text-primary" : ""
+                                    }`}
+                                    onClick={() => {
+                                      setForm({ ...form, subcategory_id: sub.id });
+                                      setCategoryOpen(false);
+                                    }}
+                                  >
+                                    <DynamicIcon name={sub.icon} className="h-4 w-4 shrink-0" style={{ color: `hsl(${subColor})` }} />
+                                    <span className="truncate">{translateCategory(sub.name)}</span>
+                                  </button>
+                                );
+                              })}
                             </div>
                           </CollapsibleContent>
                         </Collapsible>

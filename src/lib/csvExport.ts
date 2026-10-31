@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { formatAccountNameWithOwner } from "@/components/AccountSelectItems";
+import { getFirstName } from "@/hooks/queries/useProfile";
 
 export interface CsvExportOptions {
   accountIds: string[];
@@ -6,8 +8,16 @@ export interface CsvExportOptions {
     from?: Date;
     to?: Date;
   };
-  accounts: Array<{ id: string; name: string; currency?: string }>;
-  householdMembers?: Array<{ user_id: string; display_name?: string | null }>;
+  accounts: Array<{ id: string; name: string; currency?: string; owner_user_id?: string | null }>;
+  householdMembers?: Array<{
+    user_id: string;
+    display_name?: string | null;
+    profile?: {
+      first_name?: string | null;
+      last_name?: string | null;
+      display_name?: string | null;
+    } | null;
+  }>;
   t: (key: string) => string;
   translateCategory?: (name: string) => string;
 }
@@ -78,7 +88,12 @@ export async function exportTransactionsToCsv(options: CsvExportOptions): Promis
   if (error) throw error;
 
   const accountMap = new Map(accounts.map((a) => [a.id, a]));
-  const memberMap = new Map((householdMembers || []).map((m) => [m.user_id, m.display_name || m.user_id]));
+  const memberMap = new Map(
+    (householdMembers || []).map((m: any) => [
+      m.user_id,
+      getFirstName(m.profile) || m.display_name || m.user_id,
+    ])
+  );
 
   // CSV Headers
   const headers = [
@@ -102,6 +117,9 @@ export async function exportTransactionsToCsv(options: CsvExportOptions): Promis
     const sub = (row as any).subcategories;
     const main = sub?.main_categories;
 
+    const accName = acc ? (formatAccountNameWithOwner(acc, householdMembers) || acc.name) : "";
+    const toAccName = toAcc ? (formatAccountNameWithOwner(toAcc, householdMembers) || toAcc.name) : "";
+
     const subName = sub?.name ? (translateCategory ? translateCategory(sub.name) : sub.name) : "";
     const mainName = main?.name ? (translateCategory ? translateCategory(main.name) : main.name) : "";
     const creatorName = row.created_by ? memberMap.get(row.created_by) || row.created_by : "";
@@ -119,8 +137,8 @@ export async function exportTransactionsToCsv(options: CsvExportOptions): Promis
       escapeCsvField(typeLabel),
       escapeCsvField(amountDecimal),
       escapeCsvField(acc?.currency || "EUR"),
-      escapeCsvField(acc?.name || ""),
-      escapeCsvField(toAcc?.name || ""),
+      escapeCsvField(accName),
+      escapeCsvField(toAccName),
       escapeCsvField(mainName),
       escapeCsvField(subName),
       escapeCsvField(row.note || ""),

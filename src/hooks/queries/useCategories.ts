@@ -1,6 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { categoryRepository } from "@/repositories/categoryRepository";
 
+function invalidateAllCategoryDependentQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ["main_categories"] });
+  queryClient.invalidateQueries({ queryKey: ["subcategories"] });
+  queryClient.invalidateQueries({ queryKey: ["active-subcategories"] });
+  queryClient.invalidateQueries({ queryKey: ["transactions"] });
+  queryClient.invalidateQueries({ queryKey: ["transactions-for-budgets"] });
+  queryClient.invalidateQueries({ queryKey: ["prev-transactions-for-budgets"] });
+  queryClient.invalidateQueries({ queryKey: ["budgets-with-categories"] });
+  queryClient.invalidateQueries({ queryKey: ["analytics-transactions"] });
+}
+
 export function useMainCategories(userId?: string) {
   return useQuery({
     queryKey: ["main_categories", userId],
@@ -45,7 +56,7 @@ export function useSaveMainCategory(options?: { onSuccess?: () => void; onError?
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["main_categories"] });
+      invalidateAllCategoryDependentQueries(queryClient);
       options?.onSuccess?.();
     },
     onError: options?.onError,
@@ -58,9 +69,7 @@ export function useDeleteMainCategory(options?: { onSuccess?: () => void; onErro
   return useMutation({
     mutationFn: categoryRepository.deleteMainCategory,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["main_categories"] });
-      queryClient.invalidateQueries({ queryKey: ["subcategories"] });
-      queryClient.invalidateQueries({ queryKey: ["active-subcategories"] });
+      invalidateAllCategoryDependentQueries(queryClient);
       options?.onSuccess?.();
     },
     onError: options?.onError,
@@ -79,8 +88,7 @@ export function useSaveSubcategory(options?: { onSuccess?: () => void; onError?:
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["subcategories"] });
-      queryClient.invalidateQueries({ queryKey: ["active-subcategories"] });
+      invalidateAllCategoryDependentQueries(queryClient);
       options?.onSuccess?.();
     },
     onError: options?.onError,
@@ -93,8 +101,7 @@ export function useDeleteSubcategory(options?: { onSuccess?: () => void; onError
   return useMutation({
     mutationFn: categoryRepository.deleteSubcategory,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["subcategories"] });
-      queryClient.invalidateQueries({ queryKey: ["active-subcategories"] });
+      invalidateAllCategoryDependentQueries(queryClient);
       options?.onSuccess?.();
     },
     onError: options?.onError,

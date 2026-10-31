@@ -302,12 +302,20 @@ export function QuickAddTransaction() {
                 <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-between">
-                      <span className={form.subcategory_id ? "text-foreground" : "text-muted-foreground"}>
-                        {form.subcategory_id
-                          ? translateCategory(subcategories.find((s: any) => s.id === form.subcategory_id)?.name) || t("quickAdd.selectCategory")
-                          : t("quickAdd.selectCategory")}
+                      <span className={form.subcategory_id ? "text-foreground flex items-center gap-2" : "text-muted-foreground"}>
+                        {form.subcategory_id ? (() => {
+                          const sub = subcategories.find((s: any) => s.id === form.subcategory_id);
+                          if (!sub) return t("quickAdd.selectCategory");
+                          const subColor = sub.main_categories?.color || sub.color;
+                          return (
+                            <>
+                              <DynamicIcon name={sub.icon} className="h-4 w-4 shrink-0" style={{ color: subColor ? `hsl(${subColor})` : undefined }} />
+                              <span className="truncate">{translateCategory(sub.name)}</span>
+                            </>
+                          );
+                        })() : t("quickAdd.selectCategory")}
                       </span>
-                      <ChevronRight className="h-4 w-4 opacity-50" />
+                      <ChevronRight className="h-4 w-4 opacity-50 shrink-0" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" sideOffset={4} onOpenAutoFocus={(e) => e.preventDefault()}>
@@ -338,22 +346,25 @@ export function QuickAddTransaction() {
                               <ChevronRight className="h-3 w-3 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
                             </CollapsibleTrigger>
                             <CollapsibleContent>
-                              {subs.map((s: any) => (
-                                <button
-                                  key={s.id}
-                                  type="button"
-                                  className={`flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer ${
-                                    form.subcategory_id === s.id ? "bg-accent font-medium" : ""
-                                  }`}
-                                  onClick={() => {
-                                    setForm({ ...form, subcategory_id: s.id });
-                                    setCategoryOpen(false);
-                                  }}
-                                >
-                                  <DynamicIcon name={s.icon} className="h-3.5 w-3.5 text-muted-foreground" />
-                                  {translateCategory(s.name)}
-                                </button>
-                              ))}
+                              {subs.map((s: any) => {
+                                const subColor = mainCat?.color || s.color;
+                                return (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    className={`flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer ${
+                                      form.subcategory_id === s.id ? "bg-accent font-medium" : ""
+                                    }`}
+                                    onClick={() => {
+                                      setForm({ ...form, subcategory_id: s.id });
+                                      setCategoryOpen(false);
+                                    }}
+                                  >
+                                    <DynamicIcon name={s.icon} className="h-3.5 w-3.5 shrink-0" style={{ color: subColor ? `hsl(${subColor})` : undefined }} />
+                                    <span className="truncate">{translateCategory(s.name)}</span>
+                                  </button>
+                                );
+                              })}
                             </CollapsibleContent>
                           </Collapsible>
                         );

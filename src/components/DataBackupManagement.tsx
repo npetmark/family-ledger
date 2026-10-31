@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/lib/i18n";
 import { useAccounts } from "@/hooks/queries/useAccounts";
@@ -46,7 +46,10 @@ import {
   CheckCircle2,
   Check,
   Database,
+  User,
+  Users,
 } from "lucide-react";
+import { getFirstName } from "@/hooks/queries/useProfile";
 import { exportTransactionsToCsv } from "@/lib/csvExport";
 import {
   downloadEncryptedBackup,
@@ -64,7 +67,7 @@ export default function DataBackupManagement({ householdId }: { householdId: str
   const { data: accounts = [], isLoading: accountsLoading } = useAccounts(user?.id);
   const { data: householdInfo } = useHouseholdMembers(user?.id);
 
-  const isOwner = householdInfo?.role === "owner";
+  const isOwner = (householdInfo as any)?.myRole === "owner" || (householdInfo as any)?.role === "owner";
 
   // Account permissions:
   // Owner can export all accounts.
@@ -84,11 +87,11 @@ export default function DataBackupManagement({ householdId }: { householdId: str
   const [isExportingCsv, setIsExportingCsv] = useState(false);
 
   // Initialize selected accounts once loaded
-  useMemo(() => {
+  useEffect(() => {
     if (selectableAccounts.length > 0 && selectedAccountIds.length === 0) {
       setSelectedAccountIds(selectableAccounts.map((a: any) => a.id));
     }
-  }, [selectableAccounts]);
+  }, [selectableAccounts, selectedAccountIds.length]);
 
   const toggleAccount = (id: string) => {
     setSelectedAccountIds((prev) =>
@@ -230,7 +233,7 @@ export default function DataBackupManagement({ householdId }: { householdId: str
 
     setIsRestoring(true);
     try {
-      const stats = await restoreHouseholdBackup(decryptedBackup, householdId, user.id);
+      await restoreHouseholdBackup(decryptedBackup, householdId, user.id);
       toast.success(t("settings.restoreSuccess"));
 
       // Invalidate all react-query caches
@@ -313,6 +316,12 @@ export default function DataBackupManagement({ householdId }: { householdId: str
                 {selectableAccounts.map((acc: any) => {
                   const isChecked = selectedAccountIds.includes(acc.id);
                   const isShared = acc.owner_user_id === null;
+                  const isMine = acc.owner_user_id === user?.id;
+                  const ownerMember = (householdInfo?.members || []).find((m: any) => m.user_id === acc.owner_user_id);
+                  const ownerFirstName = getFirstName(ownerMember?.profile) || ownerMember?.profile?.display_name;
+                  const ownerLabel = isMine
+                    ? (ownerFirstName ? `${ownerFirstName} (${t("accounts.you")})` : t("accounts.you"))
+                    : (ownerFirstName || t("accounts.personal"));
 
                   return (
                     <div
@@ -330,9 +339,26 @@ export default function DataBackupManagement({ householdId }: { householdId: str
                         id={`csv-acc-${acc.id}`}
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate text-xs">{acc.name}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {acc.currency || "EUR"} · {isShared ? "Shared" : "Personal"}
+                        <div className="flex items-center justify-between gap-1.5">
+                          <p className="font-medium truncate text-xs">{acc.name}</p>
+                          {isShared ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0 flex items-center gap-1 font-medium">
+                              <Users className="h-2.5 w-2.5" />
+                              {t("accounts.shared")}
+                            </span>
+                          ) : (
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 flex items-center gap-1 font-medium ${
+                                isMine ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              <User className="h-2.5 w-2.5" />
+                              {ownerLabel}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                          {acc.currency || "EUR"} · {isShared ? t("accounts.shared") : `${t("accounts.personal")} (${ownerLabel})`}
                         </p>
                       </div>
                     </div>

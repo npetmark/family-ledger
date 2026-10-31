@@ -165,6 +165,15 @@ export interface TranslationDictionary {
     icon: string;
     targetHint: string;
     deleteConfirm: string;
+    confirmDeleteTitle: string;
+    deleteSubWarning: string;
+    deleteMainWarning: string;
+    deactivateHintTitle: string;
+    deactivateHintBody: string;
+    deactivateKeepHistory: string;
+    deletedToast: string;
+    restoredToast: string;
+    deactivatedToast: string;
   };
   accounts: {
     title: string;

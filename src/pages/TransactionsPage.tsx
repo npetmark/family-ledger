@@ -494,8 +494,12 @@ export default function TransactionsPage() {
                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                       {selectedSubcategory ? (
                         <div className="flex items-center gap-2">
-                          <DynamicIcon name={selectedSubcategory.icon} className="h-4 w-4" />
-                          {translateCategory(selectedSubcategory.name)}
+                          <DynamicIcon
+                            name={selectedSubcategory.icon}
+                            className="h-4 w-4 shrink-0"
+                            style={{ color: `hsl(${(selectedSubcategory as any).main_categories?.color || selectedSubcategory.color || "var(--primary)"})` }}
+                          />
+                          <span className="truncate">{translateCategory(selectedSubcategory.name)}</span>
                         </div>
                       ) : (
                         t("quickAdd.selectCategory")
@@ -520,21 +524,24 @@ export default function TransactionsPage() {
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <div className="ml-4">
-                              {group.items.map((sub: any) => (
-                                <button
-                                  key={sub.id}
-                                  className={`flex w-full items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted/50 ${
-                                    form.subcategory_id === sub.id ? "bg-primary/10 text-primary" : ""
-                                  }`}
-                                  onClick={() => {
-                                    setForm({ ...form, subcategory_id: sub.id });
-                                    setCategoryOpen(false);
-                                  }}
-                                >
-                                  <DynamicIcon name={sub.icon} className="h-4 w-4" />
-                                  {translateCategory(sub.name)}
-                                </button>
-                              ))}
+                              {group.items.map((sub: any) => {
+                                const subColor = group.color || sub.color;
+                                return (
+                                  <button
+                                    key={sub.id}
+                                    className={`flex w-full items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted/50 ${
+                                      form.subcategory_id === sub.id ? "bg-primary/10 text-primary" : ""
+                                    }`}
+                                    onClick={() => {
+                                      setForm({ ...form, subcategory_id: sub.id });
+                                      setCategoryOpen(false);
+                                    }}
+                                  >
+                                    <DynamicIcon name={sub.icon} className="h-4 w-4 shrink-0" style={{ color: `hsl(${subColor})` }} />
+                                    <span className="truncate">{translateCategory(sub.name)}</span>
+                                  </button>
+                                );
+                              })}
                             </div>
                           </CollapsibleContent>
                         </Collapsible>
@@ -605,8 +612,8 @@ export default function TransactionsPage() {
               const subMeta = subcategories.find((s: any) => s.id === tItem.subcategory_id);
               mainGroups[mainCatName].subGroups[subId] = {
                 name: subName,
-                icon: tItem.subcategories?.icon || "circle",
-                color: tItem.subcategories?.color || mainCatColor,
+                icon: tItem.subcategories?.icon || subMeta?.icon || "circle",
+                color: mainCatColor || (subMeta as any)?.main_categories?.color || tItem.subcategories?.color || subMeta?.color,
                 sortOrder: (tItem.subcategories as any)?.sort_order ?? subMeta?.sort_order ?? 999,
                 transactions: [],
               };
@@ -639,10 +646,13 @@ export default function TransactionsPage() {
         }
 
         const renderTransaction = (tItem: typeof transactions[0], groupColor: string) => {
-          const account = accounts.find((a: any) => a.id === tItem.account_id);
-          const destAccount = accounts.find((a: any) => a.id === tItem.transfer_to_account_id);
+          const account: any = accounts.find((a: any) => a.id === tItem.account_id);
+          const destAccount: any = accounts.find((a: any) => a.id === tItem.transfer_to_account_id);
           const accountDisplayName = formatAccountNameWithOwner(account || { name: (tItem as any).accounts?.name, owner_user_id: account?.owner_user_id }, householdInfo?.members);
           const destDisplayName = destAccount ? formatAccountNameWithOwner(destAccount, householdInfo?.members) : null;
+          const subMeta = subcategories.find((s: any) => s.id === tItem.subcategory_id);
+          const subColor = groupColor || (subMeta as any)?.main_categories?.color || tItem.subcategories?.color || subMeta?.color;
+          const subIcon = tItem.subcategories?.icon || subMeta?.icon || "circle";
 
           return (
           <div
@@ -653,14 +663,14 @@ export default function TransactionsPage() {
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div
                 className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ background: `hsl(${tItem.subcategories?.color || groupColor} / 0.12)` }}
+                style={{ background: `hsl(${subColor} / 0.12)` }}
               >
                 {tItem.transaction_type === "transfer" ? (
                   <ArrowLeftRight className="h-4 w-4" style={{ color: `hsl(${groupColor})` }} />
                 ) : tItem.transaction_type === "income" ? (
                   <Banknote className="h-4 w-4" style={{ color: `hsl(${groupColor})` }} />
                 ) : (
-                  <DynamicIcon name={tItem.subcategories?.icon || "circle"} className="h-4 w-4" style={{ color: `hsl(${tItem.subcategories?.color || groupColor})` }} />
+                  <DynamicIcon name={subIcon} className="h-4 w-4" style={{ color: `hsl(${subColor})` }} />
                 )}
               </div>
               <div className="min-w-0 flex-1">

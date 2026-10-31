@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Paintbrush } from "lucide-react";
@@ -40,6 +39,13 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
   const [hue, setHue] = useState(parsed.h);
   const [saturation, setSaturation] = useState(parsed.s);
   const [lightness, setLightness] = useState(parsed.l);
+
+  useEffect(() => {
+    const p = parseHSL(value);
+    setHue(p.h);
+    setSaturation(p.s);
+    setLightness(p.l);
+  }, [value]);
 
   const currentColor = `${Math.round(hue)} ${Math.round(saturation)}% ${Math.round(lightness)}%`;
 

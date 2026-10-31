@@ -1,5 +1,4 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAccounts } from "@/hooks/queries/useAccounts";
 import { useBudgetsWithCategories } from "@/hooks/queries/useBudgets";
 import { useTransactions } from "@/hooks/queries/useTransactions";
@@ -54,7 +53,6 @@ export function BudgetBurndown() {
 
   const { data: transactions = [] } = useTransactions(user?.id, dateFilter);
 
-
   // Filter by visible accounts only
   const visibleAccountIds = new Set(accounts.filter((a) => a.is_visible).map((a) => a.id));
   const visibleTransactions = transactions.filter((t) => visibleAccountIds.has(t.account_id));
@@ -71,11 +69,13 @@ export function BudgetBurndown() {
       const remaining = b.amount - spent;
       const pct = (spent / b.amount) * 100;
       const sub = (b as any).subcategories;
+      const color = sub?.main_categories?.color || sub?.color || "";
       return {
         id: b.id,
         subcategoryId: b.subcategory_id,
         name: sub?.name || "Unknown",
         icon: sub?.icon || "circle",
+        color,
         mainCategory: sub?.main_categories?.name || "",
         mainCategoryId: sub?.main_categories?.id || "",
         mainCategorySortOrder: sub?.main_categories?.sort_order ?? 999,
@@ -108,6 +108,7 @@ export function BudgetBurndown() {
         subcategoryId: t.subcategory_id,
         name: sub.name || "Unknown",
         icon: sub.icon || "circle",
+        color: sub.main_categories?.color || sub.color || "",
         mainCategory: mainName,
         mainCategoryId: sub.main_categories?.id || "",
         mainCategorySortOrder: sub.main_categories?.sort_order ?? 999,
@@ -157,7 +158,8 @@ export function BudgetBurndown() {
       const totalSpent = items.reduce((s, b) => s + b.spent, 0);
       const pct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
       const isInvestment = investmentNames.includes(name);
-      return { name, items, totalBudget, totalSpent, remaining: totalBudget - totalSpent, pct, isInvestment };
+      const color = items[0]?.color || "";
+      return { name, color, items, totalBudget, totalSpent, remaining: totalBudget - totalSpent, pct, isInvestment };
     });
 
   const totalBudget = allItems.reduce((s, b) => s + b.budget, 0);
@@ -182,163 +184,170 @@ export function BudgetBurndown() {
   return (
     <TooltipProvider delayDuration={150}>
       <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-medium">{t("dashboard.budgetBurndown")}</CardTitle>
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-sm text-muted-foreground">{t("common.total")}</span>
-          <div className="text-sm">
-            <span className={`font-mono-numbers font-medium ${getBurndownTextColor(totalPct, 90)}`}>
-              {formatCurrency(totalSpent)}
-            </span>
-            <span className="text-muted-foreground"> / {formatCurrency(totalBudget)}</span>
-          </div>
-        </div>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="cursor-pointer py-1">
-              <Progress
-                value={Math.min(totalPct, 100)}
-                className={`h-2 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${getBurndownColor(totalPct, 90)}`}
-              />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium">{t("dashboard.budgetBurndown")}</CardTitle>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-sm text-muted-foreground">{t("common.total")}</span>
+            <div className="text-sm">
+              <span className={`font-mono-numbers font-medium ${getBurndownTextColor(totalPct, 90)}`}>
+                {formatCurrency(totalSpent)}
+              </span>
+              <span className="text-muted-foreground"> / {formatCurrency(totalBudget)}</span>
             </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <span className="font-mono-numbers text-xs font-medium">
-              {totalPct.toFixed(1)}% ({formatCurrency(totalSpent)} / {formatCurrency(totalBudget)})
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="cursor-pointer py-1">
+                <Progress
+                  value={Math.min(totalPct, 100)}
+                  className={`h-2 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${getBurndownColor(totalPct, 90)}`}
+                />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <span className="font-mono-numbers text-xs font-medium">
+                {totalPct.toFixed(1)}% ({formatCurrency(totalSpent)} / {formatCurrency(totalBudget)})
+              </span>
+            </TooltipContent>
+          </Tooltip>
+          <div className="flex justify-between text-xs text-muted-foreground mt-1">
+            <span>
+              {totalBudget - totalSpent >= 0
+                ? `${formatCurrency(totalBudget - totalSpent)} ${t("dashboard.remaining")}`
+                : `${formatCurrency(Math.abs(totalBudget - totalSpent))} ${t("budgets.overBudget")}`}
             </span>
-          </TooltipContent>
-        </Tooltip>
-        <div className="flex justify-between text-xs text-muted-foreground mt-1">
-          <span>
-            {totalBudget - totalSpent >= 0
-              ? `${formatCurrency(totalBudget - totalSpent)} ${t("dashboard.remaining")}`
-              : `${formatCurrency(Math.abs(totalBudget - totalSpent))} ${t("budgets.overBudget")}`}
-          </span>
-          <span>{Math.round(totalPct)}%</span>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {sortedCategories.map((cat) => {
-            const clampedPct = Math.min(cat.pct, 100);
-            // Use average alert threshold from subcategories, default 90
-            const avgThreshold = cat.items.length > 0
-              ? cat.items.reduce((s, i) => s + i.alertThreshold, 0) / cat.items.length
-              : 90;
+            <span>{Math.round(totalPct)}%</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {sortedCategories.map((cat) => {
+              const clampedPct = Math.min(cat.pct, 100);
+              const avgThreshold = cat.items.length > 0
+                ? cat.items.reduce((s, i) => s + i.alertThreshold, 0) / cat.items.length
+                : 90;
 
-            const displayName = translateCategory(cat.name);
+              const displayName = translateCategory(cat.name);
 
-            return (
-              <Collapsible key={cat.name}>
-                <div className="space-y-1">
-                  <CollapsibleTrigger className="flex w-full items-center justify-between group cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" />
-                      <span className="text-sm font-medium">{displayName}</span>
-                    </div>
-                    <div className="text-xs text-right">
-                      <span className={`font-mono-numbers font-medium ${getBurndownTextColor(cat.pct, avgThreshold, cat.isInvestment)}`}>
-                        {formatCurrency(cat.totalSpent)}
-                      </span>
-                      <span className="text-muted-foreground"> / {formatCurrency(cat.totalBudget)}</span>
-                    </div>
-                  </CollapsibleTrigger>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="cursor-pointer py-1">
-                        <Progress
-                          value={clampedPct}
-                          className={`h-1.5 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${getBurndownColor(cat.pct, avgThreshold, cat.isInvestment)}`}
-                        />
+              return (
+                <Collapsible key={cat.name}>
+                  <div className="space-y-1">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between group cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-90" />
+                        {cat.color && (
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: `hsl(${cat.color})` }}
+                          />
+                        )}
+                        <span className="text-sm font-medium">{displayName}</span>
                       </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <span className="font-mono-numbers text-xs font-medium">
-                        {cat.pct.toFixed(1)}% ({formatCurrency(cat.totalSpent)} / {formatCurrency(cat.totalBudget)})
+                      <div className="text-xs text-right">
+                        <span className={`font-mono-numbers font-medium ${getBurndownTextColor(cat.pct, avgThreshold, cat.isInvestment)}`}>
+                          {formatCurrency(cat.totalSpent)}
+                        </span>
+                        <span className="text-muted-foreground"> / {formatCurrency(cat.totalBudget)}</span>
+                      </div>
+                    </CollapsibleTrigger>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="cursor-pointer py-1">
+                          <Progress
+                            value={clampedPct}
+                            className={`h-1.5 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${getBurndownColor(cat.pct, avgThreshold, cat.isInvestment)}`}
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <span className="font-mono-numbers text-xs font-medium">
+                          {cat.pct.toFixed(1)}% ({formatCurrency(cat.totalSpent)} / {formatCurrency(cat.totalBudget)})
+                        </span>
+                      </TooltipContent>
+                    </Tooltip>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        {cat.remaining >= 0
+                          ? `${formatCurrency(cat.remaining)} ${t("dashboard.remaining")}`
+                          : `${formatCurrency(Math.abs(cat.remaining))} ${t("budgets.overBudget")}`}
                       </span>
-                    </TooltipContent>
-                  </Tooltip>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>
-                      {cat.remaining >= 0
-                        ? `${formatCurrency(cat.remaining)} ${t("dashboard.remaining")}`
-                        : `${formatCurrency(Math.abs(cat.remaining))} ${t("budgets.overBudget")}`}
-                    </span>
-                    <span>{Math.round(cat.pct)}%</span>
+                      <span>{Math.round(cat.pct)}%</span>
+                    </div>
                   </div>
-                </div>
-                <CollapsibleContent>
-                  <div className="ml-5 mt-2 space-y-3 border-l border-border pl-3">
-                    {cat.items.map((item) => {
-                      const itemClampedPct = Math.min(item.pct, 100);
-                      const subName = translateCategory(item.name);
-                      if (item.unbudgeted) {
+                  <CollapsibleContent>
+                    <div className="ml-5 mt-2 space-y-3 border-l border-border pl-3">
+                      {cat.items.map((item) => {
+                        const itemClampedPct = Math.min(item.pct, 100);
+                        const subName = translateCategory(item.name);
+                        const iconColor = item.color || cat.color;
+                        const iconStyle = iconColor ? { color: `hsl(${iconColor})` } : undefined;
+                        if (item.unbudgeted) {
+                          return (
+                            <div key={item.id} className="space-y-1 opacity-80">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <DynamicIcon name={item.icon} className="h-3.5 w-3.5 text-muted-foreground" style={iconStyle} />
+                                  <span className="text-sm">{subName}</span>
+                                  <span className="text-[10px] uppercase tracking-wide text-warning font-medium">{t("budgets.unbudgeted")}</span>
+                                </div>
+                                <div className="text-xs text-right">
+                                  <span className="font-mono-numbers font-medium text-warning">
+                                    {formatCurrency(item.spent)}
+                                  </span>
+                                  <span className="text-muted-foreground"> / —</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
                         return (
-                          <div key={item.id} className="space-y-1 opacity-80">
+                          <div key={item.id} className="space-y-1">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <DynamicIcon name={item.icon} className="h-3.5 w-3.5 text-muted-foreground" />
+                                <DynamicIcon name={item.icon} className="h-3.5 w-3.5 text-muted-foreground" style={iconStyle} />
                                 <span className="text-sm">{subName}</span>
-                                <span className="text-[10px] uppercase tracking-wide text-warning font-medium">{t("budgets.unbudgeted")}</span>
                               </div>
                               <div className="text-xs text-right">
-                                <span className="font-mono-numbers font-medium text-warning">
+                                <span className={`font-mono-numbers font-medium ${getBurndownTextColor(item.pct, item.alertThreshold, cat.isInvestment)}`}>
                                   {formatCurrency(item.spent)}
                                 </span>
-                                <span className="text-muted-foreground"> / —</span>
+                                <span className="text-muted-foreground"> / {formatCurrency(item.budget)}</span>
                               </div>
+                            </div>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="cursor-pointer py-1">
+                                  <Progress
+                                    value={itemClampedPct}
+                                    className={`h-1.5 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${getBurndownColor(item.pct, item.alertThreshold, cat.isInvestment)}`}
+                                  />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <span className="font-mono-numbers text-xs font-medium">
+                                  {item.pct.toFixed(1)}% ({formatCurrency(item.spent)} / {formatCurrency(item.budget)})
+                                </span>
+                              </TooltipContent>
+                            </Tooltip>
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>
+                                {item.remaining >= 0
+                                  ? `${formatCurrency(item.remaining)} ${t("dashboard.remaining")}`
+                                  : `${formatCurrency(Math.abs(item.remaining))} ${t("budgets.overBudget")}`}
+                              </span>
+                              <span>{Math.round(cat.pct)}%</span>
                             </div>
                           </div>
                         );
-                      }
-                      return (
-                        <div key={item.id} className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <DynamicIcon name={item.icon} className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span className="text-sm">{subName}</span>
-                            </div>
-                            <div className="text-xs text-right">
-                              <span className={`font-mono-numbers font-medium ${getBurndownTextColor(item.pct, item.alertThreshold, cat.isInvestment)}`}>
-                                {formatCurrency(item.spent)}
-                              </span>
-                              <span className="text-muted-foreground"> / {formatCurrency(item.budget)}</span>
-                            </div>
-                          </div>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="cursor-pointer py-1">
-                                <Progress
-                                  value={itemClampedPct}
-                                  className={`h-1.5 transition-all hover:ring-2 hover:ring-primary/20 rounded-full ${getBurndownColor(item.pct, item.alertThreshold, cat.isInvestment)}`}
-                                />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <span className="font-mono-numbers text-xs font-medium">
-                                {item.pct.toFixed(1)}% ({formatCurrency(item.spent)} / {formatCurrency(item.budget)})
-                              </span>
-                            </TooltipContent>
-                          </Tooltip>
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>
-                              {item.remaining >= 0
-                                ? `${formatCurrency(item.remaining)} ${t("dashboard.remaining")}`
-                                : `${formatCurrency(Math.abs(item.remaining))} ${t("budgets.overBudget")}`}
-                            </span>
-                            <span>{Math.round(item.pct)}%</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+                      })}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
     </TooltipProvider>
   );
 }
