@@ -126,6 +126,8 @@ export interface TranslationDictionary {
     numTransactions: string;
     allAccountsSelected: string;
     hidden: string;
+    expandAll: string;
+    collapseAll: string;
   };
   budgets: {
     title: string;

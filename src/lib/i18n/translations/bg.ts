@@ -126,6 +126,8 @@ export const bg: TranslationDictionary = {
     numTransactions: "трансакции",
     allAccountsSelected: "Всички сметки са избрани",
     hidden: "скрита",
+    expandAll: "Разгъни всички",
+    collapseAll: "Сгъни всички",
   },
   budgets: {
     title: "Бюджети",

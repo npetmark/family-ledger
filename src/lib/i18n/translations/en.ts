@@ -126,6 +126,8 @@ export const en: TranslationDictionary = {
     numTransactions: "transactions",
     allAccountsSelected: "All accounts selected",
     hidden: "hidden",
+    expandAll: "Expand All",
+    collapseAll: "Collapse All",
   },
   budgets: {
     title: "Budgets",

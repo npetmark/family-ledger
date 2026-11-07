@@ -23,7 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { AccountSelectItems, formatAccountNameWithOwner } from "@/components/AccountSelectItems";
-import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, Pencil, Banknote, Users, User, Trash2, Search, X } from "lucide-react";
+import { Plus, ArrowLeftRight, CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, ChevronsUpDown, Pencil, Banknote, Users, User, Trash2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, addMonths, addDays, addYears } from "date-fns";
 import { getFundSubcategoryId } from "@/lib/fund-accounts";
@@ -98,6 +98,8 @@ export default function TransactionsPage() {
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [accountFilter, setAccountFilter] = useState<AccountFilterValue>({ mode: "all-visible" });
   const [searchQuery, setSearchQuery] = useState("");
+  const [openMainGroups, setOpenMainGroups] = useState<Record<string, boolean>>({});
+  const [openSubGroups, setOpenSubGroups] = useState<Record<string, boolean>>({});
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
 
@@ -248,7 +250,210 @@ export default function TransactionsPage() {
   const totalIncome = filteredTransactions.filter((t) => t.transaction_type === "income").reduce((s, t) => s + t.amount, 0);
   const totalExpenses = filteredTransactions.filter((t) => t.transaction_type === "expense").reduce((s, t) => s + t.amount, 0);
 
-  // old renderTransactionForm removed
+  // Group transactions by main category, then by subcategory
+  type SubGroup = { name: string; icon: string; color: string; sortOrder: number; transactions: typeof transactions };
+  type MainGroup = { name: string; color: string; sortOrder: number; dbSortOrder: number; subGroups: Record<string, SubGroup>; ungrouped: typeof transactions };
+
+  const groups = useMemo(() => {
+    const mainGroups: Record<string, MainGroup> = {};
+
+    filteredTransactions.forEach((tItem) => {
+      const mainCatName = tItem.subcategories?.main_categories?.name || (tItem.transaction_type === "income" ? "Income" : tItem.transaction_type === "transfer" ? "Transfers" : "Uncategorized");
+      const mainCatColor = tItem.subcategories?.main_categories?.color || (tItem.transaction_type === "income" ? "145 45% 42%" : "0 0% 50%");
+
+      if (!mainGroups[mainCatName]) {
+        const dbSortOrder = (tItem.subcategories?.main_categories as any)?.sort_order ?? 999;
+        mainGroups[mainCatName] = { name: mainCatName, color: mainCatColor, sortOrder: getMainCategoryOrder(mainCatName), dbSortOrder, subGroups: {}, ungrouped: [] };
+      }
+
+      const subName = tItem.subcategories?.name;
+      if (subName) {
+        const subId = tItem.subcategory_id || subName;
+        if (!mainGroups[mainCatName].subGroups[subId]) {
+          const subMeta = subcategories.find((s: any) => s.id === tItem.subcategory_id);
+          mainGroups[mainCatName].subGroups[subId] = {
+            name: subName,
+            icon: tItem.subcategories?.icon || subMeta?.icon || "circle",
+            color: mainCatColor || (subMeta as any)?.main_categories?.color || tItem.subcategories?.color || subMeta?.color,
+            sortOrder: (tItem.subcategories as any)?.sort_order ?? subMeta?.sort_order ?? 999,
+            transactions: [],
+          };
+        }
+        mainGroups[mainCatName].subGroups[subId].transactions.push(tItem);
+      } else {
+        mainGroups[mainCatName].ungrouped.push(tItem);
+      }
+    });
+
+    return Object.values(mainGroups).sort((a, b) =>
+      a.sortOrder - b.sortOrder || compareMainCategories({ name: a.name, sort_order: a.dbSortOrder }, { name: b.name, sort_order: b.dbSortOrder })
+    );
+  }, [filteredTransactions, subcategories]);
+
+  const collapsibleSubKeys = useMemo(() => {
+    const keys: { groupName: string; subId: string }[] = [];
+    groups.forEach((group) => {
+      Object.entries(group.subGroups).forEach(([subId, sg]) => {
+        if (sg.transactions.length > 1) {
+          keys.push({ groupName: group.name, subId });
+        }
+      });
+    });
+    return keys;
+  }, [groups]);
+
+  const isMainGroupOpen = (groupName: string) => {
+    if (openMainGroups[groupName] !== undefined) {
+      return openMainGroups[groupName];
+    }
+    const isIncome = groupName === "Income" || groupName === "Приходи";
+    return !isIncome;
+  };
+
+  const isSubGroupOpen = (groupName: string, subId: string) => {
+    const key = `${groupName}:${subId}`;
+    if (openSubGroups[key] !== undefined) {
+      return openSubGroups[key];
+    }
+    return false;
+  };
+
+  const allRecordsExpanded = useMemo(() => {
+    if (groups.length === 0) return false;
+    const allMainsOpen = groups.every((g) => isMainGroupOpen(g.name));
+    if (collapsibleSubKeys.length === 0) return allMainsOpen;
+    const allSubsOpen = collapsibleSubKeys.every(({ groupName, subId }) => isSubGroupOpen(groupName, subId));
+    return allMainsOpen && allSubsOpen;
+  }, [groups, openMainGroups, openSubGroups, collapsibleSubKeys]);
+
+  const toggleAllRecords = () => {
+    if (allRecordsExpanded) {
+      const nextSub: Record<string, boolean> = {};
+      collapsibleSubKeys.forEach(({ groupName, subId }) => {
+        nextSub[`${groupName}:${subId}`] = false;
+      });
+      setOpenSubGroups(nextSub);
+    } else {
+      const nextMain: Record<string, boolean> = {};
+      const nextSub: Record<string, boolean> = {};
+      groups.forEach((g) => {
+        nextMain[g.name] = true;
+      });
+      collapsibleSubKeys.forEach(({ groupName, subId }) => {
+        nextSub[`${groupName}:${subId}`] = true;
+      });
+      setOpenMainGroups(nextMain);
+      setOpenSubGroups(nextSub);
+    }
+  };
+
+  const renderTransaction = (
+    tItem: typeof transactions[0],
+    groupColor: string,
+    options?: {
+      hideDate?: boolean;
+      timeline?: {
+        isFirst: boolean;
+        isLast: boolean;
+        dotColor: string;
+      };
+    }
+  ) => {
+    const account: any = accounts.find((a: any) => a.id === tItem.account_id);
+    const destAccount: any = accounts.find((a: any) => a.id === tItem.transfer_to_account_id);
+    const accountDisplayName = formatAccountNameWithOwner(
+      account || { name: (tItem as any).accounts?.name, owner_user_id: account?.owner_user_id },
+      householdInfo?.members
+    );
+    const destDisplayName = destAccount ? formatAccountNameWithOwner(destAccount, householdInfo?.members) : null;
+    const subMeta = subcategories.find((s: any) => s.id === tItem.subcategory_id);
+    const subColor = groupColor || (subMeta as any)?.main_categories?.color || tItem.subcategories?.color || subMeta?.color;
+    const subIcon = tItem.subcategories?.icon || subMeta?.icon || "circle";
+    const hideDate = options?.hideDate ?? false;
+    const timeline = options?.timeline;
+
+    return (
+      <div
+        key={tItem.id}
+        className={`flex items-center justify-between rounded-lg hover:bg-muted/30 transition-colors group cursor-pointer ${
+          timeline ? "p-2 sm:p-2.5" : "p-3"
+        }`}
+        onClick={() => openEditDialog(tItem)}
+      >
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 self-stretch">
+          {timeline && (
+            <>
+              {/* Timeline track with continuous line and dot */}
+              <div className="relative flex items-center justify-center w-7 sm:w-8 shrink-0 self-stretch">
+                <div
+                  className={`absolute top-0 left-1/2 -translate-x-1/2 w-px bg-border/70 ${
+                    timeline.isLast ? "bottom-1/2" : "bottom-0"
+                  }`}
+                />
+                <div
+                  className="relative z-10 w-2.5 h-2.5 rounded-full ring-2 ring-background transition-all duration-200 group-hover:scale-125 group-hover:ring-primary/40"
+                  style={{ backgroundColor: `hsl(${timeline.dotColor})` }}
+                />
+              </div>
+              {/* Timeline short date (dd/mm/yy) */}
+              <span className="font-mono text-[11px] sm:text-xs text-muted-foreground group-hover:text-foreground font-medium shrink-0 select-none ml-0.5 sm:ml-1 mr-1.5 sm:mr-2.5 tabular-nums transition-colors w-[52px] sm:w-[58px]">
+                {formatDate(new Date(tItem.date), "dd/MM/yy")}
+              </span>
+            </>
+          )}
+
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: `hsl(${subColor} / 0.12)` }}
+          >
+            {tItem.transaction_type === "transfer" ? (
+              <ArrowLeftRight className="h-4 w-4" style={{ color: `hsl(${groupColor})` }} />
+            ) : tItem.transaction_type === "income" ? (
+              <Banknote className="h-4 w-4" style={{ color: `hsl(${groupColor})` }} />
+            ) : (
+              <DynamicIcon name={subIcon} className="h-4 w-4" style={{ color: `hsl(${subColor})` }} />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium break-words">
+              {translateCategory(tItem.subcategories?.name) || tItem.note || (tItem.transaction_type === "transfer" ? t("transactions.transfer") : t("transactions.title"))}
+            </p>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 flex-wrap">
+              <span className="truncate flex items-center gap-1.5">
+                {accountDisplayName}
+                {tItem.transaction_type === "transfer" && destDisplayName && (
+                  <span className="text-muted-foreground">
+                    → {destDisplayName}
+                  </span>
+                )}
+              </span>
+              {!hideDate && (
+                <>
+                  <span>·</span>
+                  <span className="flex-shrink-0">{formatDate(new Date(tItem.date), "dd/MM/yyyy")}</span>
+                </>
+              )}
+              {tItem.note && tItem.subcategories?.name ? (
+                <>
+                  <span>·</span>
+                  <span className="break-words line-clamp-2">{tItem.note}</span>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 pl-2">
+          <span className={`font-mono-numbers text-sm font-medium whitespace-nowrap flex-shrink-0 ${
+            tItem.transaction_type === "income" ? "text-income" :
+            tItem.transaction_type === "transfer" ? "text-transfer" : "text-expense"
+          }`}>
+            {tItem.transaction_type === "income" ? "+" : tItem.transaction_type === "expense" ? "-" : ""}
+            {formatCurrency(tItem.amount)}
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -260,6 +465,18 @@ export default function TransactionsPage() {
             <span className="text-expense font-mono-numbers">-{formatCurrency(totalExpenses)}</span>
           </div>
         </div>
+
+        {filteredTransactions.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleAllRecords}
+            className="text-xs gap-1.5 h-8 shrink-0"
+          >
+            <ChevronsUpDown className="h-3.5 w-3.5" />
+            {allRecordsExpanded ? t("transactions.collapseAll") : t("transactions.expandAll")}
+          </Button>
+        )}
       </div>
 
       {/* Time filter presets, account filter & search */}
@@ -588,135 +805,30 @@ export default function TransactionsPage() {
         </DialogContent>
       </Dialog>
 
-      {(() => {
-        // Group transactions by main category, then by subcategory
-        type SubGroup = { name: string; icon: string; color: string; sortOrder: number; transactions: typeof transactions };
-        type MainGroup = { name: string; color: string; sortOrder: number; subGroups: Record<string, SubGroup>; ungrouped: typeof transactions };
-
-        const mainGroups: Record<string, MainGroup & { dbSortOrder: number }> = {};
-
-        filteredTransactions.forEach((tItem) => {
-          const mainCatName = tItem.subcategories?.main_categories?.name || (tItem.transaction_type === "income" ? "Income" : tItem.transaction_type === "transfer" ? "Transfers" : "Uncategorized");
-          const mainCatColor = tItem.subcategories?.main_categories?.color || (tItem.transaction_type === "income" ? "145 45% 42%" : "0 0% 50%");
-
-          if (!mainGroups[mainCatName]) {
-            const dbSortOrder = (tItem.subcategories?.main_categories as any)?.sort_order ?? 999;
-            mainGroups[mainCatName] = { name: mainCatName, color: mainCatColor, sortOrder: getMainCategoryOrder(mainCatName), dbSortOrder, subGroups: {}, ungrouped: [] };
-          }
-
-          const subName = tItem.subcategories?.name;
-          if (subName) {
-            const subId = tItem.subcategory_id || subName;
-            if (!mainGroups[mainCatName].subGroups[subId]) {
-              // Prefer the joined sort_order (works for inactive subcategories too)
-              const subMeta = subcategories.find((s: any) => s.id === tItem.subcategory_id);
-              mainGroups[mainCatName].subGroups[subId] = {
-                name: subName,
-                icon: tItem.subcategories?.icon || subMeta?.icon || "circle",
-                color: mainCatColor || (subMeta as any)?.main_categories?.color || tItem.subcategories?.color || subMeta?.color,
-                sortOrder: (tItem.subcategories as any)?.sort_order ?? subMeta?.sort_order ?? 999,
-                transactions: [],
-              };
-            }
-            mainGroups[mainCatName].subGroups[subId].transactions.push(tItem);
-          } else {
-            mainGroups[mainCatName].ungrouped.push(tItem);
-          }
-        });
-
-        // Fixed main group order (system order → user sort_order → name); never date-dependent
-        const groups = Object.values(mainGroups).sort((a, b) =>
-          a.sortOrder - b.sortOrder || compareMainCategories({ name: a.name, sort_order: a.dbSortOrder }, { name: b.name, sort_order: b.dbSortOrder })
-        );
-        if (groups.length === 0) {
-          return (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center justify-center h-32 text-sm text-muted-foreground gap-1.5">
-                  <span>{searchQuery.trim() ? t("transactions.noTransactionsMatch") : t("transactions.noTransactionsPeriod")}</span>
-                  {searchQuery.trim() && (
-                    <Button variant="outline" size="sm" onClick={() => setSearchQuery("")} className="text-xs h-7">
-                      {t("transactions.clearSearch")}
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        }
-
-        const renderTransaction = (tItem: typeof transactions[0], groupColor: string) => {
-          const account: any = accounts.find((a: any) => a.id === tItem.account_id);
-          const destAccount: any = accounts.find((a: any) => a.id === tItem.transfer_to_account_id);
-          const accountDisplayName = formatAccountNameWithOwner(account || { name: (tItem as any).accounts?.name, owner_user_id: account?.owner_user_id }, householdInfo?.members);
-          const destDisplayName = destAccount ? formatAccountNameWithOwner(destAccount, householdInfo?.members) : null;
-          const subMeta = subcategories.find((s: any) => s.id === tItem.subcategory_id);
-          const subColor = groupColor || (subMeta as any)?.main_categories?.color || tItem.subcategories?.color || subMeta?.color;
-          const subIcon = tItem.subcategories?.icon || subMeta?.icon || "circle";
-
-          return (
-          <div
-            key={tItem.id}
-            className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors group cursor-pointer"
-            onClick={() => openEditDialog(tItem)}
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ background: `hsl(${subColor} / 0.12)` }}
-              >
-                {tItem.transaction_type === "transfer" ? (
-                  <ArrowLeftRight className="h-4 w-4" style={{ color: `hsl(${groupColor})` }} />
-                ) : tItem.transaction_type === "income" ? (
-                  <Banknote className="h-4 w-4" style={{ color: `hsl(${groupColor})` }} />
-                ) : (
-                  <DynamicIcon name={subIcon} className="h-4 w-4" style={{ color: `hsl(${subColor})` }} />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium break-words">
-                  {translateCategory(tItem.subcategories?.name) || tItem.note || (tItem.transaction_type === "transfer" ? t("transactions.transfer") : t("transactions.title"))}
-                </p>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 flex-wrap">
-                  <span className="truncate flex items-center gap-1.5">
-                    {accountDisplayName}
-                    {tItem.transaction_type === "transfer" && destDisplayName && (
-                      <span className="text-muted-foreground">
-                        → {destDisplayName}
-                      </span>
-                    )}
-                  </span>
-                  <span>·</span>
-                  <span className="flex-shrink-0">{formatDate(new Date(tItem.date), "dd/MM/yyyy")}</span>
-                  {tItem.note && tItem.subcategories?.name ? (
-                    <>
-                      <span>·</span>
-                      <span className="break-words line-clamp-2">{tItem.note}</span>
-                    </>
-                  ) : null}
-                </div>
-              </div>
+      {groups.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center justify-center h-32 text-sm text-muted-foreground gap-1.5">
+              <span>{searchQuery.trim() ? t("transactions.noTransactionsMatch") : t("transactions.noTransactionsPeriod")}</span>
+              {searchQuery.trim() && (
+                <Button variant="outline" size="sm" onClick={() => setSearchQuery("")} className="text-xs h-7">
+                  {t("transactions.clearSearch")}
+                </Button>
+              )}
             </div>
-            <div className="flex items-center gap-2 pl-2">
-              <span className={`font-mono-numbers text-sm font-medium whitespace-nowrap flex-shrink-0 ${
-                tItem.transaction_type === "income" ? "text-income" :
-                tItem.transaction_type === "transfer" ? "text-transfer" : "text-expense"
-              }`}>
-                {tItem.transaction_type === "income" ? "+" : tItem.transaction_type === "expense" ? "-" : ""}
-                {formatCurrency(tItem.amount)}
-              </span>
-            </div>
-          </div>
-          );
-        };
-
-        return groups.map((group) => {
+          </CardContent>
+        </Card>
+      ) : (
+        groups.map((group) => {
           const allTransactions = [...Object.values(group.subGroups).flatMap((sg) => sg.transactions), ...group.ungrouped];
           const totalAmount = allTransactions.reduce((s, tItem) => s + tItem.amount, 0);
 
-          const isIncome = group.name === "Income" || group.name === "Приходи";
           return (
-            <Collapsible key={group.name} defaultOpen={!isIncome}>
+            <Collapsible
+              key={group.name}
+              open={isMainGroupOpen(group.name)}
+              onOpenChange={(open) => setOpenMainGroups((prev) => ({ ...prev, [group.name]: open }))}
+            >
               <Card>
                 <CollapsibleTrigger className="w-full">
                   <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors rounded-t-lg">
@@ -736,47 +848,59 @@ export default function TransactionsPage() {
                 <CollapsibleContent>
                   <CardContent className="pt-0 pb-2">
                     <div className="space-y-0.5">
-                    {Object.entries(group.subGroups)
-                      .sort(([idA, a], [idB, b]) => compareSubcategories({ name: a.name, sort_order: a.sortOrder, id: idA }, { name: b.name, sort_order: b.sortOrder, id: idB }))
-                      .map(([, sg]) => {
-                        // Sort transactions within subcategory by date desc
-                        const sortedTxns = [...sg.transactions].sort((a, b) => b.date.localeCompare(a.date) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-                        const subTotal = sortedTxns.reduce((s, tItem) => s + tItem.amount, 0);
-                        if (sortedTxns.length === 1) {
-                          return renderTransaction(sortedTxns[0], group.color);
-                        }
-                        return (
-                          <Collapsible key={sg.name}>
-                            <CollapsibleTrigger className="w-full">
-                              <div className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors">
-                                <div className="flex items-center gap-3">
-                                  <div
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center"
-                                    style={{ background: `hsl(${sg.color} / 0.12)` }}
-                                  >
-                                    <DynamicIcon name={sg.icon} className="h-4 w-4" style={{ color: `hsl(${sg.color})` }} />
+                      {Object.entries(group.subGroups)
+                        .sort(([idA, a], [idB, b]) => compareSubcategories({ name: a.name, sort_order: a.sortOrder, id: idA }, { name: b.name, sort_order: b.sortOrder, id: idB }))
+                        .map(([subId, sg]) => {
+                          const sortedTxns = [...sg.transactions].sort((a, b) => b.date.localeCompare(a.date) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                          const subTotal = sortedTxns.reduce((s, tItem) => s + tItem.amount, 0);
+                          if (sortedTxns.length === 1) {
+                            return renderTransaction(sortedTxns[0], group.color);
+                          }
+                          return (
+                            <Collapsible
+                              key={`${group.name}:${subId}`}
+                              open={isSubGroupOpen(group.name, subId)}
+                              onOpenChange={(open) => setOpenSubGroups((prev) => ({ ...prev, [`${group.name}:${subId}`]: open }))}
+                            >
+                              <CollapsibleTrigger className="w-full">
+                                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors">
+                                  <div className="flex items-center gap-3">
+                                    <div
+                                      className="w-8 h-8 rounded-lg flex items-center justify-center"
+                                      style={{ background: `hsl(${sg.color} / 0.12)` }}
+                                    >
+                                      <DynamicIcon name={sg.icon} className="h-4 w-4" style={{ color: `hsl(${sg.color})` }} />
+                                    </div>
+                                    <div className="text-left min-w-0 flex-1">
+                                      <p className="text-sm font-medium break-words">{translateCategory(sg.name)}</p>
+                                      <p className="text-xs text-muted-foreground">{sortedTxns.length} {t("transactions.numTransactions")}</p>
+                                    </div>
                                   </div>
-                                  <div className="text-left min-w-0 flex-1">
-                                    <p className="text-sm font-medium break-words">{translateCategory(sg.name)}</p>
-                                    <p className="text-xs text-muted-foreground">{sortedTxns.length} {t("transactions.numTransactions")}</p>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono-numbers text-sm font-medium text-muted-foreground">
+                                      {formatCurrency(subTotal)}
+                                    </span>
+                                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:rotate-[-90deg]" />
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono-numbers text-sm font-medium text-muted-foreground">
-                                    {formatCurrency(subTotal)}
-                                  </span>
-                                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform [[data-state=closed]_&]:rotate-[-90deg]" />
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="space-y-0.5 ml-1 sm:ml-2">
+                                  {sortedTxns.map((tItem, idx) =>
+                                    renderTransaction(tItem, group.color, {
+                                      hideDate: true,
+                                      timeline: {
+                                        isFirst: idx === 0,
+                                        isLast: idx === sortedTxns.length - 1,
+                                        dotColor: sg.color || group.color,
+                                      },
+                                    })
+                                  )}
                                 </div>
-                              </div>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                              <div className="ml-6 border-l border-border/50 pl-2 space-y-0.5">
-                                {sortedTxns.map((tItem) => renderTransaction(tItem, group.color))}
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        );
-                      })}
+                              </CollapsibleContent>
+                            </Collapsible>
+                          );
+                        })}
                       {group.ungrouped.map((tItem) => renderTransaction(tItem, group.color))}
                     </div>
                   </CardContent>
@@ -784,8 +908,8 @@ export default function TransactionsPage() {
               </Card>
             </Collapsible>
           );
-        });
-      })()}
+        })
+      )}
 
       <AlertDialog open={!!pendingDeleteTxId} onOpenChange={(v) => !v && setPendingDeleteTxId(null)}>
         <AlertDialogContent>
