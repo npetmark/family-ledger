@@ -11,11 +11,11 @@ const STALE_TOKEN_ERRORS = new Set([
   "messaging/registration-token-not-registered",
 ]);
 
-function formatAmount(cents: number, currency: string = "USD"): string {
+function formatAmount(cents: number, currency: string = "EUR"): string {
   const amount = Math.abs(cents) / 100;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency,
+    currency: currency || "EUR",
     minimumFractionDigits: 2,
   }).format(amount);
 }
@@ -66,10 +66,10 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get account to find the household_id
+    // Get account to find the household_id and currency
     const { data: account, error: accError } = await supabase
       .from("accounts")
-      .select("household_id, name")
+      .select("household_id, name, currency")
       .eq("id", transaction.account_id)
       .single();
 
@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
         : Promise.resolve(null),
     ]);
 
-    const amountStr = formatAmount(transaction.amount, account.currency);
+    const amountStr = formatAmount(transaction.amount, account.currency || "EUR");
     let summary: string;
     if (isTransfer) {
       summary = `${actorName} transferred ${amountStr} from ${account.name}` +
