@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
         ` from ${account.name}`;
     }
     const note = (transaction.note || transaction.description || "").trim();
-    const body = note ? `${summary}\n${note}` : summary;
+    const body = note ? `${summary}\nNote: "${note}"` : summary;
 
     const fcmTokens = tokens.map(t => t.token);
 
