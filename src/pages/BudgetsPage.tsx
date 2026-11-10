@@ -447,6 +447,9 @@ export default function BudgetsPage() {
                     const mClampedPct = Math.min(mPct, 100);
                     const mIsInvestment = ["Инвестиции", "Investments"].includes(mainName);
                     const mTargetPct = getBudgetTarget(mainName);
+                    const mBudgetedPct = totalBudget > 0 ? (mBudget / totalBudget) * 100 : 0;
+                    const mTargetAmount = mTargetPct !== undefined ? Math.round((totalBudget * mTargetPct) / 100) : 0;
+                    const mBudgetedFormatted = mBudgetedPct % 1 === 0 ? mBudgetedPct.toFixed(0) : mBudgetedPct.toFixed(1);
                     const mDisplayName = translateCategory(mainName);
                     const mColor = subs[0]?.main_categories?.color;
 
@@ -461,8 +464,37 @@ export default function BudgetsPage() {
                               />
                             )}
                             <span className="truncate">{mDisplayName}</span>
-                            {mTargetPct !== undefined && (
-                              <span className="text-[10px] text-muted-foreground font-mono-numbers shrink-0">({mTargetPct}%)</span>
+                            {mTargetPct !== undefined ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="text-[10px] text-muted-foreground font-mono-numbers shrink-0 cursor-pointer hover:text-foreground transition-colors">
+                                    ({mTargetPct}% / {mBudgetedFormatted}%)
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs">
+                                  <div className="font-semibold">{mDisplayName}</div>
+                                  <div className="text-[11px] mt-0.5">
+                                    {t("budgets.target")}: <span className="font-mono-numbers font-medium">{mTargetPct}%</span> ({formatCurrency(mTargetAmount)})
+                                  </div>
+                                  <div className="text-[11px]">
+                                    {t("budgets.budgeted")}: <span className="font-mono-numbers font-medium">{mBudgetedPct.toFixed(1)}%</span> ({formatCurrency(mBudget)})
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="text-[10px] text-muted-foreground font-mono-numbers shrink-0 cursor-pointer hover:text-foreground transition-colors">
+                                    ({mBudgetedFormatted}%)
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs">
+                                  <div className="font-semibold">{mDisplayName}</div>
+                                  <div className="text-[11px] mt-0.5">
+                                    {t("budgets.budgeted")}: <span className="font-mono-numbers font-medium">{mBudgetedPct.toFixed(1)}%</span> ({formatCurrency(mBudget)})
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
                             )}
                           </div>
                         </div>
@@ -478,7 +510,7 @@ export default function BudgetsPage() {
                           </TooltipTrigger>
                           <TooltipContent>
                             <span className="font-mono-numbers text-xs font-medium">
-                              {mPct.toFixed(1)}% ({formatCurrency(mSpent)} / {formatCurrency(mBudget)})
+                              {mPct.toFixed(1)}% ({formatCurrency(mSpent)} / {formatCurrency(mBudget)}) ({mBudgetedFormatted}% {t("budgets.ofTotalBudget")})
                             </span>
                           </TooltipContent>
                         </Tooltip>
@@ -602,7 +634,7 @@ export default function BudgetsPage() {
                     </TooltipTrigger>
                     <TooltipContent>
                       <span className="font-mono-numbers text-xs font-medium">
-                        {mainBudgetTotal > 0 ? ((mainSpentTotal / mainBudgetTotal) * 100).toFixed(1) : "0.0"}% {t("dashboard.spent")} ({formatCurrency(mainSpentTotal)} / {formatCurrency(mainBudgetTotal)})
+                        {mainBudgetTotal > 0 ? ((mainSpentTotal / mainBudgetTotal) * 100).toFixed(1) : "0.0"}% {t("dashboard.spent")} ({formatCurrency(mainSpentTotal)} / {formatCurrency(mainBudgetTotal)}) ({budgetedPct.toFixed(1)}% {t("budgets.ofTotalBudget")})
                       </span>
                     </TooltipContent>
                   </Tooltip>
@@ -613,7 +645,17 @@ export default function BudgetsPage() {
                       </span>
                       <span className="text-muted-foreground"> / {formatCurrency(mainBudgetTotal)}</span>
                     </div>
-                    <span className="text-muted-foreground font-medium">{Math.round(mainPct)}%</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-muted-foreground font-medium cursor-default">{Math.round(mainPct)}%</span>
+                      </TooltipTrigger>
+                      <TooltipContent className="text-xs max-w-xs">
+                        <div className="font-semibold">{t("dashboard.budgetBurndown")}: {mainPct.toFixed(1)}%</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          {t("budgets.burndownTooltip")}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </CardHeader>
 
@@ -630,6 +672,9 @@ export default function BudgetsPage() {
                         const prevSpent = getPrevSpent(sub.id);
                         const subColor = mainCatColor || sub.color || "215 55% 52%";
                         const subIconStyle = { backgroundColor: `hsl(${subColor} / 0.12)`, color: `hsl(${subColor})` };
+                        const subPctOfTotal = totalBudget > 0 ? (budget / totalBudget) * 100 : 0;
+                        const subPctOfTotalFormatted = subPctOfTotal % 1 === 0 ? subPctOfTotal.toFixed(0) : subPctOfTotal.toFixed(1);
+                        const burndownPct = budget > 0 ? (spent / budget) * 100 : 0;
 
                         if (isEditing) {
                           return (
@@ -737,7 +782,7 @@ export default function BudgetsPage() {
                                   <span className="font-mono-numbers text-xs font-medium">
                                     {isUnbudgetedSpend
                                       ? `${t("budgets.unbudgeted")}: ${formatCurrency(spent)}`
-                                      : `${budget > 0 ? ((spent / budget) * 100).toFixed(1) : "0.0"}% (${formatCurrency(spent)} / ${formatCurrency(budget)})`}
+                                      : `${burndownPct.toFixed(1)}% (${formatCurrency(spent)} / ${formatCurrency(budget)})${budget > 0 ? ` (${subPctOfTotalFormatted}% ${t("budgets.ofTotalBudget")})` : ""}`}
                                   </span>
                                 </TooltipContent>
                               </Tooltip>
@@ -754,16 +799,38 @@ export default function BudgetsPage() {
                               </div>
                               <div className="min-w-[48px] text-right">
                                 {budget > 0 ? (
-                                  <Badge
-                                    variant={isOver ? "destructive" : "secondary"}
-                                    className="font-mono-numbers text-[11px] px-1.5 py-0"
-                                  >
-                                    {((spent / budget) * 100).toFixed(0)}%
-                                  </Badge>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge
+                                        variant={isOver ? "destructive" : "secondary"}
+                                        className="font-mono-numbers text-[11px] px-1.5 py-0 cursor-default"
+                                      >
+                                        {burndownPct.toFixed(0)}%
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="text-xs max-w-xs">
+                                      <div className="font-semibold">
+                                        {t("dashboard.budgetBurndown")}: {burndownPct.toFixed(1)}%
+                                      </div>
+                                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                                        {t("budgets.burndownTooltip")}
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
                                 ) : isUnbudgetedSpend ? (
-                                  <Badge variant="outline" className="font-mono-numbers text-[11px] text-warning border-warning/40 px-1.5 py-0">
-                                    !
-                                  </Badge>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="outline" className="font-mono-numbers text-[11px] text-warning border-warning/40 px-1.5 py-0 cursor-default">
+                                        !
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="text-xs">
+                                      <div className="font-semibold">{t("budgets.unbudgeted")}</div>
+                                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                                        {formatCurrency(spent)}
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
                                 ) : (
                                   <span className="text-xs text-muted-foreground font-mono-numbers">—</span>
                                 )}

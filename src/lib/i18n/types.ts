@@ -155,6 +155,8 @@ export interface TranslationDictionary {
     targetTooltip: string;
     budgetedTooltip: string;
     budgetedOffTargetTooltip: string;
+    burndownTooltip: string;
+    ofTotalBudget: string;
   };
   categories: {
     title: string;

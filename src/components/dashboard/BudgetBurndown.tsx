@@ -267,6 +267,7 @@ export function BudgetBurndown() {
                       <TooltipContent>
                         <span className="font-mono-numbers text-xs font-medium">
                           {cat.pct.toFixed(1)}% ({formatCurrency(cat.totalSpent)} / {formatCurrency(cat.totalBudget)})
+                          {totalBudget > 0 ? ` (${((cat.totalBudget / totalBudget) * 100).toFixed(1)}% ${t("budgets.ofTotalBudget")})` : ""}
                         </span>
                       </TooltipContent>
                     </Tooltip>
@@ -276,7 +277,17 @@ export function BudgetBurndown() {
                           ? `${formatCurrency(cat.remaining)} ${t("dashboard.remaining")}`
                           : `${formatCurrency(Math.abs(cat.remaining))} ${t("budgets.overBudget")}`}
                       </span>
-                      <span>{Math.round(cat.pct)}%</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-default">{Math.round(cat.pct)}%</span>
+                        </TooltipTrigger>
+                        <TooltipContent className="text-xs max-w-xs">
+                          <div className="font-semibold">{t("dashboard.budgetBurndown")}: {cat.pct.toFixed(1)}%</div>
+                          <div className="text-[11px] text-muted-foreground mt-0.5">
+                            {t("budgets.burndownTooltip")}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                   <CollapsibleContent>
@@ -331,6 +342,7 @@ export function BudgetBurndown() {
                               <TooltipContent>
                                 <span className="font-mono-numbers text-xs font-medium">
                                   {item.pct.toFixed(1)}% ({formatCurrency(item.spent)} / {formatCurrency(item.budget)})
+                                  {item.budget > 0 && totalBudget > 0 ? ` (${((item.budget / totalBudget) * 100).toFixed(1)}% ${t("budgets.ofTotalBudget")})` : ""}
                                 </span>
                               </TooltipContent>
                             </Tooltip>
@@ -340,7 +352,17 @@ export function BudgetBurndown() {
                                   ? `${formatCurrency(item.remaining)} ${t("dashboard.remaining")}`
                                   : `${formatCurrency(Math.abs(item.remaining))} ${t("budgets.overBudget")}`}
                               </span>
-                              <span>{Math.round(cat.pct)}%</span>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="cursor-default">{Math.round(item.pct)}%</span>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs max-w-xs">
+                                  <div className="font-semibold">{t("dashboard.budgetBurndown")}: {item.pct.toFixed(1)}%</div>
+                                  <div className="text-[11px] text-muted-foreground mt-0.5">
+                                    {t("budgets.burndownTooltip")}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
                             </div>
                           </div>
                         );
